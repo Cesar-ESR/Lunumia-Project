@@ -1,0 +1,1 @@
+export { computeCategoryChangePercentage } from './index'

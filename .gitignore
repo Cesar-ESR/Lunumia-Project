@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+dist/
+android/.gradle/
+android/**/build/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+supabase/functions/.env
+supabase/functions/.env.*
+
+# Supabase local state
+supabase/.temp/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
