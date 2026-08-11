@@ -6,6 +6,7 @@ android/.gradle/
 android/**/build/
 
 # Local configuration and secrets
+.kiro/
 .env
 .env.*
 !.env.example
