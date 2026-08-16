@@ -1,8 +1,15 @@
-import type { AmountCents, DateOnly, Instant } from '@domain/value-objects'
+import type {
+  AmountCents,
+  DateOnly,
+  Instant,
+  SignedMoneyCents,
+} from '@domain/value-objects'
 
 export type PeriodType = 'monthly' | 'biweekly'
 export type Frequency = 'weekly' | 'biweekly' | 'monthly'
 export type OccurrenceStatus = 'pending' | 'paid' | 'skipped'
+export type IncomeStatus = 'expected' | 'received' | 'cancelled'
+export type PeriodTemporalState = 'future' | 'active' | 'ended'
 export type PaymentStatus = 'active' | 'inactive'
 export type SyncStatus = 'synced' | 'pending' | 'error'
 export type SyncOperationType =
@@ -31,13 +38,26 @@ export interface Period extends SyncableEntity {
   startDate: DateOnly
   endDate: DateOnly
 }
-export interface Income extends SyncableEntity {
+interface IncomeBase extends SyncableEntity {
   periodId: string
   amount: AmountCents
   description: string
   date: DateOnly
 }
-export interface Expense extends SyncableEntity {
+export interface IncomeV2 extends IncomeBase {
+  status: IncomeStatus
+  affectsBalance: boolean
+  balanceEffectiveAt: Instant | null
+}
+/**
+ * Temporary compatibility contract for records created before Lunumia 2.0.
+ * Persistence migrations will convert these records in later phases.
+ */
+export type LegacyIncome = IncomeBase
+/** Temporary read/write boundary until legacy persistence is migrated. */
+export type Income = IncomeV2 | LegacyIncome
+export type PersistedIncome = Income
+interface ExpenseBase extends SyncableEntity {
   periodId: string
   categoryId: string
   amount: AmountCents
@@ -45,6 +65,18 @@ export interface Expense extends SyncableEntity {
   date: DateOnly
   recurringOccurrenceId: string | null
 }
+export interface ExpenseV2 extends ExpenseBase {
+  affectsBalance: boolean
+  balanceEffectiveAt: Instant
+}
+/**
+ * Temporary compatibility contract for records created before Lunumia 2.0.
+ * Persistence migrations will convert these records in later phases.
+ */
+export type LegacyExpense = ExpenseBase
+/** Temporary read/write boundary until legacy persistence is migrated. */
+export type Expense = ExpenseV2 | LegacyExpense
+export type PersistedExpense = Expense
 export interface Category extends SyncableEntity {
   name: string
   normalizedName: string
@@ -66,12 +98,33 @@ export interface RecurringPayment extends SyncableEntity {
   categoryId: string
   status: PaymentStatus
 }
-export interface RecurringPaymentOccurrence extends SyncableEntity {
+interface RecurringPaymentOccurrenceBase extends SyncableEntity {
   recurringPaymentId: string
   periodId: string
   dueDate: DateOnly
   status: OccurrenceStatus
+  /**
+   * @deprecated Legacy local compatibility.
+   * The authoritative relation is Expense.recurringOccurrenceId.
+   */
   transactionId: string | null
+}
+export interface RecurringPaymentOccurrenceV2 extends RecurringPaymentOccurrenceBase {
+  amount: AmountCents
+}
+/**
+ * Temporary compatibility contract for occurrences generated before Lunumia 2.0.
+ * Persistence migrations will backfill their amount in a later phase.
+ */
+export type LegacyRecurringPaymentOccurrence = RecurringPaymentOccurrenceBase
+/** Temporary read/write boundary until legacy persistence is migrated. */
+export type RecurringPaymentOccurrence =
+  RecurringPaymentOccurrenceV2 | LegacyRecurringPaymentOccurrence
+export type PersistedRecurringPaymentOccurrence = RecurringPaymentOccurrence
+export interface BalanceAnchor extends SyncableEntity {
+  amount: SignedMoneyCents
+  capturedAt: Instant
+  ledgerCutoffAt: Instant
 }
 export interface SyncOperation {
   operationId: string

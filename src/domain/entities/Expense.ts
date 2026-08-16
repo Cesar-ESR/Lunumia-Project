@@ -1,1 +1,6 @@
-export type { Expense } from './index'
+export type {
+  Expense,
+  ExpenseV2,
+  LegacyExpense,
+  PersistedExpense,
+} from './index'

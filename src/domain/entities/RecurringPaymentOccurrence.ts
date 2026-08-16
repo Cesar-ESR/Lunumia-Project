@@ -1,1 +1,7 @@
-export type { RecurringPaymentOccurrence, OccurrenceStatus } from './index'
+export type {
+  LegacyRecurringPaymentOccurrence,
+  OccurrenceStatus,
+  PersistedRecurringPaymentOccurrence,
+  RecurringPaymentOccurrence,
+  RecurringPaymentOccurrenceV2,
+} from './index'

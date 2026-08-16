@@ -11,6 +11,12 @@ import type {
   SignedMoneyCents,
 } from '@domain/value-objects'
 
+export type {
+  FinancialSnapshot,
+  ProjectionCoverage,
+} from './financial-snapshot'
+export type { PlanningProjection } from './planning-projection'
+
 const sum = (values: readonly { amount: AmountCents }[]): number =>
   values.reduce((total, value) => total + value.amount, 0)
 export const computeCurrentBalance = (

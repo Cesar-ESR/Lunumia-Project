@@ -1,1 +1,1 @@
-export type { Period, PeriodType } from './index'
+export type { Period, PeriodTemporalState, PeriodType } from './index'
