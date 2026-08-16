@@ -96,6 +96,13 @@ async function seedOwner(
     status: 'pending',
     transactionId: null,
   })
+  await db.balanceAnchors.add({
+    ...base,
+    id: `${prefix}-anchor`,
+    amount: -2500,
+    capturedAt: now,
+    ledgerCutoffAt: now,
+  })
   await db.syncOperations.add({
     operationId: `${prefix}-operation`,
     ownerId,
@@ -139,6 +146,7 @@ async function countsByOwner(
     db.categoryBudgets.where('ownerId').equals(ownerId).count(),
     db.recurringPayments.where('ownerId').equals(ownerId).count(),
     db.recurringPaymentOccurrences.where('ownerId').equals(ownerId).count(),
+    db.balanceAnchors.where('ownerId').equals(ownerId).count(),
     db.syncOperations.where('ownerId').equals(ownerId).count(),
     db.userSettings.where('ownerId').equals(ownerId).count(),
     db.deviceSyncStates.where('ownerId').equals(ownerId).count(),
@@ -162,9 +170,9 @@ describe('migración y limpieza local por ownerId', () => {
       new DexieOwnerDataManager(db, storage),
     )
     await service.migrate(guest, target)
-    expect(await countsByOwner(db, guest)).toEqual(Array(10).fill(0))
+    expect(await countsByOwner(db, guest)).toEqual(Array(11).fill(0))
     expect(await countsByOwner(db, target)).toEqual([
-      1, 1, 1, 1, 1, 1, 1, 8, 1, 0,
+      1, 1, 1, 1, 1, 1, 1, 1, 9, 1, 0,
     ])
     expect(await db.expenses.get('guest-expense')).toMatchObject({
       periodId: 'guest-period',
@@ -179,7 +187,7 @@ describe('migración y limpieza local por ownerId', () => {
     await new DataMigrationService(
       new DexieOwnerDataManager(db, storage),
     ).migrate(guest, target)
-    expect(await countsByOwner(db, other)).toEqual(Array(10).fill(1))
+    expect(await countsByOwner(db, other)).toEqual(Array(11).fill(1))
   })
 
   it('revierte todas las tablas si una etapa intermedia falla', async () => {
@@ -190,8 +198,8 @@ describe('migración y limpieza local por ownerId', () => {
     await expect(
       new DataMigrationService(manager).migrate(guest, target),
     ).rejects.toThrow('fallo forzado')
-    expect(await countsByOwner(db, guest)).toEqual(Array(10).fill(1))
-    expect(await countsByOwner(db, target)).toEqual(Array(10).fill(0))
+    expect(await countsByOwner(db, guest)).toEqual(Array(11).fill(1))
+    expect(await countsByOwner(db, target)).toEqual(Array(11).fill(0))
     expect(storage.getItem('gastoclaro.active-owner-id')).toBeNull()
   })
 
@@ -208,6 +216,7 @@ describe('migración y limpieza local por ownerId', () => {
       budgets: 0,
       recurringPayments: 0,
       occurrences: 0,
+      balanceAnchors: 0,
       hasData: false,
     })
     expect(storage.getItem('gastoclaro.active-owner-id')).toBe(target)
@@ -219,12 +228,12 @@ describe('migración y limpieza local por ownerId', () => {
     const manager = new DexieOwnerDataManager(db, storage)
 
     expect(await manager.deleteOwnerIfResolved(target)).toBe(1)
-    expect(await countsByOwner(db, target)).toEqual(Array(10).fill(1))
+    expect(await countsByOwner(db, target)).toEqual(Array(11).fill(1))
 
     await db.syncOperations.where('ownerId').equals(target).delete()
     expect(await manager.deleteOwnerIfResolved(target)).toBe(0)
-    expect(await countsByOwner(db, target)).toEqual(Array(10).fill(0))
-    expect(await countsByOwner(db, other)).toEqual(Array(10).fill(1))
+    expect(await countsByOwner(db, target)).toEqual(Array(11).fill(0))
+    expect(await countsByOwner(db, other)).toEqual(Array(11).fill(1))
   })
 
   it('limpia físicamente solo el propietario autenticado y su cola', async () => {
@@ -248,9 +257,9 @@ describe('migración y limpieza local por ownerId', () => {
     )
     expect(await cleaner.countUnresolvedOperations(target)).toBe(2)
     await cleaner.deleteOwner(target)
-    expect(await countsByOwner(db, target)).toEqual(Array(10).fill(0))
-    expect(await countsByOwner(db, guest)).toEqual(Array(10).fill(1))
-    expect(await countsByOwner(db, other)).toEqual(Array(10).fill(1))
+    expect(await countsByOwner(db, target)).toEqual(Array(11).fill(0))
+    expect(await countsByOwner(db, guest)).toEqual(Array(11).fill(1))
+    expect(await countsByOwner(db, other)).toEqual(Array(11).fill(1))
   })
 
   it('cuenta pending, processing y error como operaciones no resueltas', async () => {

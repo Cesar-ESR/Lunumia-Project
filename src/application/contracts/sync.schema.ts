@@ -23,6 +23,9 @@ export const remoteRowSchemas = {
     amount: z.number().int().nonnegative().safe(),
     description: z.string(),
     date: dateOnlySchema,
+    status: z.enum(['expected', 'received', 'cancelled']),
+    affects_balance: z.boolean(),
+    balance_effective_at: timestampSchema.nullable(),
   }),
   expense: remoteBaseSchema.extend({
     period_id: uuidSchema,
@@ -31,6 +34,8 @@ export const remoteRowSchemas = {
     description: z.string(),
     date: dateOnlySchema,
     recurring_occurrence_id: uuidSchema.nullable(),
+    affects_balance: z.boolean(),
+    balance_effective_at: timestampSchema,
   }),
   category: remoteBaseSchema.extend({
     name: z.string(),
@@ -58,6 +63,12 @@ export const remoteRowSchemas = {
     period_id: uuidSchema,
     due_date: dateOnlySchema,
     status: z.enum(['pending', 'paid', 'skipped']),
+    amount: z.number().int().positive().safe(),
+  }),
+  balanceAnchor: remoteBaseSchema.extend({
+    amount: z.number().int().safe(),
+    captured_at: timestampSchema,
+    ledger_cutoff_at: timestampSchema,
   }),
   userSettings: z.object({
     id: uuidSchema,

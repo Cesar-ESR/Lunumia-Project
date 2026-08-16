@@ -1,4 +1,5 @@
 import type {
+  BalanceAnchor,
   Category,
   CategoryBudget,
   Expense,
@@ -13,6 +14,7 @@ import type {
 } from '@domain/entities'
 
 export interface SynchronizableRecordByType {
+  balanceAnchor: BalanceAnchor
   period: Period
   income: Income
   expense: Expense
@@ -135,6 +137,7 @@ export interface LocalSyncStore {
 
 const DOWNLOAD_ORDER: readonly SyncEntityType[] = [
   'period',
+  'balanceAnchor',
   'category',
   'recurringPayment',
   'recurringPaymentOccurrence',

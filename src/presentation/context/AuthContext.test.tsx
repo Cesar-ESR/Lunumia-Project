@@ -41,6 +41,7 @@ const emptySummary = {
   budgets: 0,
   recurringPayments: 0,
   occurrences: 0,
+  balanceAnchors: 0,
   hasData: false,
 }
 

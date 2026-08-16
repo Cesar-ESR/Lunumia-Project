@@ -1,6 +1,7 @@
 import Dexie from 'dexie'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type {
+  BalanceAnchor,
   Category,
   Expense,
   Period,
@@ -32,6 +33,7 @@ const firstExpenseId = '50000000-0000-4000-8000-000000000005'
 const secondExpenseId = '60000000-0000-4000-8000-000000000006'
 const localSettingsId = '70000000-0000-4000-8000-000000000007'
 const remoteSettingsId = '80000000-0000-4000-8000-000000000008'
+const balanceAnchorId = '90000000-0000-4000-8000-000000000009'
 const entityInstant = '2026-08-09T05:30:00.000Z'
 const migrationInstant = '2026-08-09T06:17:39.705Z'
 const reconciliationInstant = '2026-08-09T07:00:00.000Z'
@@ -52,6 +54,7 @@ class ForeignKeyRemote implements RemoteSyncGateway {
   readonly periods = new Map<string, Period>()
   readonly categories = new Map<string, Category>()
   readonly expenses = new Map<string, Expense>()
+  readonly balanceAnchors = new Map<string, BalanceAnchor>()
   userSettings: UserSettings | null
 
   constructor(defaults = remoteDefaults()) {
@@ -112,6 +115,11 @@ class ForeignKeyRemote implements RemoteSyncGateway {
         this.expenses.set(value.id, { ...value, syncStatus: 'synced' })
         break
       }
+      case 'balanceAnchor': {
+        const value = payload as unknown as BalanceAnchor
+        this.balanceAnchors.set(value.id, { ...value, syncStatus: 'synced' })
+        break
+      }
       case 'userSettings': {
         const value = payload as unknown as UserSettings
         if (value.activePeriodId && !this.periods.has(value.activePeriodId))
@@ -164,6 +172,11 @@ class ForeignKeyRemote implements RemoteSyncGateway {
           entityType,
           record,
         }))
+      case 'balanceAnchor':
+        return sortRecords(this.balanceAnchors.values()).map((record) => ({
+          entityType,
+          record,
+        }))
       case 'userSettings':
         return this.userSettings
           ? [{ entityType, record: this.userSettings }]
@@ -208,6 +221,7 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
       'period',
       'expense',
       'expense',
+      'balanceAnchor',
       'userSettings',
     ])
     expect(beforeReconciliation[2]).toMatchObject({
@@ -233,10 +247,15 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
       'period',
       'expense',
       'expense',
+      'balanceAnchor',
       'userSettings',
     ])
     expect(remote.periods).toHaveLength(1)
     expect(remote.expenses).toHaveLength(2)
+    expect(remote.balanceAnchors.get(balanceAnchorId)).toMatchObject({
+      amount: -25_000,
+      capturedAt: entityInstant,
+    })
     expect(
       [...remote.expenses.values()].reduce(
         (total, expense) => total + expense.amount,
@@ -280,6 +299,12 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
       expect(secondResult.failed).toBe(0)
       expect(await newClient.periods.count()).toBe(1)
       expect(await newClient.expenses.count()).toBe(2)
+      expect(await newClient.balanceAnchors.get(balanceAnchorId)).toMatchObject(
+        {
+          amount: -25_000,
+          ownerId,
+        },
+      )
       expect(await newClient.categories.toArray()).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: remoteCategoryId }),
@@ -414,6 +439,13 @@ async function seedGuest(db: GastoClaroDB): Promise<void> {
     createdAt: entityInstant,
     updatedAt: entityInstant,
   })
+  await db.balanceAnchors.add({
+    ...base,
+    id: balanceAnchorId,
+    amount: -25_000,
+    capturedAt: entityInstant,
+    ledgerCutoffAt: '2026-08-09T05:29:59.999Z',
+  })
 }
 
 async function migrateGuest(db: GastoClaroDB): Promise<void> {
@@ -423,6 +455,7 @@ async function migrateGuest(db: GastoClaroDB): Promise<void> {
     '10000000-0000-4000-8000-000000000003',
     'b0000000-0000-4000-8000-000000000004',
     'd0000000-0000-4000-8000-000000000005',
+    'e0000000-0000-4000-8000-000000000006',
   ]
   let index = 0
   await new DataMigrationService(

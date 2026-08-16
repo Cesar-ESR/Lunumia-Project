@@ -4,6 +4,7 @@ import type { SyncMutationDependencies } from './sync-mutations'
 import { GastoClaroDB } from './database'
 import {
   DexieCategoryBudgetRepository,
+  DexieBalanceAnchorRepository,
   DexieCategoryRepository,
   DexieExpenseRepository,
   DexieIncomeRepository,
@@ -124,6 +125,13 @@ describe('cola local de sincronización', () => {
       status: 'pending',
       transactionId: null,
     })
+    await new DexieBalanceAnchorRepository(database, ownerId, sync).create({
+      ...base(),
+      id: 'anchor',
+      amount: -12_345,
+      capturedAt: now,
+      ledgerCutoffAt: now,
+    })
     await new DexieUserSettingsRepository(database, ownerId, sync).upsert({
       id: 'settings',
       ownerId,
@@ -137,7 +145,7 @@ describe('cola local de sincronización', () => {
     const operations = await database.syncOperations
       .orderBy('createdAt')
       .toArray()
-    expect(operations).toHaveLength(8)
+    expect(operations).toHaveLength(9)
     expect(new Set(operations.map(({ entityType }) => entityType))).toEqual(
       new Set([
         'period',
@@ -147,6 +155,7 @@ describe('cola local de sincronización', () => {
         'categoryBudget',
         'recurringPayment',
         'recurringPaymentOccurrence',
+        'balanceAnchor',
         'userSettings',
       ]),
     )

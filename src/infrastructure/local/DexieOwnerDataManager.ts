@@ -39,6 +39,7 @@ export class DexieOwnerDataManager implements OwnerDataPort {
       budgets,
       recurringPayments,
       occurrences,
+      balanceAnchors,
     ] = await Promise.all([
       this.db.periods
         .where('ownerId')
@@ -75,6 +76,11 @@ export class DexieOwnerDataManager implements OwnerDataPort {
         .equals(ownerId)
         .filter((value) => value.deletedAt === null)
         .count(),
+      this.db.balanceAnchors
+        .where('ownerId')
+        .equals(ownerId)
+        .filter((value) => value.deletedAt === null)
+        .count(),
     ])
     return {
       periods,
@@ -84,6 +90,7 @@ export class DexieOwnerDataManager implements OwnerDataPort {
       budgets,
       recurringPayments,
       occurrences,
+      balanceAnchors,
       hasData:
         periods +
           incomes +
@@ -91,7 +98,8 @@ export class DexieOwnerDataManager implements OwnerDataPort {
           categories +
           budgets +
           recurringPayments +
-          occurrences >
+          occurrences +
+          balanceAnchors >
         0,
     }
   }
@@ -110,6 +118,7 @@ export class DexieOwnerDataManager implements OwnerDataPort {
         this.db.categoryBudgets,
         this.db.recurringPayments,
         this.db.recurringPaymentOccurrences,
+        this.db.balanceAnchors,
         this.db.syncOperations,
         this.db.userSettings,
         this.db.deviceSyncStates,
@@ -195,6 +204,18 @@ export class DexieOwnerDataManager implements OwnerDataPort {
         await this.db.recurringPaymentOccurrences.bulkPut(
           recurringPaymentOccurrences,
         )
+        this.onMigrationStep('balanceAnchors')
+        const balanceAnchors = (
+          await this.db.balanceAnchors
+            .where('ownerId')
+            .equals(sourceOwnerId)
+            .toArray()
+        ).map((value) => ({
+          ...value,
+          ownerId: targetOwnerId,
+          syncStatus: 'pending' as const,
+        }))
+        await this.db.balanceAnchors.bulkPut(balanceAnchors)
         this.onMigrationStep('syncOperations')
         await this.db.syncOperations
           .where('ownerId')
@@ -246,6 +267,7 @@ export class DexieOwnerDataManager implements OwnerDataPort {
           'recurringPaymentOccurrence',
           recurringPaymentOccurrences,
         )
+        appendOperations('balanceAnchor', balanceAnchors)
         userSettings.forEach((value) =>
           operations.push(
             createSyncOperation(
@@ -277,6 +299,7 @@ export class DexieOwnerDataManager implements OwnerDataPort {
         this.db.categoryBudgets,
         this.db.recurringPayments,
         this.db.recurringPaymentOccurrences,
+        this.db.balanceAnchors,
         this.db.syncOperations,
         this.db.userSettings,
         this.db.deviceSyncStates,
@@ -296,6 +319,7 @@ export class DexieOwnerDataManager implements OwnerDataPort {
         this.db.categoryBudgets,
         this.db.recurringPayments,
         this.db.recurringPaymentOccurrences,
+        this.db.balanceAnchors,
         this.db.syncOperations,
         this.db.userSettings,
         this.db.deviceSyncStates,
@@ -336,6 +360,7 @@ export class DexieOwnerDataManager implements OwnerDataPort {
       .where('ownerId')
       .equals(ownerId)
       .delete()
+    await this.db.balanceAnchors.where('ownerId').equals(ownerId).delete()
     await this.db.syncOperations.where('ownerId').equals(ownerId).delete()
     await this.db.userSettings.where('ownerId').equals(ownerId).delete()
     await this.db.deviceSyncStates.where('ownerId').equals(ownerId).delete()

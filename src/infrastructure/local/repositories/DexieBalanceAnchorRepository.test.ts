@@ -6,6 +6,7 @@ import { DexieBalanceAnchorRepository } from './DexieBalanceAnchorRepository'
 
 const ownerId = 'owner-a'
 const otherOwnerId = 'owner-b'
+const authenticatedOwnerId = '10000000-0000-4000-8000-000000000001'
 const capturedAt = '2026-08-15T12:00:00.000Z'
 const updatedAt = '2026-08-15T12:05:00.000Z'
 const lowId = '00000000-0000-4000-8000-000000000001'
@@ -54,6 +55,7 @@ describe('DexieBalanceAnchorRepository', () => {
 
       expect(await repository.create(value)).toEqual(value)
       expect(await database.balanceAnchors.get(value.id)).toEqual(value)
+      expect(await database.syncOperations.count()).toBe(0)
     },
   )
 
@@ -65,6 +67,42 @@ describe('DexieBalanceAnchorRepository', () => {
       /no pertenece al propietario/,
     )
     expect(await database.balanceAnchors.count()).toBe(0)
+  })
+
+  it('crea entidad y operación de sync atómicamente para un owner autenticado', async () => {
+    database = new GastoClaroDB(`balance-anchor-sync-${sequence++}`)
+    const value = anchor(lowId, { ownerId: authenticatedOwnerId, amount: -25 })
+    const repository = new DexieBalanceAnchorRepository(
+      database,
+      authenticatedOwnerId,
+      {
+        ids: { generate: () => highId },
+        clock: { now: () => updatedAt },
+      },
+    )
+
+    await repository.create(value)
+    expect(await database.syncOperations.get(highId)).toMatchObject({
+      ownerId: authenticatedOwnerId,
+      entityType: 'balanceAnchor',
+      entityId: lowId,
+      operationType: 'create',
+      payload: JSON.stringify(value),
+    })
+  })
+
+  it('revierte el anchor si no puede generar una operación válida', async () => {
+    database = new GastoClaroDB(`balance-anchor-rollback-${sequence++}`)
+    const value = anchor(lowId, { ownerId: authenticatedOwnerId })
+    const repository = new DexieBalanceAnchorRepository(
+      database,
+      authenticatedOwnerId,
+      { ids: { generate: () => 'operation-invalida' } },
+    )
+
+    await expect(repository.create(value)).rejects.toThrow(/UUID/)
+    expect(await database.balanceAnchors.count()).toBe(0)
+    expect(await database.syncOperations.count()).toBe(0)
   })
 
   it('conserva el anchor después de cerrar y reabrir la DB', async () => {

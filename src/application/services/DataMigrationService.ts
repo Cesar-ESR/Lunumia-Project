@@ -8,6 +8,7 @@ export interface GuestDataSummary {
   budgets: number
   recurringPayments: number
   occurrences: number
+  balanceAnchors: number
   hasData: boolean
 }
 

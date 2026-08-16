@@ -5,6 +5,7 @@ import type {
   SynchronizableRecord,
 } from '@application/services/SyncCoordinator'
 import type {
+  BalanceAnchor,
   Category,
   CategoryBudget,
   Expense,
@@ -30,26 +31,48 @@ const localBaseSchema = z.object({
   syncStatus: z.enum(['synced', 'pending', 'error']),
 })
 
+const localIncomeLegacySchema = localBaseSchema.extend({
+  periodId: uuidSchema,
+  amount: z.number().int().nonnegative().safe(),
+  description: z.string(),
+  date: dateOnlySchema,
+})
+const localIncomeV2Schema = localIncomeLegacySchema.extend({
+  status: z.enum(['expected', 'received', 'cancelled']),
+  affectsBalance: z.boolean(),
+  balanceEffectiveAt: instantSchema.nullable(),
+})
+const localExpenseLegacySchema = localBaseSchema.extend({
+  periodId: uuidSchema,
+  categoryId: uuidSchema,
+  amount: z.number().int().nonnegative().safe(),
+  description: z.string(),
+  date: dateOnlySchema,
+  recurringOccurrenceId: uuidSchema.nullable(),
+})
+const localExpenseV2Schema = localExpenseLegacySchema.extend({
+  affectsBalance: z.boolean(),
+  balanceEffectiveAt: instantSchema,
+})
+const localOccurrenceLegacySchema = localBaseSchema.extend({
+  recurringPaymentId: uuidSchema,
+  periodId: uuidSchema,
+  dueDate: dateOnlySchema,
+  status: z.enum(['pending', 'paid', 'skipped']),
+  transactionId: uuidSchema.nullable(),
+})
+const localOccurrenceV2Schema = localOccurrenceLegacySchema.extend({
+  amount: z.number().int().positive().safe(),
+})
+
 const localSchemas = {
   period: localBaseSchema.extend({
     type: z.enum(['monthly', 'biweekly']),
     startDate: dateOnlySchema,
     endDate: dateOnlySchema,
   }),
-  income: localBaseSchema.extend({
-    periodId: uuidSchema,
-    amount: z.number().int().nonnegative().safe(),
-    description: z.string(),
-    date: dateOnlySchema,
-  }),
-  expense: localBaseSchema.extend({
-    periodId: uuidSchema,
-    categoryId: uuidSchema,
-    amount: z.number().int().nonnegative().safe(),
-    description: z.string(),
-    date: dateOnlySchema,
-    recurringOccurrenceId: uuidSchema.nullable(),
-  }),
+  income: z.union([localIncomeV2Schema, localIncomeLegacySchema]),
+  expense: z.union([localExpenseV2Schema, localExpenseLegacySchema]),
   category: localBaseSchema.extend({
     name: z.string(),
     normalizedName: z.string(),
@@ -71,12 +94,14 @@ const localSchemas = {
     categoryId: uuidSchema,
     status: z.enum(['active', 'inactive']),
   }),
-  recurringPaymentOccurrence: localBaseSchema.extend({
-    recurringPaymentId: uuidSchema,
-    periodId: uuidSchema,
-    dueDate: dateOnlySchema,
-    status: z.enum(['pending', 'paid', 'skipped']),
-    transactionId: uuidSchema.nullable(),
+  recurringPaymentOccurrence: z.union([
+    localOccurrenceV2Schema,
+    localOccurrenceLegacySchema,
+  ]),
+  balanceAnchor: localBaseSchema.extend({
+    amount: z.number().int().safe(),
+    capturedAt: instantSchema,
+    ledgerCutoffAt: instantSchema,
   }),
   userSettings: z.object({
     id: uuidSchema,
@@ -148,6 +173,11 @@ export function deserializeRemoteChange(
           amount: row.amount,
           description: row.description,
           date: row.date,
+          status: row.status,
+          affectsBalance: row.affects_balance,
+          balanceEffectiveAt: normalizeNullableInstant(
+            row.balance_effective_at,
+          ),
           createdAt: normalizeInstant(row.created_at),
           updatedAt: normalizeInstant(row.updated_at),
           deletedAt: normalizeNullableInstant(row.deleted_at),
@@ -167,6 +197,8 @@ export function deserializeRemoteChange(
           description: row.description,
           date: row.date,
           recurringOccurrenceId: row.recurring_occurrence_id,
+          affectsBalance: row.affects_balance,
+          balanceEffectiveAt: normalizeInstant(row.balance_effective_at),
           createdAt: normalizeInstant(row.created_at),
           updatedAt: normalizeInstant(row.updated_at),
           deletedAt: normalizeNullableInstant(row.deleted_at),
@@ -238,11 +270,28 @@ export function deserializeRemoteChange(
           periodId: row.period_id,
           dueDate: row.due_date,
           status: row.status,
+          amount: row.amount,
           transactionId: null,
           createdAt: normalizeInstant(row.created_at),
           updatedAt: normalizeInstant(row.updated_at),
           deletedAt: normalizeNullableInstant(row.deleted_at),
         }) satisfies RecurringPaymentOccurrence,
+      }
+    }
+    case 'balanceAnchor': {
+      const row = remoteRowSchemas.balanceAnchor.parse(input)
+      return {
+        entityType,
+        record: withSyncState({
+          id: row.id,
+          ownerId: row.user_id,
+          amount: row.amount,
+          capturedAt: normalizeInstant(row.captured_at),
+          ledgerCutoffAt: normalizeInstant(row.ledger_cutoff_at),
+          createdAt: normalizeInstant(row.created_at),
+          updatedAt: normalizeInstant(row.updated_at),
+          deletedAt: normalizeNullableInstant(row.deleted_at),
+        }) satisfies BalanceAnchor,
       }
     }
     case 'userSettings': {
@@ -279,17 +328,23 @@ function toRemoteRecord(
     }
     case 'income': {
       const entity = localSchemas.income.parse(value)
-      return {
+      const remote: Record<string, Json> = {
         ...remoteBase(entity),
         period_id: entity.periodId,
         amount: entity.amount,
         description: entity.description,
         date: entity.date,
       }
+      if ('status' in entity) {
+        remote.status = entity.status
+        remote.affects_balance = entity.affectsBalance
+        remote.balance_effective_at = entity.balanceEffectiveAt
+      }
+      return remote
     }
     case 'expense': {
       const entity = localSchemas.expense.parse(value)
-      return {
+      const remote: Record<string, Json> = {
         ...remoteBase(entity),
         period_id: entity.periodId,
         category_id: entity.categoryId,
@@ -298,6 +353,11 @@ function toRemoteRecord(
         date: entity.date,
         recurring_occurrence_id: entity.recurringOccurrenceId,
       }
+      if ('affectsBalance' in entity) {
+        remote.affects_balance = entity.affectsBalance
+        remote.balance_effective_at = entity.balanceEffectiveAt
+      }
+      return remote
     }
     case 'category': {
       const entity = localSchemas.category.parse(value)
@@ -332,15 +392,26 @@ function toRemoteRecord(
         status: entity.status,
       }
     }
+    case 'balanceAnchor': {
+      const entity = localSchemas.balanceAnchor.parse(value)
+      return {
+        ...remoteBase(entity),
+        amount: entity.amount,
+        captured_at: entity.capturedAt,
+        ledger_cutoff_at: entity.ledgerCutoffAt,
+      }
+    }
     case 'recurringPaymentOccurrence': {
       const entity = localSchemas.recurringPaymentOccurrence.parse(value)
-      return {
+      const remote: Record<string, Json> = {
         ...remoteBase(entity),
         recurring_payment_id: entity.recurringPaymentId,
         period_id: entity.periodId,
         due_date: entity.dueDate,
         status: entity.status,
       }
+      if ('amount' in entity) remote.amount = entity.amount
+      return remote
     }
     case 'userSettings': {
       const entity = localSchemas.userSettings.parse(value)
@@ -377,7 +448,8 @@ function withSyncState<
     | Omit<Category, 'syncStatus'>
     | Omit<CategoryBudget, 'syncStatus'>
     | Omit<RecurringPayment, 'syncStatus'>
-    | Omit<RecurringPaymentOccurrence, 'syncStatus'>,
+    | Omit<RecurringPaymentOccurrence, 'syncStatus'>
+    | Omit<BalanceAnchor, 'syncStatus'>,
 >(value: T): T & { syncStatus: 'synced' } {
   return { ...value, syncStatus: 'synced' }
 }

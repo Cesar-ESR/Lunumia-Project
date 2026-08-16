@@ -6,14 +6,18 @@ import type {
   SynchronizableRecordByType,
 } from '@application/services/SyncCoordinator'
 import type {
+  BalanceAnchor,
   Category,
   CategoryBudget,
   DeviceSyncState,
   Expense,
+  ExpenseV2,
   Income,
+  IncomeV2,
   Period,
   RecurringPayment,
   RecurringPaymentOccurrence,
+  RecurringPaymentOccurrenceV2,
   SyncCursor,
   SyncEntityType,
   SyncOperation,
@@ -55,6 +59,10 @@ export const positiveAmountCentsArbitrary = fc.integer({
   min: 1,
   max: 100_000_000,
 })
+export const signedAmountCentsArbitrary = fc.integer({
+  min: -100_000_000,
+  max: 100_000_000,
+})
 export const categoryNameArbitrary = fc.stringMatching(
   /^[A-Za-z][A-Za-z0-9 ]{0,39}$/,
 )
@@ -86,17 +94,19 @@ const uniqueEntityIdsArbitrary = fc
     fc.uuid(),
     fc.uuid(),
     fc.uuid(),
+    fc.uuid(),
   )
   .filter((ids) => new Set(ids).size === ids.length)
 
 export interface SynchronizableEntitySet {
   period: Period
-  income: Income
-  expense: Expense
+  income: IncomeV2
+  expense: ExpenseV2
   category: Category
   categoryBudget: CategoryBudget
   recurringPayment: RecurringPayment
-  recurringPaymentOccurrence: RecurringPaymentOccurrence
+  recurringPaymentOccurrence: RecurringPaymentOccurrenceV2
+  balanceAnchor: BalanceAnchor
   userSettings: UserSettings
 }
 
@@ -117,6 +127,7 @@ export const synchronizableEntitySetArbitrary: fc.Arbitrary<SynchronizableEntity
       expenseAmount: positiveAmountCentsArbitrary,
       budgetAmount: amountCentsArbitrary,
       paymentAmount: positiveAmountCentsArbitrary,
+      anchorAmount: signedAmountCentsArbitrary,
       description: descriptionArbitrary,
       categoryName: categoryNameArbitrary,
       categoryColor: colorArbitrary,
@@ -151,6 +162,7 @@ export const synchronizableEntitySetArbitrary: fc.Arbitrary<SynchronizableEntity
         recurringPaymentId,
         occurrenceId,
         userSettingsId,
+        balanceAnchorId,
       ] = value.ids
       const createdAt = instantFromSeconds(value.createdSeconds)
       const updatedAt = instantFromSeconds(
@@ -191,6 +203,9 @@ export const synchronizableEntitySetArbitrary: fc.Arbitrary<SynchronizableEntity
           amount: value.incomeAmount,
           description: value.description,
           date: transactionDate,
+          status: 'received' as const,
+          affectsBalance: true,
+          balanceEffectiveAt: updatedAt,
         },
         expense: {
           ...base,
@@ -201,6 +216,8 @@ export const synchronizableEntitySetArbitrary: fc.Arbitrary<SynchronizableEntity
           description: value.description,
           date: transactionDate,
           recurringOccurrenceId,
+          affectsBalance: true,
+          balanceEffectiveAt: updatedAt,
         },
         category: {
           ...base,
@@ -237,6 +254,14 @@ export const synchronizableEntitySetArbitrary: fc.Arbitrary<SynchronizableEntity
           dueDate,
           status: value.occurrenceStatus,
           transactionId: recurringOccurrenceId ? expenseId : null,
+          amount: value.paymentAmount,
+        },
+        balanceAnchor: {
+          ...base,
+          id: balanceAnchorId,
+          amount: value.anchorAmount,
+          capturedAt: updatedAt,
+          ledgerCutoffAt: createdAt,
         },
         userSettings: {
           id: userSettingsId,
@@ -252,9 +277,9 @@ export const synchronizableEntitySetArbitrary: fc.Arbitrary<SynchronizableEntity
 
 export const periodArbitrary: fc.Arbitrary<Period> =
   synchronizableEntitySetArbitrary.map((entities) => entities.period)
-export const incomeArbitrary: fc.Arbitrary<Income> =
+export const incomeArbitrary: fc.Arbitrary<IncomeV2> =
   synchronizableEntitySetArbitrary.map((entities) => entities.income)
-export const expenseArbitrary: fc.Arbitrary<Expense> =
+export const expenseArbitrary: fc.Arbitrary<ExpenseV2> =
   synchronizableEntitySetArbitrary.map((entities) => entities.expense)
 export const categoryArbitrary: fc.Arbitrary<Category> =
   synchronizableEntitySetArbitrary.map((entities) => entities.category)
@@ -262,12 +287,14 @@ export const categoryBudgetArbitrary: fc.Arbitrary<CategoryBudget> =
   synchronizableEntitySetArbitrary.map((entities) => entities.categoryBudget)
 export const recurringPaymentArbitrary: fc.Arbitrary<RecurringPayment> =
   synchronizableEntitySetArbitrary.map((entities) => entities.recurringPayment)
-export const recurringPaymentOccurrenceArbitrary: fc.Arbitrary<RecurringPaymentOccurrence> =
+export const recurringPaymentOccurrenceArbitrary: fc.Arbitrary<RecurringPaymentOccurrenceV2> =
   synchronizableEntitySetArbitrary.map(
     (entities) => entities.recurringPaymentOccurrence,
   )
 export const userSettingsArbitrary: fc.Arbitrary<UserSettings> =
   synchronizableEntitySetArbitrary.map((entities) => entities.userSettings)
+export const balanceAnchorArbitrary: fc.Arbitrary<BalanceAnchor> =
+  synchronizableEntitySetArbitrary.map((entities) => entities.balanceAnchor)
 
 export const syncCursorArbitrary: fc.Arbitrary<SyncCursor> = fc
   .option(fc.tuple(instantArbitrary, entityIdArbitrary), { nil: null })
@@ -288,6 +315,7 @@ export const deviceSyncStateArbitrary: fc.Arbitrary<DeviceSyncState> = fc
       'categoryBudget',
       'recurringPayment',
       'recurringPaymentOccurrence',
+      'balanceAnchor',
       'userSettings',
     ),
     cursor: syncCursorArbitrary,
@@ -303,6 +331,7 @@ type SyncableRecord =
   | CategoryBudget
   | RecurringPayment
   | RecurringPaymentOccurrence
+  | BalanceAnchor
 
 export const syncableRecordArbitrary: fc.Arbitrary<SyncableRecord> = fc.oneof(
   periodArbitrary,
@@ -312,6 +341,7 @@ export const syncableRecordArbitrary: fc.Arbitrary<SyncableRecord> = fc.oneof(
   categoryBudgetArbitrary,
   recurringPaymentArbitrary,
   recurringPaymentOccurrenceArbitrary,
+  balanceAnchorArbitrary,
 )
 
 export const tombstoneArbitrary: fc.Arbitrary<SyncableRecord> =
@@ -391,6 +421,7 @@ export const syncOperationArbitrary: fc.Arbitrary<SyncOperation> = fc.oneof(
     'recurringPaymentOccurrence',
     recurringPaymentOccurrenceArbitrary,
   ),
+  operationArbitraryFor('balanceAnchor', balanceAnchorArbitrary),
   operationArbitraryFor('userSettings', userSettingsArbitrary),
   deleteOperationArbitraryFor('period', periodArbitrary),
   deleteOperationArbitraryFor('income', incomeArbitrary),
@@ -402,6 +433,7 @@ export const syncOperationArbitrary: fc.Arbitrary<SyncOperation> = fc.oneof(
     'recurringPaymentOccurrence',
     recurringPaymentOccurrenceArbitrary,
   ),
+  deleteOperationArbitraryFor('balanceAnchor', balanceAnchorArbitrary),
 )
 
 type RemoteRowSchemas = typeof remoteRowSchemas
@@ -432,6 +464,9 @@ export const remoteRowArbitraryByEntityType: {
     amount: record.amount,
     description: record.description,
     date: record.date,
+    status: record.status,
+    affects_balance: record.affectsBalance,
+    balance_effective_at: record.balanceEffectiveAt,
     created_at: record.createdAt,
     updated_at: record.updatedAt,
     deleted_at: record.deletedAt,
@@ -445,6 +480,8 @@ export const remoteRowArbitraryByEntityType: {
     description: record.description,
     date: record.date,
     recurring_occurrence_id: record.recurringOccurrenceId,
+    affects_balance: record.affectsBalance,
+    balance_effective_at: record.balanceEffectiveAt,
     created_at: record.createdAt,
     updated_at: record.updatedAt,
     deleted_at: record.deletedAt,
@@ -493,11 +530,22 @@ export const remoteRowArbitraryByEntityType: {
       period_id: record.periodId,
       due_date: record.dueDate,
       status: record.status,
+      amount: record.amount,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
       deleted_at: record.deletedAt,
     }),
   ),
+  balanceAnchor: balanceAnchorArbitrary.map((record) => ({
+    id: record.id,
+    user_id: record.ownerId,
+    amount: record.amount,
+    captured_at: record.capturedAt,
+    ledger_cutoff_at: record.ledgerCutoffAt,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+    deleted_at: record.deletedAt,
+  })),
   userSettings: userSettingsArbitrary.map((record) => ({
     id: record.id,
     user_id: record.ownerId,
@@ -517,6 +565,7 @@ export const remoteRowArbitrary: fc.Arbitrary<RemoteRow> = fc.oneof(
   remoteRowArbitraryByEntityType.categoryBudget,
   remoteRowArbitraryByEntityType.recurringPayment,
   remoteRowArbitraryByEntityType.recurringPaymentOccurrence,
+  remoteRowArbitraryByEntityType.balanceAnchor,
   remoteRowArbitraryByEntityType.userSettings,
 )
 
@@ -542,6 +591,7 @@ export const retryableSyncErrorArbitrary: fc.Arbitrary<SyncError> = fc.record({
       'categoryBudget',
       'recurringPayment',
       'recurringPaymentOccurrence',
+      'balanceAnchor',
       'userSettings',
     ),
     { nil: undefined },
@@ -571,6 +621,7 @@ export const nonRetryableSyncErrorArbitrary: fc.Arbitrary<SyncError> =
         'categoryBudget',
         'recurringPayment',
         'recurringPaymentOccurrence',
+        'balanceAnchor',
         'userSettings',
       ),
       { nil: undefined },

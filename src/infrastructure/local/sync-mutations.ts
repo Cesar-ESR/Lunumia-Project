@@ -32,6 +32,7 @@ export const REMOTE_TABLE_BY_ENTITY_TYPE: Readonly<
   categoryBudget: 'category_budgets',
   recurringPayment: 'recurring_payments',
   recurringPaymentOccurrence: 'recurring_payment_occurrences',
+  balanceAnchor: 'balance_anchors',
   userSettings: 'user_settings',
 }
 

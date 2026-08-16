@@ -598,6 +598,13 @@ export class DexieSyncStore implements LocalSyncStore {
           ownerId,
           updatedAt,
         )
+      case 'balanceAnchor':
+        return this.markSyncable(
+          this.db.balanceAnchors,
+          entityId,
+          ownerId,
+          updatedAt,
+        )
       case 'userSettings': {
         const current = await this.db.userSettings.get(entityId)
         if (current?.ownerId === ownerId && updatedAt) {
@@ -647,6 +654,8 @@ export class DexieSyncStore implements LocalSyncStore {
         return this.db.recurringPayments.get(id)
       case 'recurringPaymentOccurrence':
         return this.db.recurringPaymentOccurrences.get(id)
+      case 'balanceAnchor':
+        return this.db.balanceAnchors.get(id)
       case 'userSettings':
         return this.db.userSettings.get(id)
     }
@@ -694,6 +703,9 @@ export class DexieSyncStore implements LocalSyncStore {
         })
         return
       }
+      case 'balanceAnchor':
+        await this.db.balanceAnchors.put(change.record)
+        return
       case 'expense': {
         await this.db.expenses.put(change.record)
         if (change.record.recurringOccurrenceId) {
@@ -750,6 +762,7 @@ export class DexieSyncStore implements LocalSyncStore {
       this.db.categoryBudgets,
       this.db.recurringPayments,
       this.db.recurringPaymentOccurrences,
+      this.db.balanceAnchors,
       this.db.userSettings,
       this.db.syncOperations,
       this.db.deviceSyncStates,
@@ -847,6 +860,7 @@ function operationReferences(operation: SyncOperation): EntityReference[] {
   switch (operation.entityType) {
     case 'period':
     case 'category':
+    case 'balanceAnchor':
       return []
     case 'income':
       return compactReferences([reference('period', payload.periodId)])

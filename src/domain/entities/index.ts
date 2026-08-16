@@ -23,6 +23,7 @@ export type SyncEntityType =
   | 'categoryBudget'
   | 'recurringPayment'
   | 'recurringPaymentOccurrence'
+  | 'balanceAnchor'
   | 'userSettings'
 
 export interface SyncableEntity {
