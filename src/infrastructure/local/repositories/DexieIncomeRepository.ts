@@ -79,13 +79,21 @@ export class DexieIncomeRepository implements IIncomeRepository {
       ? value
       : null
   }
+  async findAll(): Promise<Income[]> {
+    return this.sortActive(
+      await this.db.incomes.where('ownerId').equals(this.ownerId).toArray(),
+    )
+  }
   async findByPeriod(periodId: string): Promise<Income[]> {
-    return (
+    return this.sortActive(
       await this.db.incomes
         .where('[ownerId+periodId]')
         .equals([this.ownerId, periodId])
-        .toArray()
+        .toArray(),
     )
+  }
+  private sortActive(values: Income[]): Income[] {
+    return values
       .filter((value) => value.deletedAt === null)
       .sort(
         (a, b) =>

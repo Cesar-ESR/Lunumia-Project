@@ -1,4 +1,5 @@
 import type {
+  BalanceAnchor,
   Category,
   CategoryBudget,
   Expense,
@@ -28,6 +29,7 @@ export interface IIncomeRepository {
   update(value: Income): Promise<Income>
   delete(id: string): Promise<void>
   findById(id: string): Promise<Income | null>
+  findAll(): Promise<Income[]>
   findByPeriod(periodId: string): Promise<Income[]>
 }
 export interface IExpenseRepository {
@@ -35,6 +37,7 @@ export interface IExpenseRepository {
   update(value: Expense): Promise<Expense>
   delete(id: string): Promise<void>
   findById(id: string): Promise<Expense | null>
+  findAll(): Promise<Expense[]>
   findByPeriod(periodId: string): Promise<Expense[]>
   findByCategory(categoryId: string): Promise<Expense[]>
 }
@@ -71,6 +74,7 @@ export interface IRecurringPaymentOccurrenceRepository {
   create(value: RecurringPaymentOccurrence): Promise<RecurringPaymentOccurrence>
   update(value: RecurringPaymentOccurrence): Promise<RecurringPaymentOccurrence>
   findById(id: string): Promise<RecurringPaymentOccurrence | null>
+  findAll(): Promise<RecurringPaymentOccurrence[]>
   findByPeriod(periodId: string): Promise<RecurringPaymentOccurrence[]>
   findByPaymentAndPeriod(
     paymentId: string,
@@ -81,6 +85,11 @@ export interface IRecurringPaymentOccurrenceRepository {
     dueDate: DateOnly,
   ): Promise<RecurringPaymentOccurrence | null>
   findPendingByPeriod(periodId: string): Promise<RecurringPaymentOccurrence[]>
+}
+export interface IBalanceAnchorRepository {
+  create(value: BalanceAnchor): Promise<BalanceAnchor>
+  findById(id: string): Promise<BalanceAnchor | null>
+  findLatest(): Promise<BalanceAnchor | null>
 }
 export interface ISyncOperationRepository {
   enqueue(value: SyncOperation): Promise<void>

@@ -68,4 +68,25 @@ describe('repositorios recurrentes', () => {
     expect(duplicate.id).toBe('first')
     expect((await repository.findByPeriod('period')).length).toBe(1)
   })
+  it('findAll devuelve solo ocurrencias activas del owner sin normalizarlas', async () => {
+    database = new GastoClaroDB('occurrences-find-all-test')
+    const repository = new DexieRecurringPaymentOccurrenceRepository(
+      database,
+      'owner',
+    )
+    const active = occurrence('active')
+    await database.recurringPaymentOccurrences.bulkAdd([
+      active,
+      {
+        ...occurrence('deleted'),
+        deletedAt: '2026-01-04T00:00:00.000Z',
+      },
+      { ...occurrence('other-owner'), ownerId: 'other' },
+    ])
+
+    const result = await repository.findAll()
+
+    expect(result).toEqual([active])
+    expect(result[0]).not.toHaveProperty('amount')
+  })
 })

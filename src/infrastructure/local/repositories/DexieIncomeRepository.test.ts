@@ -42,4 +42,24 @@ describe('DexieIncomeRepository', () => {
     await repository.delete('income')
     expect(await repository.findById('income')).toBeNull()
   })
+  it('findAll devuelve solo registros activos del owner sin normalizarlos', async () => {
+    database = new GastoClaroDB('incomes-find-all-test')
+    const repository = new DexieIncomeRepository(database, 'owner')
+    const active = income('active', '2026-01-02')
+    await database.incomes.bulkAdd([
+      active,
+      {
+        ...income('deleted', '2026-01-03'),
+        deletedAt: '2026-01-04T00:00:00.000Z',
+      },
+      income('other-owner', '2026-01-04', 'other'),
+    ])
+
+    const result = await repository.findAll()
+
+    expect(result).toEqual([active])
+    expect(result[0]).not.toHaveProperty('status')
+    expect(result[0]).not.toHaveProperty('affectsBalance')
+    expect(result[0]).not.toHaveProperty('balanceEffectiveAt')
+  })
 })

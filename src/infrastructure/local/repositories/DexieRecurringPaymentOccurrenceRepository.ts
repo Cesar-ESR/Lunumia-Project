@@ -59,6 +59,9 @@ export class DexieRecurringPaymentOccurrenceRepository implements IRecurringPaym
       ? value
       : null
   }
+  async findAll(): Promise<RecurringPaymentOccurrence[]> {
+    return this.list(() => true)
+  }
   async findByPeriod(periodId: string): Promise<RecurringPaymentOccurrence[]> {
     return this.list((value) => value.periodId === periodId)
   }

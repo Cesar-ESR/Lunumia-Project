@@ -51,4 +51,23 @@ describe('DexieExpenseRepository', () => {
     await repository.delete('expense')
     expect(await repository.findById('expense')).toBeNull()
   })
+  it('findAll devuelve solo registros activos del owner sin normalizarlos', async () => {
+    database = new GastoClaroDB('expenses-find-all-test')
+    const repository = new DexieExpenseRepository(database, 'owner')
+    const active = expense('active')
+    await database.expenses.bulkAdd([
+      active,
+      {
+        ...expense('deleted'),
+        deletedAt: '2026-01-04T00:00:00.000Z',
+      },
+      expense('other-owner', 'category', 'other'),
+    ])
+
+    const result = await repository.findAll()
+
+    expect(result).toEqual([active])
+    expect(result[0]).not.toHaveProperty('affectsBalance')
+    expect(result[0]).not.toHaveProperty('balanceEffectiveAt')
+  })
 })

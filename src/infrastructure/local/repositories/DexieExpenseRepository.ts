@@ -79,6 +79,11 @@ export class DexieExpenseRepository implements IExpenseRepository {
       ? value
       : null
   }
+  async findAll(): Promise<Expense[]> {
+    return this.sortActive(
+      await this.db.expenses.where('ownerId').equals(this.ownerId).toArray(),
+    )
+  }
   async findByPeriod(periodId: string): Promise<Expense[]> {
     return this.list('[ownerId+periodId]', [this.ownerId, periodId])
   }
@@ -89,7 +94,12 @@ export class DexieExpenseRepository implements IExpenseRepository {
     index: '[ownerId+periodId]' | '[ownerId+categoryId]',
     key: [string, string],
   ): Promise<Expense[]> {
-    return (await this.db.expenses.where(index).equals(key).toArray())
+    return this.sortActive(
+      await this.db.expenses.where(index).equals(key).toArray(),
+    )
+  }
+  private sortActive(values: Expense[]): Expense[] {
+    return values
       .filter((value) => value.deletedAt === null)
       .sort(
         (a, b) =>
