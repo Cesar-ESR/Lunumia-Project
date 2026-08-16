@@ -30,19 +30,81 @@ values ('10000000-0000-4000-8000-000000000006', :'user_a', '10000000-0000-4000-8
 insert into public.category_budgets (id, user_id, period_id, category_id, amount)
 values ('10000000-0000-4000-8000-000000000007', :'user_a', '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002', 5000);
 insert into public.user_settings (id, user_id, active_period_id, currency, theme)
-values ('10000000-0000-4000-8000-000000000008', :'user_a', '10000000-0000-4000-8000-000000000001', 'MXN', 'system');
+values ('10000000-0000-4000-8000-000000000008', :'user_a', '10000000-0000-4000-8000-000000000001', 'MXN', 'system')
+on conflict (user_id) do update
+set active_period_id = excluded.active_period_id,
+    currency = excluded.currency,
+    theme = excluded.theme;
 insert into public.processed_operations (operation_id, user_id, operation_type)
 values ('10000000-0000-4000-8000-000000000009', :'user_a', 'create');
+insert into public.balance_anchors (
+  id,
+  user_id,
+  amount,
+  captured_at,
+  ledger_cutoff_at
+)
+values (
+  '10000000-0000-4000-8000-000000000010',
+  :'user_a',
+  -25000,
+  '2026-08-15T12:00:00Z',
+  '2026-08-15T11:59:59Z'
+);
+
+do $$
+declare
+  affected integer;
+begin
+  if (
+    select count(*)
+    from public.balance_anchors
+    where id = '10000000-0000-4000-8000-000000000010'
+      and user_id = current_setting('test.user_a')::uuid
+  ) <> 1 then
+    raise exception 'RLS bloqueó SELECT propio en balance_anchors';
+  end if;
+
+  update public.balance_anchors
+  set amount = -24000
+  where id = '10000000-0000-4000-8000-000000000010';
+  get diagnostics affected = row_count;
+  if affected <> 1 then
+    raise exception 'RLS bloqueó UPDATE propio en balance_anchors';
+  end if;
+
+  insert into public.balance_anchors (
+    id,
+    user_id,
+    amount,
+    captured_at,
+    ledger_cutoff_at
+  ) values (
+    '10000000-0000-4000-8000-000000000011',
+    current_setting('test.user_a')::uuid,
+    0,
+    '2026-08-15T13:00:00Z',
+    '2026-08-15T12:59:59Z'
+  );
+  delete from public.balance_anchors
+  where id = '10000000-0000-4000-8000-000000000011';
+  get diagnostics affected = row_count;
+  if affected <> 1 then
+    raise exception 'RLS bloqueó DELETE propio en balance_anchors';
+  end if;
+end;
+$$;
 
 insert into rls_fixtures (table_name, payload)
-select 'periods', to_jsonb(row_value) from public.periods row_value where user_id = :'user_a'
-union all select 'categories', to_jsonb(row_value) from public.categories row_value where user_id = :'user_a'
-union all select 'incomes', to_jsonb(row_value) from public.incomes row_value where user_id = :'user_a'
-union all select 'recurring_payments', to_jsonb(row_value) from public.recurring_payments row_value where user_id = :'user_a'
-union all select 'recurring_payment_occurrences', to_jsonb(row_value) from public.recurring_payment_occurrences row_value where user_id = :'user_a'
-union all select 'expenses', to_jsonb(row_value) from public.expenses row_value where user_id = :'user_a'
-union all select 'category_budgets', to_jsonb(row_value) from public.category_budgets row_value where user_id = :'user_a'
-union all select 'user_settings', to_jsonb(row_value) from public.user_settings row_value where user_id = :'user_a';
+select 'periods', to_jsonb(row_value) from public.periods row_value where id = '10000000-0000-4000-8000-000000000001'
+union all select 'categories', to_jsonb(row_value) from public.categories row_value where id = '10000000-0000-4000-8000-000000000002'
+union all select 'incomes', to_jsonb(row_value) from public.incomes row_value where id = '10000000-0000-4000-8000-000000000003'
+union all select 'recurring_payments', to_jsonb(row_value) from public.recurring_payments row_value where id = '10000000-0000-4000-8000-000000000004'
+union all select 'recurring_payment_occurrences', to_jsonb(row_value) from public.recurring_payment_occurrences row_value where id = '10000000-0000-4000-8000-000000000005'
+union all select 'expenses', to_jsonb(row_value) from public.expenses row_value where id = '10000000-0000-4000-8000-000000000006'
+union all select 'category_budgets', to_jsonb(row_value) from public.category_budgets row_value where id = '10000000-0000-4000-8000-000000000007'
+union all select 'user_settings', to_jsonb(row_value) from public.user_settings row_value where user_id = :'user_a'
+union all select 'balance_anchors', to_jsonb(row_value) from public.balance_anchors row_value where id = '10000000-0000-4000-8000-000000000010';
 
 select set_config('request.jwt.claim.sub', :'user_b', true);
 

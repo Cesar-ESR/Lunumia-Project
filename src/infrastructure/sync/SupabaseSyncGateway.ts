@@ -152,8 +152,8 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
         Database['public']['Functions']['fetch_sync_changes']['Args']
       >('fetch_sync_changes', {
         p_entity_type: entityType,
-        p_updated_at: cursor.lastUpdatedAt,
-        p_entity_id: cursor.lastEntityId,
+        p_updated_at: cursor.lastUpdatedAt ?? undefined,
+        p_entity_id: cursor.lastEntityId ?? undefined,
         p_limit: limit,
       })
     } catch (error) {
