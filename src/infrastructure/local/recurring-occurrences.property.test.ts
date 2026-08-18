@@ -93,6 +93,7 @@ describe('propiedades de pago de ocurrencias recurrentes', () => {
           periodId: value.periodId,
           dueDate: value.dueDate,
           status: 'pending',
+          amount: value.amount,
           transactionId: null,
         }
         await database.periods.add({
@@ -169,6 +170,7 @@ describe('propiedades de pago de ocurrencias recurrentes', () => {
           occurrenceId: fc.uuid(),
           paymentId: fc.uuid(),
           dueDate: dateOnlyArbitrary,
+          amount: fc.integer({ min: 1, max: 1_000_000_000 }),
         }),
         async (value) => {
           await database.recurringPaymentOccurrences.clear()
@@ -180,6 +182,7 @@ describe('propiedades de pago de ocurrencias recurrentes', () => {
             periodId: value.periodId,
             dueDate: value.dueDate,
             status: 'pending',
+            amount: value.amount,
             transactionId: null,
             createdAt: now,
             updatedAt: now,

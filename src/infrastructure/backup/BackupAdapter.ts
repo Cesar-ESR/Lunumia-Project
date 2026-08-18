@@ -1,4 +1,7 @@
-import type { BackupData } from '@application/contracts/backup.schema'
+import {
+  backupDataSchema,
+  type BackupData,
+} from '@application/contracts/backup.schema'
 import type { BackupDataSource } from '@application/services/BackupDataSource'
 import type {
   SyncableEntity,
@@ -51,6 +54,7 @@ export class BackupAdapter implements BackupDataSource {
         this.db.categoryBudgets,
         this.db.recurringPayments,
         this.db.recurringPaymentOccurrences,
+        this.db.balanceAnchors,
         this.db.userSettings,
       ],
       async () => {
@@ -62,6 +66,7 @@ export class BackupAdapter implements BackupDataSource {
           categoryBudgets,
           recurringPayments,
           recurringPaymentOccurrences,
+          balanceAnchors,
           userSettings,
         ] = await Promise.all([
           this.db.periods
@@ -99,9 +104,14 @@ export class BackupAdapter implements BackupDataSource {
             .equals(ownerId)
             .filter(({ deletedAt }) => deletedAt === null)
             .toArray(),
+          this.db.balanceAnchors
+            .where('ownerId')
+            .equals(ownerId)
+            .filter(({ deletedAt }) => deletedAt === null)
+            .toArray(),
           this.db.userSettings.where('ownerId').equals(ownerId).toArray(),
         ])
-        return {
+        return backupDataSchema.parse({
           periods: sortRecords(asActive(periods)),
           incomes: sortRecords(asActive(incomes)),
           expenses: sortRecords(asActive(expenses)),
@@ -111,8 +121,9 @@ export class BackupAdapter implements BackupDataSource {
           recurringPaymentOccurrences: sortRecords(
             asActive(recurringPaymentOccurrences),
           ),
+          balanceAnchors: sortRecords(asActive(balanceAnchors)),
           userSettings: sortRecords(userSettings).slice(0, 1),
-        }
+        })
       },
     )
   }
@@ -128,6 +139,7 @@ export class BackupAdapter implements BackupDataSource {
         this.db.categoryBudgets,
         this.db.recurringPayments,
         this.db.recurringPaymentOccurrences,
+        this.db.balanceAnchors,
         this.db.userSettings,
         this.db.syncOperations,
       ],
@@ -143,6 +155,7 @@ export class BackupAdapter implements BackupDataSource {
           oldBudgets,
           oldPayments,
           oldOccurrences,
+          oldBalanceAnchors,
           oldSettings,
         ] = await Promise.all([
           this.db.periods.where('ownerId').equals(ownerId).toArray(),
@@ -155,6 +168,7 @@ export class BackupAdapter implements BackupDataSource {
             .where('ownerId')
             .equals(ownerId)
             .toArray(),
+          this.db.balanceAnchors.where('ownerId').equals(ownerId).toArray(),
           this.db.userSettings.where('ownerId').equals(ownerId).toArray(),
         ])
 
@@ -245,6 +259,11 @@ export class BackupAdapter implements BackupDataSource {
           oldOccurrences,
           data.recurringPaymentOccurrences,
         )
+        const balanceAnchors = prepare(
+          'balanceAnchor',
+          oldBalanceAnchors,
+          data.balanceAnchors,
+        )
         const userSettings: UserSettings[] = data.userSettings.map((value) => ({
           ...value,
           ownerId,
@@ -291,6 +310,7 @@ export class BackupAdapter implements BackupDataSource {
             .where('ownerId')
             .equals(ownerId)
             .delete(),
+          this.db.balanceAnchors.where('ownerId').equals(ownerId).delete(),
           this.db.userSettings.where('ownerId').equals(ownerId).delete(),
         ])
 
@@ -303,6 +323,7 @@ export class BackupAdapter implements BackupDataSource {
         await this.db.recurringPaymentOccurrences.bulkAdd(
           recurringPaymentOccurrences,
         )
+        await this.db.balanceAnchors.bulkAdd(balanceAnchors)
         await this.db.userSettings.bulkAdd(userSettings)
         if (operations.length > 0)
           await this.db.syncOperations.bulkAdd(operations)

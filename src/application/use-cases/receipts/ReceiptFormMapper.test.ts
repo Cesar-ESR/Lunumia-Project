@@ -29,7 +29,15 @@ describe('ReceiptFormMapper', () => {
       {
         merchant: 'Mercado',
         date: '2026-08-04',
+        subtotal: 10_000,
+        tax: 2_345,
+        tip: null,
+        discount: null,
+        otherFees: null,
         total: 12345,
+        amountPaid: 12_345,
+        amountEvidence: 'TOTAL 123.45',
+        amountAmbiguous: false,
         currency: 'MXN',
         confidence: 0.9,
         rawText: 'texto descartado',
@@ -52,7 +60,15 @@ describe('ReceiptFormMapper', () => {
       {
         merchant: null,
         date: null,
+        subtotal: null,
+        tax: null,
+        tip: null,
+        discount: null,
+        otherFees: null,
         total: null,
+        amountPaid: null,
+        amountEvidence: null,
+        amountAmbiguous: false,
         currency: null,
         confidence: 0.3,
         rawText: 'contenido libre',
@@ -66,6 +82,36 @@ describe('ReceiptFormMapper', () => {
       date: '',
       categoryId: '',
       periodId: julyPeriod.id,
+    })
+    expect(proposal.amountValidation.status).toBe('invalid')
+  })
+
+  it('no prellena un total negativo sugerido por OCR', () => {
+    const proposal = mapReceiptToExpenseDraft(
+      {
+        merchant: 'Mercado',
+        date: '2026-07-10',
+        subtotal: null,
+        tax: null,
+        tip: null,
+        discount: null,
+        otherFees: null,
+        total: -18_990,
+        amountPaid: null,
+        amountEvidence: 'TOTAL -189.90',
+        amountAmbiguous: false,
+        currency: 'MXN',
+        confidence: 0.8,
+        rawText: null,
+      },
+      periods,
+      julyPeriod.id,
+    )
+    expect(proposal.draft.amount).toBeNull()
+    expect(proposal.amountValidation).toMatchObject({
+      status: 'invalid',
+      reasons: ['total_non_positive'],
+      totalCents: -18_990,
     })
   })
 

@@ -1,9 +1,12 @@
 import { z } from 'zod'
 import { OCRFunctionError } from '../errors/OCRFunctionError.ts'
 
-export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024
+// Groq limits requests containing a base64 image to 4 MiB. Three million raw
+// bytes encode to four million base64 characters and leave room for JSON/prompt.
+export const MAX_RECEIPT_BYTES = 3_000_000
 export const MAX_BASE64_LENGTH = Math.ceil(MAX_RECEIPT_BYTES / 3) * 4
 export const MAX_RAW_TEXT_LENGTH = 20_000
+export const MAX_AMOUNT_EVIDENCE_LENGTH = 200
 
 export const ReceiptRecognitionRequestSchema = z
   .object({
@@ -30,12 +33,24 @@ export const ReceiptRecognitionResponseSchema = z
   .object({
     merchant: z.string().trim().max(200).nullable(),
     date: dateOnlySchema.nullable(),
-    total: z.number().int().finite().nonnegative().nullable(),
+    subtotal: z.number().int().finite().safe().nullable(),
+    tax: z.number().int().finite().safe().nullable(),
+    tip: z.number().int().finite().safe().nullable(),
+    discount: z.number().int().finite().safe().nullable(),
+    otherFees: z.number().int().finite().safe().nullable(),
+    total: z.number().int().finite().safe().nullable(),
+    amountPaid: z.number().int().finite().safe().nullable(),
+    amountEvidence: z
+      .string()
+      .trim()
+      .max(MAX_AMOUNT_EVIDENCE_LENGTH)
+      .nullable(),
+    amountAmbiguous: z.boolean(),
     currency: z
       .string()
       .regex(/^[A-Z]{3}$/)
       .nullable(),
-    confidence: z.number().finite().min(0).max(1),
+    confidence: z.number().finite().min(0).max(1).nullable(),
     rawText: z.string().max(MAX_RAW_TEXT_LENGTH).nullable(),
   })
   .strict()

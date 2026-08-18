@@ -138,16 +138,22 @@ describe('IA mantiene el flujo local-first', () => {
       categoryId: category!.id,
       amount: 50_000,
     })
+    await services.balance.setCurrentBalance.execute({
+      ownerId,
+      amount: 75_000,
+    })
 
-    const dashboard = await services.dashboard.getSummary.execute(
-      period,
-      '2026-08-15',
-    )
-    expect(dashboard).toMatchObject({
-      currentBalance: 75_000,
+    const [financial, budget] = await Promise.all([
+      services.dashboard.getFinancialSnapshot.execute(),
+      services.dashboard.getBudgetSummary.execute(period, '2026-08-15'),
+    ])
+    expect(financial).toMatchObject({
+      currentBalanceCents: 75_000,
+      projectedAvailableCents: 75_000,
+    })
+    expect(budget).toMatchObject({
       totalBudget: 50_000,
       budgetRemaining: 25_000,
-      realAvailableMoney: 75_000,
     })
     const changes = buildCalculatedCategoryChanges([expense], [], [category!])
     expect(changes[0]).toMatchObject({
@@ -172,10 +178,10 @@ describe('IA mantiene el flujo local-first', () => {
     ).toEqual([])
 
     const operations = await database.syncOperations.toArray()
-    expect(operations).toHaveLength(5)
+    expect(operations).toHaveLength(6)
     expect(
       operations.filter(({ operationType }) => operationType === 'create'),
-    ).toHaveLength(3)
+    ).toHaveLength(4)
     expect(
       operations.filter(({ operationType }) => operationType === 'update'),
     ).toHaveLength(1)

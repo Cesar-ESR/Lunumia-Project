@@ -1,14 +1,20 @@
 import type {
   BackupData,
   BackupFile,
+  LegacyBackupFileV1,
 } from '@application/contracts/backup.schema'
-import { APP_NAME, CURRENT_BACKUP_SCHEMA_VERSION } from '@shared/constants'
+import {
+  APP_NAME,
+  BACKUP_SCHEMA_VERSION_V1,
+  CURRENT_BACKUP_SCHEMA_VERSION,
+} from '@shared/constants'
 
 export const BACKUP_NOW = '2026-07-31T18:00:00.000Z'
 export const PERIOD_ID = '11111111-1111-4111-8111-111111111111'
 export const CATEGORY_ID = '22222222-2222-4222-8222-222222222222'
 export const EXPENSE_ID = '33333333-3333-4333-8333-333333333333'
 export const OCCURRENCE_ID = '77777777-7777-4777-8777-777777777777'
+export const BALANCE_ANCHOR_ID = '99999999-9999-4999-8999-999999999999'
 
 export function createBackupData(
   ownerId = 'guest:source',
@@ -38,6 +44,9 @@ export function createBackupData(
         amount: amount + 100,
         description: 'Ingreso',
         date: '2026-07-01',
+        status: 'received',
+        affectsBalance: true,
+        balanceEffectiveAt: BACKUP_NOW,
         ...syncable,
       },
     ],
@@ -50,6 +59,8 @@ export function createBackupData(
         description: 'Pago',
         date: '2026-07-15',
         recurringOccurrenceId: OCCURRENCE_ID,
+        affectsBalance: true,
+        balanceEffectiveAt: BACKUP_NOW,
         ...syncable,
       },
     ],
@@ -94,6 +105,16 @@ export function createBackupData(
         dueDate: '2026-07-15',
         status: 'paid',
         transactionId: EXPENSE_ID,
+        amount,
+        ...syncable,
+      },
+    ],
+    balanceAnchors: [
+      {
+        id: BALANCE_ANCHOR_ID,
+        amount: 50_000,
+        capturedAt: BACKUP_NOW,
+        ledgerCutoffAt: BACKUP_NOW,
         ...syncable,
       },
     ],
@@ -121,5 +142,46 @@ export function createBackupFile(
     exportedAt: BACKUP_NOW,
     ownerId,
     data: createBackupData(ownerId, amount),
+  }
+}
+
+export function createLegacyBackupFileV1(
+  ownerId = 'guest:source',
+  amount = 12500,
+): LegacyBackupFileV1 {
+  const current = createBackupData(ownerId, amount)
+  return {
+    schemaVersion: BACKUP_SCHEMA_VERSION_V1,
+    appName: APP_NAME,
+    exportedAt: BACKUP_NOW,
+    ownerId,
+    data: {
+      periods: current.periods,
+      incomes: current.incomes.map(
+        ({ status, affectsBalance, balanceEffectiveAt, ...income }) => {
+          void status
+          void affectsBalance
+          void balanceEffectiveAt
+          return income
+        },
+      ),
+      expenses: current.expenses.map(
+        ({ affectsBalance, balanceEffectiveAt, ...expense }) => {
+          void affectsBalance
+          void balanceEffectiveAt
+          return expense
+        },
+      ),
+      categories: current.categories,
+      categoryBudgets: current.categoryBudgets,
+      recurringPayments: current.recurringPayments,
+      recurringPaymentOccurrences: current.recurringPaymentOccurrences.map(
+        ({ amount: occurrenceAmount, ...occurrence }) => {
+          void occurrenceAmount
+          return occurrence
+        },
+      ),
+      userSettings: current.userSettings,
+    },
   }
 }

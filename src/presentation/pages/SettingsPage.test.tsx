@@ -19,7 +19,7 @@ describe('SettingsPage', () => {
     vi.mocked(services.backup.prepareImport).mockReturnValue({
       file: backup,
       summary: {
-        schemaVersion: 1,
+        schemaVersion: backup.schemaVersion,
         exportedAt: backup.exportedAt,
         counts: {
           periods: 1,
@@ -29,6 +29,7 @@ describe('SettingsPage', () => {
           categoryBudgets: 1,
           recurringPayments: 1,
           recurringPaymentOccurrences: 1,
+          balanceAnchors: 1,
           userSettings: 1,
         },
       },

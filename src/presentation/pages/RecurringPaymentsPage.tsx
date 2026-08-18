@@ -44,11 +44,12 @@ export function RecurringPaymentsPage() {
         services.ownerId,
         activePeriod.id,
       )
-    const [overview, categories] = await Promise.all([
+    const [overview, categories, financial] = await Promise.all([
       services.recurringPayments.getOverview.execute(activePeriod?.id ?? null),
       services.categories.listCategories.execute(),
+      services.dashboard.getFinancialSnapshot.execute(),
     ])
-    return { ...overview, categories }
+    return { ...overview, categories, financial }
   }, [activePeriod, services])
   const data = useAsyncData(load)
   const [form, setForm] = useState<{
@@ -241,7 +242,11 @@ export function RecurringPaymentsPage() {
         actions={
           <div className="summary-pill">
             <span>Pendientes</span>
-            <MoneyDisplay amount={data.data?.pendingCommitments ?? 0} />
+            {data.data ? (
+              <MoneyDisplay amount={data.data.financial.committedCents} />
+            ) : (
+              <strong>—</strong>
+            )}
           </div>
         }
       />

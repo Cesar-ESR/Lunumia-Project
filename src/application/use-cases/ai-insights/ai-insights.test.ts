@@ -1,5 +1,6 @@
 import type { Category, Expense, Income, Period } from '@domain/entities'
 import type { AIInsightsProvider } from '@domain/ports'
+import { buildHistoricalAnalysisRequest } from '@application/contracts'
 import {
   ExplainCategoryChanges,
   buildCalculatedCategoryChanges,
@@ -116,6 +117,42 @@ describe('casos de uso de IA con cifras locales', () => {
     expect(data.totalIncome).toBe(50_000)
     expect(data.totalExpenses).toBe(12_345)
     expect(data.categoryBreakdown[0]?.total).toBe(12_345)
+  })
+
+  it('conserva el total histórico sólo con ingresos recibidos', () => {
+    const received = {
+      ...income({ amount: 10_000 }),
+      status: 'received' as const,
+      affectsBalance: true,
+      balanceEffectiveAt: now,
+    }
+    const expected = {
+      ...income({ amount: 20_000 }),
+      status: 'expected' as const,
+      affectsBalance: false,
+      balanceEffectiveAt: null,
+    }
+    const cancelled = {
+      ...income({ amount: 30_000 }),
+      status: 'cancelled' as const,
+      affectsBalance: false,
+      balanceEffectiveAt: null,
+    }
+
+    const data = buildPeriodAggregatedData(
+      period,
+      [received, expected, cancelled],
+      [],
+      [category],
+    )
+
+    const request = buildHistoricalAnalysisRequest(data)
+
+    expect(data.totalIncome).toBe(10_000)
+    expect(request.facts.receivedIncomeCents).toBe(10_000)
+    expect(JSON.stringify(request)).not.toMatch(
+      /20000|30000|expected|cancelled/,
+    )
   })
 
   it('39-40, 76-78. los casos de IA solo delegan payloads y no persisten ni crean SyncOperation', async () => {

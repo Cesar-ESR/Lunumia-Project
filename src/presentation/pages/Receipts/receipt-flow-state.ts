@@ -1,12 +1,18 @@
 import type { ReceiptExpenseDraft } from '@application/use-cases/receipts'
 import type { CapturedImage } from '@infrastructure/platform'
 import type { ReceiptFlowFailure } from './receipt-flow-errors'
+import type {
+  ReceiptAmountProposal,
+  ReceiptAmountValidation,
+} from '@domain/rules'
 
 export interface ReceiptFormContext {
   image: CapturedImage | null
   draft: ReceiptExpenseDraft
   detectedCurrency: string | null
   confidence: number | null
+  amountProposal: ReceiptAmountProposal | null
+  amountValidation: ReceiptAmountValidation | null
 }
 
 export type ReceiptFlowState =

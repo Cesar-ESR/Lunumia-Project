@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from '../../App'
 import {
@@ -38,11 +38,12 @@ describe('ReceiptCapturePage routing', () => {
     await user.clear(screen.getByLabelText('Fecha'))
     await user.type(screen.getByLabelText('Fecha'), '2026-07-15')
     await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Confirmar monto y guardar gasto',
+      }),
+    )
     expect(mocks.createExpense).toHaveBeenCalledOnce()
-    expect(
-      await screen.findByText('Gasto guardado en este dispositivo.'),
-    ).toBeVisible()
-    expect(window.location.pathname).toBe('/expenses')
+    await waitFor(() => expect(window.location.pathname).toBe('/expenses'))
   })
 })

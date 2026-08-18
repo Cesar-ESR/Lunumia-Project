@@ -1,4 +1,6 @@
 import { isDateOnly } from '@domain/value-objects'
+import type { FinancialSnapshot } from '@domain/calculations'
+import type { PeriodAggregatedData } from '@domain/ports'
 import { z } from 'zod'
 
 export const AI_REQUEST_LIMITS = {
@@ -11,6 +13,7 @@ export const AI_REQUEST_LIMITS = {
 
 const dateOnlySchema = z.string().refine(isDateOnly, 'Fecha DateOnly inválida.')
 const amountCentsSchema = z.number().int().finite().nonnegative()
+const signedCentsSchema = z.number().int().finite().safe()
 const uniqueIds = <T extends { categoryId: string }>(items: T[]) =>
   new Set(items.map(({ categoryId }) => categoryId)).size === items.length
 
@@ -39,7 +42,7 @@ const PeriodCategoryBreakdownSchema = z
   .object({
     categoryId: z.string().uuid(),
     categoryName: z.string().trim().min(1).max(AI_REQUEST_LIMITS.categoryName),
-    total: amountCentsSchema,
+    totalCents: amountCentsSchema,
     percentage: z.number().finite(),
   })
   .strict()
@@ -51,16 +54,17 @@ const PeriodTopExpenseSchema = z
       .trim()
       .min(1)
       .max(AI_REQUEST_LIMITS.topExpenseDescription),
-    amount: amountCentsSchema,
+    amountCents: amountCentsSchema,
   })
   .strict()
 
-export const PeriodSummaryRequestSchema = z
+export const HistoricalAnalysisRequestSchema = z
   .object({
-    aggregatedData: z
+    context: z.literal('historical'),
+    facts: z
       .object({
-        totalIncome: amountCentsSchema,
-        totalExpenses: amountCentsSchema,
+        receivedIncomeCents: amountCentsSchema,
+        expenseCents: amountCentsSchema,
         categoryBreakdown: z
           .array(PeriodCategoryBreakdownSchema)
           .max(AI_REQUEST_LIMITS.categories)
@@ -80,6 +84,80 @@ export const PeriodSummaryRequestSchema = z
       }),
   })
   .strict()
+
+export const PlanningAnalysisRequestSchema = z
+  .object({
+    context: z.literal('planning'),
+    facts: z
+      .object({
+        currentBalanceCents: signedCentsSchema.nullable(),
+        committedCents: amountCentsSchema,
+        expectedIncomeCents: amountCentsSchema,
+        projectedAvailableCents: signedCentsSchema.nullable(),
+        projectedClosingBalanceCents: signedCentsSchema.nullable(),
+        projectionCoverage: z.enum(['full_period', 'overdue_only']),
+        projectionHorizonEnd: dateOnlySchema.nullable(),
+      })
+      .strict(),
+  })
+  .strict()
+
+export const AIAnalysisRequestSchema = z.discriminatedUnion('context', [
+  HistoricalAnalysisRequestSchema,
+  PlanningAnalysisRequestSchema,
+])
+
+export const PeriodSummaryRequestSchema = HistoricalAnalysisRequestSchema
+
+export type HistoricalAnalysisRequest = z.infer<
+  typeof HistoricalAnalysisRequestSchema
+>
+export type PlanningAnalysisRequest = z.infer<
+  typeof PlanningAnalysisRequestSchema
+>
+export type AIAnalysisRequest = z.infer<typeof AIAnalysisRequestSchema>
+
+export function buildHistoricalAnalysisRequest(
+  aggregatedData: PeriodAggregatedData,
+): HistoricalAnalysisRequest {
+  return HistoricalAnalysisRequestSchema.parse({
+    context: 'historical',
+    facts: {
+      receivedIncomeCents: aggregatedData.totalIncome,
+      expenseCents: aggregatedData.totalExpenses,
+      categoryBreakdown: aggregatedData.categoryBreakdown.map((category) => ({
+        categoryId: category.categoryId,
+        categoryName: category.categoryName,
+        totalCents: category.total,
+        percentage: category.percentage,
+      })),
+      topExpenses: aggregatedData.topExpenses?.map((expense) => ({
+        description: expense.description,
+        amountCents: expense.amount,
+      })),
+      periodType: aggregatedData.periodType,
+      startDate: aggregatedData.startDate,
+      endDate: aggregatedData.endDate,
+    },
+  })
+}
+
+export function buildPlanningAnalysisRequest(
+  snapshot: FinancialSnapshot,
+): PlanningAnalysisRequest {
+  return PlanningAnalysisRequestSchema.parse({
+    context: 'planning',
+    facts: {
+      currentBalanceCents: snapshot.currentBalanceCents,
+      committedCents: snapshot.committedCents,
+      expectedIncomeCents: snapshot.expectedIncomeCents,
+      projectedAvailableCents: snapshot.projectedAvailableCents,
+      projectedClosingBalanceCents: snapshot.projectedClosingBalanceCents,
+      projectionCoverage: snapshot.projectionCoverage,
+      projectionHorizonEnd: snapshot.projectionHorizonEnd,
+    },
+  })
+}
 
 const CalculatedCategoryChangeSchema = z
   .object({

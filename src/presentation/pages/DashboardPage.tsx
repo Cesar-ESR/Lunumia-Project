@@ -1,8 +1,7 @@
 import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import type { DashboardSummary } from '@application/use-cases/dashboard/GetDashboardSummary'
+import type { DashboardBudgetSummary } from '@application/use-cases/dashboard/GetDashboardBudgetSummary'
 import { getLocalDateOnly } from '@shared/utils/date'
-import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { LoadingState } from '../components/LoadingState'
 import { MoneyDisplay } from '../components/MoneyDisplay'
@@ -22,23 +21,29 @@ function FinancialCard({
   description,
 }: {
   title: string
-  amount: number
+  amount: number | null
   description: string
 }) {
   return (
-    <article className={`financial-card ${amount < 0 ? 'negative-value' : ''}`}>
+    <article
+      className={`financial-card ${amount !== null && amount < 0 ? 'negative-value' : ''}`}
+    >
       <span>{title}</span>
-      <MoneyDisplay amount={amount} />
+      {amount === null ? (
+        <strong>No configurado</strong>
+      ) : (
+        <MoneyDisplay amount={amount} />
+      )}
       <p>
         {description}
-        {amount < 0 ? ' Valor negativo.' : ''}
+        {amount !== null && amount < 0 ? ' Valor negativo.' : ''}
       </p>
     </article>
   )
 }
 
 const paceCopy: Record<
-  DashboardSummary['spendingPace']['pace'],
+  DashboardBudgetSummary['spendingPace']['pace'],
   { label: string; description: string }
 > = {
   low: {
@@ -65,12 +70,18 @@ export function DashboardPage() {
   const canUseAI = useAIAvailability(Boolean(services.aiInsights))
   const { activePeriod } = usePeriod()
   const load = useCallback(async () => {
-    if (!activePeriod) return null
-    const [financial, aggregated] = await Promise.all([
-      services.dashboard.getSummary.execute(activePeriod, getLocalDateOnly()),
+    const financial = services.dashboard.getFinancialSnapshot.execute()
+    if (!activePeriod)
+      return { financial: await financial, budget: null, aggregated: null }
+    const [snapshot, budget, aggregated] = await Promise.all([
+      financial,
+      services.dashboard.getBudgetSummary.execute(
+        activePeriod,
+        getLocalDateOnly(),
+      ),
       services.aiData.preparePeriodSummary.execute(activePeriod),
     ])
-    return { financial, aggregated }
+    return { financial: snapshot, budget, aggregated }
   }, [activePeriod, services])
   const summary = useAsyncData(load)
   const aiSummary = usePeriodSummary({
@@ -80,32 +91,17 @@ export function DashboardPage() {
     identityKey: `${auth.ownerId}:${auth.user?.id ?? 'guest'}`,
     periodId: activePeriod?.id ?? null,
   })
-  if (!activePeriod)
-    return (
-      <>
-        <PageHeader
-          eyebrow="Resumen"
-          title="Tu panorama financiero"
-          description="Todo lo importante de tu periodo, en un solo lugar."
-        />
-        <EmptyState
-          title="Aún no hay un periodo activo"
-          description="Crea o selecciona un periodo para ver tu panorama financiero."
-          action={
-            <Link className="button" to="/periods">
-              Configurar periodo
-            </Link>
-          }
-        />
-      </>
-    )
   if (summary.status === 'loading' && !summary.data)
     return (
       <>
         <PageHeader
           eyebrow="Resumen"
           title="Tu panorama financiero"
-          description={`${activePeriod.startDate} — ${activePeriod.endDate}`}
+          description={
+            activePeriod
+              ? `${activePeriod.startDate} — ${activePeriod.endDate}`
+              : 'Estado financiero actual'
+          }
         />
         <LoadingState message="Calculando tu panorama…" />
       </>
@@ -119,20 +115,25 @@ export function DashboardPage() {
     )
   if (!summary.data) return null
   const financial = summary.data.financial
-  const pace = paceCopy[financial.spendingPace.pace]
+  const budget = summary.data.budget
+  const pace = budget ? paceCopy[budget.spendingPace.pace] : null
   return (
     <>
       <PageHeader
         eyebrow="Resumen"
         title="Tu panorama financiero"
-        description={`${activePeriod.startDate} — ${activePeriod.endDate}`}
+        description={
+          activePeriod
+            ? `${activePeriod.startDate} — ${activePeriod.endDate}`
+            : 'Estado financiero actual'
+        }
         actions={
           <Link className="button" to="/expenses">
             Registrar gasto
           </Link>
         }
       />
-      {financial.spendingPace.pace === 'high' ? (
+      {budget?.spendingPace.pace === 'high' ? (
         <Notice
           tone="error"
           message="Tu ritmo de gasto es alto. Revisa tus gastos y presupuestos para evitar quedarte corto antes de terminar el periodo."
@@ -141,46 +142,79 @@ export function DashboardPage() {
       <section className="financial-grid" aria-label="Resumen financiero">
         <FinancialCard
           title="Saldo actual"
-          amount={financial.currentBalance}
-          description="Ingresos menos gastos registrados."
+          amount={financial.currentBalanceCents}
+          description="Saldo reconciliado con movimientos efectivos."
         />
+        {budget ? (
+          <FinancialCard
+            title="Presupuesto restante"
+            amount={budget.budgetRemaining}
+            description={`De un total planeado de ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(budget.totalBudget / 100)}.`}
+          />
+        ) : null}
         <FinancialCard
-          title="Presupuesto restante"
-          amount={financial.budgetRemaining}
-          description={`De un total planeado de ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(financial.totalBudget / 100)}.`}
+          title="Gastos del periodo"
+          amount={financial.spentCents}
+          description="Gastos registrados en el periodo actual."
         />
         <FinancialCard
           title="Compromisos pendientes"
-          amount={financial.pendingCommitments}
-          description="Pagos recurrentes aún pendientes."
+          amount={financial.committedCents}
+          description="Compromisos vencidos y próximos dentro del horizonte."
         />
         <FinancialCard
-          title="Dinero disponible real"
-          amount={financial.realAvailableMoney}
-          description="Saldo actual menos compromisos pendientes."
+          title="Dinero disponible proyectado"
+          amount={financial.projectedAvailableCents}
+          description="Saldo actual después de compromisos pendientes."
         />
+        {financial.upcomingCommittedCents > 0 ? (
+          <FinancialCard
+            title="Compromisos próximos"
+            amount={financial.upcomingCommittedCents}
+            description="Compromisos por vencer dentro del horizonte."
+          />
+        ) : null}
+        {financial.overdueCommittedCents > 0 ? (
+          <FinancialCard
+            title="Compromisos vencidos"
+            amount={financial.overdueCommittedCents}
+            description="Compromisos pendientes con fecha anterior a hoy."
+          />
+        ) : null}
+        {financial.expectedIncomeCents > 0 ? (
+          <FinancialCard
+            title="Ingresos esperados"
+            amount={financial.expectedIncomeCents}
+            description="Ingresos esperados dentro del horizonte actual."
+          />
+        ) : null}
+        {financial.overdueExpectedIncomeCents > 0 ? (
+          <FinancialCard
+            title="Ingresos esperados vencidos"
+            amount={financial.overdueExpectedIncomeCents}
+            description="Ingresos esperados con fecha anterior a hoy."
+          />
+        ) : null}
       </section>
-      <section
-        className={`panel pace-card pace-${financial.spendingPace.pace}`}
-      >
-        <div>
-          <p className="eyebrow">Ritmo de gasto</p>
-          <h2>{pace.label}</h2>
-          <p>{pace.description}</p>
-        </div>
-        <div className="pace-metrics">
+      {budget && pace ? (
+        <section className={`panel pace-card pace-${budget.spendingPace.pace}`}>
           <div>
-            <span>Presupuesto gastado</span>
-            <strong>
-              {financial.spendingPace.spentPercentage.toFixed(1)}%
-            </strong>
+            <p className="eyebrow">Ritmo de gasto</p>
+            <h2>{pace.label}</h2>
+            <p>{pace.description}</p>
           </div>
-          <div>
-            <span>Tiempo transcurrido</span>
-            <strong>{financial.spendingPace.timePercentage.toFixed(1)}%</strong>
+          <div className="pace-metrics">
+            <div>
+              <span>Presupuesto gastado</span>
+              <strong>{budget.spendingPace.spentPercentage.toFixed(1)}%</strong>
+            </div>
+            <div>
+              <span>Tiempo transcurrido</span>
+              <strong>{budget.spendingPace.timePercentage.toFixed(1)}%</strong>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
       <PeriodAISummary
         state={aiSummary}
         canUseAI={canUseAI}

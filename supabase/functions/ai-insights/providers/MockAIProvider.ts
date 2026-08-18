@@ -70,16 +70,17 @@ export class MockAIProvider implements AIProvider {
     signal: AbortSignal,
   ): Promise<PeriodSummaryOutput> {
     this.record('generatePeriodSummary', {
-      categoryCount: input.aggregatedData.categoryBreakdown.length,
-      periodType: input.aggregatedData.periodType,
-      topExpenseCount: input.aggregatedData.topExpenses?.length ?? 0,
+      categoryCount: input.facts.categoryBreakdown.length,
+      context: input.context,
+      periodType: input.facts.periodType,
+      topExpenseCount: input.facts.topExpenses?.length ?? 0,
     })
     await this.beforeResponse(signal)
     if (this.options.periodSummary) return this.options.periodSummary
-    const { aggregatedData } = input
+    const { facts } = input
     return {
-      text: `Resumen ${aggregatedData.periodType} del ${aggregatedData.startDate} al ${aggregatedData.endDate}.`,
-      highlights: aggregatedData.categoryBreakdown
+      text: `Resumen histórico ${facts.periodType} del ${facts.startDate} al ${facts.endDate}.`,
+      highlights: facts.categoryBreakdown
         .slice(0, 5)
         .map(({ categoryName }) => `Actividad registrada en ${categoryName}.`),
     }

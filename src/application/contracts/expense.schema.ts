@@ -7,4 +7,5 @@ export const createExpenseSchema = z.object({
   amount: positiveCentsSchema,
   description: z.string().trim().min(1).max(200),
   date: dateOnlySchema,
+  affectsBalance: z.boolean().optional(),
 })

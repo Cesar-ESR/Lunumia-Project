@@ -4,6 +4,9 @@ import { isDateOnly } from '@domain/value-objects'
 
 export const MAX_RECEIPT_MERCHANT_LENGTH = 200
 export const MAX_RECEIPT_RAW_TEXT_LENGTH = 20_000
+export const MAX_RECEIPT_AMOUNT_EVIDENCE_LENGTH = 200
+
+const suggestedCentsSchema = z.number().int().finite().safe().nullable()
 
 export const ReceiptResultSchema = z
   .object({
@@ -12,12 +15,24 @@ export const ReceiptResultSchema = z
       .string()
       .refine(isDateOnly, 'La fecha OCR debe usar YYYY-MM-DD y ser válida.')
       .nullable(),
-    total: z.number().int().finite().nonnegative().nullable(),
+    subtotal: suggestedCentsSchema,
+    tax: suggestedCentsSchema,
+    tip: suggestedCentsSchema,
+    discount: suggestedCentsSchema,
+    otherFees: suggestedCentsSchema,
+    total: suggestedCentsSchema,
+    amountPaid: suggestedCentsSchema,
+    amountEvidence: z
+      .string()
+      .trim()
+      .max(MAX_RECEIPT_AMOUNT_EVIDENCE_LENGTH)
+      .nullable(),
+    amountAmbiguous: z.boolean(),
     currency: z
       .string()
       .regex(/^[A-Z]{3}$/)
       .nullable(),
-    confidence: z.number().finite().min(0).max(1),
+    confidence: z.number().finite().min(0).max(1).nullable(),
     rawText: z.string().max(MAX_RECEIPT_RAW_TEXT_LENGTH).nullable(),
   })
   .strict()

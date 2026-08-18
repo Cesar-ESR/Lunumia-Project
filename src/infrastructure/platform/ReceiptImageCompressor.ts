@@ -2,7 +2,7 @@ import type { SupportedReceiptMimeType } from '@domain/ports'
 import type { CapturedImage, SelectedReceiptImage } from './PlatformAdapter'
 import { ReceiptImageError } from './ReceiptImageError'
 import {
-  MAX_RECEIPT_IMAGE_BYTES,
+  MAX_RECEIPT_OCR_IMAGE_BYTES,
   validateReceiptImage,
 } from './validateReceiptImage'
 
@@ -92,7 +92,7 @@ export class ReceiptImageCompressor {
       canvas.draw(decoded.source, dimensions.width, dimensions.height)
       const blob = await canvas.toBlob(mimeType, RECEIPT_COMPRESSION_QUALITY)
       if (blob.size === 0) throw new ReceiptImageError('compression_failed')
-      if (blob.size >= MAX_RECEIPT_IMAGE_BYTES)
+      if (blob.size >= MAX_RECEIPT_OCR_IMAGE_BYTES)
         throw new ReceiptImageError('file_too_large')
       const base64 = await this.dependencies.base64.encode(blob)
       const previewUrl = this.dependencies.objectUrls.create(blob)

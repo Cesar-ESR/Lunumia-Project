@@ -127,6 +127,7 @@ describe('integracion de casos de uso criticos', () => {
       periodId: 'period',
       dueDate: '2026-01-05',
       status: 'pending',
+      amount: payment.amount,
       transactionId: null,
     }
     await database.periods.add({
@@ -148,7 +149,7 @@ describe('integracion de casos de uso criticos', () => {
         occurrenceId: occurrence.id,
         paidDate: '2026-02-01',
       }),
-    ).rejects.toThrow('La fecha de pago debe estar dentro del periodo activo.')
+    ).rejects.toThrow('No existe un periodo para la fecha de pago.')
     expect(await database.expenses.count()).toBe(0)
 
     const result = await markAsPaid.execute({
@@ -280,11 +281,60 @@ describe('integracion de casos de uso criticos', () => {
       '2026-01-10',
       '2026-01-17',
     ])
+    expect(
+      first.created.map((value) => ('amount' in value ? value.amount : null)),
+    ).toEqual([10_000, 10_000, 10_000])
+    const payment = await payments.findById('payment')
+    if (!payment) throw new Error('Falta el pago recurrente.')
+    await payments.update({ ...payment, amount: 25_000 })
+    expect(
+      (await occurrences.findByPaymentAndPeriod('payment', 'period')).map(
+        (value) => ('amount' in value ? value.amount : null),
+      ),
+    ).toEqual([10_000, 10_000, 10_000])
     expect(second.created).toEqual([])
     expect(second.skippedExisting).toBe(first.created.length)
     expect(persisted).toHaveLength(first.created.length)
     expect(new Set(persisted.map((value) => value.dueDate)).size).toBe(
       persisted.length,
     )
+  })
+
+  it('no materializa ocurrencias para un periodo futuro', async () => {
+    const periods = new DexiePeriodRepository(database, ownerId)
+    const payments = new DexieRecurringPaymentRepository(database, ownerId)
+    const occurrences = new DexieRecurringPaymentOccurrenceRepository(
+      database,
+      ownerId,
+    )
+    await periods.create({
+      ...base,
+      id: 'future-period',
+      type: 'monthly',
+      startDate: '2026-02-01',
+      endDate: '2026-02-28',
+    })
+    await payments.create({
+      ...base,
+      id: 'future-payment',
+      name: 'Pago futuro',
+      amount: 10_000,
+      frequency: 'monthly',
+      dueDate: '2026-02-05',
+      endDate: null,
+      categoryId: 'services',
+      status: 'active',
+    })
+
+    await expect(
+      new GenerateOccurrencesForPeriod(
+        periods,
+        payments,
+        occurrences,
+        ids,
+        clock,
+      ).execute(ownerId, 'future-period'),
+    ).rejects.toThrow(/periodo actual/)
+    expect(await occurrences.findAll()).toEqual([])
   })
 })

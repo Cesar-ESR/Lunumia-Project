@@ -72,10 +72,43 @@ describe('EdgeFunctionAIAdapter', () => {
     ).resolves.toEqual(response)
     expect(invoke).toHaveBeenCalledWith('ai-insights/period-summary', {
       method: 'POST',
-      body: { aggregatedData },
+      body: {
+        context: 'historical',
+        facts: {
+          receivedIncomeCents: 700_000,
+          expenseCents: 21_300,
+          categoryBreakdown: [
+            {
+              categoryId,
+              categoryName: 'Comida',
+              totalCents: 14_000,
+              percentage: 65.73,
+            },
+            {
+              categoryId: secondCategoryId,
+              categoryName: 'Transporte',
+              totalCents: 7_300,
+              percentage: 34.27,
+            },
+          ],
+          topExpenses: [
+            { description: 'Hamburguesa', amountCents: 12_000 },
+            { description: 'Uber al trabajo', amountCents: 5_000 },
+            { description: 'Pasaje', amountCents: 2_300 },
+            { description: 'Agua', amountCents: 2_000 },
+          ],
+          periodType: 'monthly',
+          startDate: '2026-08-01',
+          endDate: '2026-08-31',
+        },
+      },
     })
     const serializedRequest = JSON.stringify(invoke.mock.calls[0])
     expect(serializedRequest).toMatch(/700000|21300|14000|7300/)
+    expect(serializedRequest).not.toMatch(
+      /aggregatedData|totalIncome|expected|cancelled/,
+    )
+    expect(aggregatedData.totalIncome).toBe(700_000)
   })
 
   it('23. invoca explain-changes correctamente', async () => {

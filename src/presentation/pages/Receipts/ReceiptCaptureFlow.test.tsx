@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import type { ReceiptRecognitionProposal } from '@application/use-cases/receipts'
 import { ReceiptRecognitionError } from '@infrastructure/ocr'
+import {
+  validateReceiptAmount,
+  type ReceiptAmountProposal,
+} from '@domain/rules'
 import { ReceiptImageError, type CapturedImage } from '@infrastructure/platform'
 import type { ApplicationServices } from '../../../app/composition-root'
 import {
@@ -55,6 +59,19 @@ function createCapturedImage(
 function createProposal(
   overrides: Partial<ReceiptRecognitionProposal> = {},
 ): ReceiptRecognitionProposal {
+  const amountProposal: ReceiptAmountProposal = {
+    subtotal: 10_000,
+    tax: 2_345,
+    tip: null,
+    discount: null,
+    otherFees: null,
+    total: 12_345,
+    amountPaid: 12_345,
+    amountEvidence: 'TOTAL $123.45',
+    amountAmbiguous: false,
+    currency: 'MXN',
+    confidence: 0.92,
+  }
   return {
     draft: {
       description: 'Mercado local',
@@ -65,6 +82,8 @@ function createProposal(
     },
     detectedCurrency: 'MXN',
     confidence: 0.92,
+    amountProposal,
+    amountValidation: validateReceiptAmount(amountProposal),
     ...overrides,
   }
 }
@@ -252,10 +271,16 @@ describe('ReceiptCaptureFlow - OCR y resultados tardíos', () => {
     expect(screen.getByLabelText('Monto (MXN)')).toHaveValue('123.45')
     expect(screen.getByLabelText('Fecha')).toHaveValue('2026-07-10')
     expect(screen.getByLabelText('Periodo')).toHaveValue(PERIOD_ID)
+    expect(
+      screen.getByRole('heading', { name: 'Validación del monto' }),
+    ).toBeVisible()
+    expect(screen.getByText('TOTAL $123.45')).toBeVisible()
+    expect(screen.getByText('Listo para confirmar')).toBeVisible()
   })
 
   it('deja vacíos todos los campos OCR faltantes y no usa rawText', async () => {
     const user = userEvent.setup()
+    const missing = createProposal()
     setup({
       proposal: createProposal({
         draft: {
@@ -266,6 +291,15 @@ describe('ReceiptCaptureFlow - OCR y resultados tardíos', () => {
           periodId: PERIOD_ID,
         },
         detectedCurrency: null,
+        amountProposal: {
+          ...missing.amountProposal,
+          subtotal: null,
+          tax: null,
+          total: null,
+          amountPaid: null,
+          amountEvidence: null,
+          currency: null,
+        },
       }),
     })
     await openEditing(user)
@@ -273,6 +307,7 @@ describe('ReceiptCaptureFlow - OCR y resultados tardíos', () => {
     expect(screen.getByLabelText('Monto (MXN)')).toHaveValue('')
     expect(screen.getByLabelText('Fecha')).toHaveValue('')
     expect(screen.queryByText(/rawText/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/No pudimos identificar el total/)).toBeVisible()
   })
 
   it.each([
@@ -393,10 +428,15 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
     await user.type(screen.getByLabelText('Descripción'), 'Comercio corregido')
     await user.clear(screen.getByLabelText('Monto (MXN)'))
     await user.type(screen.getByLabelText('Monto (MXN)'), '150.25')
+    expect(
+      screen.getByText('Monto corregido, listo para confirmar'),
+    ).toBeVisible()
     await user.clear(screen.getByLabelText('Fecha'))
     await user.type(screen.getByLabelText('Fecha'), '2026-07-12')
     await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     expect(createExpense).toHaveBeenCalledWith(
       expect.objectContaining({
         description: 'Comercio corregido',
@@ -406,6 +446,40 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
         periodId: PERIOD_ID,
       }),
     )
+  })
+
+  it('OCR no escribe y solo la confirmación explícita invoca CreateExpense', async () => {
+    const user = userEvent.setup()
+    const { createExpense } = setup()
+    await openEditing(user)
+    expect(createExpense).not.toHaveBeenCalled()
+    await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Confirmar monto y guardar gasto',
+      }),
+    )
+    expect(createExpense).toHaveBeenCalledOnce()
+  })
+
+  it('muestra mismatch sin reemplazar el total detectado', async () => {
+    const user = userEvent.setup()
+    const mismatchProposal = createProposal()
+    setup({
+      proposal: createProposal({
+        draft: { ...mismatchProposal.draft, amount: 15_000 },
+        amountProposal: {
+          ...mismatchProposal.amountProposal,
+          total: 15_000,
+          amountPaid: 15_000,
+        },
+      }),
+    })
+    await openEditing(user)
+    expect(screen.getByLabelText('Monto (MXN)')).toHaveValue('150.00')
+    expect(
+      screen.getByText(/componentes detectados no parecen coincidir/),
+    ).toBeVisible()
   })
 
   it.each(['', '0', '-10'])(
@@ -418,7 +492,9 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
       await user.clear(input)
       if (amount) await user.type(input, amount)
       await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
-      await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+      await user.click(
+        screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+      )
       expect(
         screen.getByText('Escribe un monto positivo con máximo dos decimales.'),
       ).toBeVisible()
@@ -433,7 +509,9 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
     await user.clear(screen.getByLabelText('Fecha'))
     await user.type(screen.getByLabelText('Fecha'), '2026-09-10')
     await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     expect(
       screen.getByText(/No existe un periodo para esta fecha/),
     ).toBeVisible()
@@ -464,7 +542,9 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
     expect(
       screen.getByText(/parece estar en USD.*configurada es MXN/),
     ).toBeVisible()
-    const save = screen.getByRole('button', { name: 'Guardar gasto' })
+    const save = screen.getByRole('button', {
+      name: 'Confirmar monto y guardar gasto',
+    })
     expect(save).toBeDisabled()
     await user.click(screen.getByLabelText(/Revisé el importe/))
     await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
@@ -483,10 +563,20 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
 
   it('confianza baja comunica revisión sin bloquear el formulario', async () => {
     const user = userEvent.setup()
-    setup({ proposal: createProposal({ confidence: 0.2 }) })
+    const lowConfidence = createProposal()
+    setup({
+      proposal: createProposal({
+        confidence: 0.2,
+        amountProposal: { ...lowConfidence.amountProposal, confidence: 0.2 },
+      }),
+    })
     await openEditing(user)
-    expect(screen.getByText(/confianza baja/)).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Guardar gasto' })).toBeEnabled()
+    expect(
+      screen.getByText(/lectura del monto no fue suficientemente clara/i),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    ).toBeEnabled()
   })
 
   it('el registro manual libera imagen y nunca llama OCR', async () => {
@@ -512,7 +602,9 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
     const flow = setup({ image: createCapturedImage('save', revoke) })
     await openEditing(user)
     await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
-    await user.dblClick(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.dblClick(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     expect(flow.createExpense).toHaveBeenCalledOnce()
     expect(revoke).toHaveBeenCalledOnce()
     expect(
@@ -526,7 +618,9 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
     const { createExpense } = setup()
     await openEditing(user)
     await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     const payload = createExpense.mock.calls[0]?.[0]
     expect(payload).toEqual({
       ownerId: OWNER_ID,
@@ -549,13 +643,17 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
       .mockResolvedValueOnce(createExpenseMock())
     await openEditing(user)
     await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     expect(
       await screen.findByText('No pudimos guardar el gasto.'),
     ).toBeVisible()
     expect(screen.queryByText('No se pudo guardar localmente.')).toBeNull()
     expect(screen.getByLabelText('Descripción')).toHaveValue('Mercado local')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     expect(createExpense).toHaveBeenCalledTimes(2)
   })
 
@@ -586,7 +684,9 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
     expect(screen.getByLabelText('Categoría')).toBeVisible()
     expect(screen.getByLabelText('Fecha')).toBeVisible()
     expect(screen.getByLabelText('Periodo')).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     const amount = screen.getByLabelText('Monto (MXN)')
     expect(amount).toHaveAttribute(
       'aria-describedby',

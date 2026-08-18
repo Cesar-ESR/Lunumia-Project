@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   APP_NAME,
+  BACKUP_SCHEMA_VERSION_V1,
   CURRENT_BACKUP_SCHEMA_VERSION,
   LEGACY_BACKUP_APP_NAME,
 } from '@shared/constants'
@@ -35,6 +36,7 @@ const instantSchema = z
 const syncStatusSchema = z.enum(['synced', 'pending', 'error'])
 const positiveCentsSchema = z.number().int().positive()
 const nonNegativeCentsSchema = z.number().int().nonnegative()
+const signedCentsSchema = z.number().int().safe()
 
 const syncableShape = {
   id: uuidSchema,
@@ -65,6 +67,9 @@ export const backupIncomeSchema = z
     amount: positiveCentsSchema,
     description: persistedTextSchema(200),
     date: dateOnlySchema,
+    status: z.enum(['expected', 'received', 'cancelled']),
+    affectsBalance: z.boolean(),
+    balanceEffectiveAt: instantSchema.nullable(),
   })
   .strict()
 
@@ -77,6 +82,8 @@ export const backupExpenseSchema = z
     description: persistedTextSchema(200),
     date: dateOnlySchema,
     recurringOccurrenceId: uuidSchema.nullable(),
+    affectsBalance: z.boolean(),
+    balanceEffectiveAt: instantSchema,
   })
   .strict()
 
@@ -120,7 +127,7 @@ export const backupRecurringPaymentSchema = z
     },
   )
 
-export const backupRecurringPaymentOccurrenceSchema = z
+const backupRecurringPaymentOccurrenceBaseSchema = z
   .object({
     ...syncableShape,
     recurringPaymentId: uuidSchema,
@@ -130,22 +137,31 @@ export const backupRecurringPaymentOccurrenceSchema = z
     transactionId: uuidSchema.nullable(),
   })
   .strict()
-  .superRefine((occurrence, context) => {
-    if (occurrence.status === 'paid' && occurrence.transactionId === null) {
-      context.addIssue({
-        code: 'custom',
-        path: ['transactionId'],
-        message: 'Una ocurrencia pagada debe referenciar un gasto.',
-      })
-    }
-    if (occurrence.status !== 'paid' && occurrence.transactionId !== null) {
-      context.addIssue({
-        code: 'custom',
-        path: ['transactionId'],
-        message: 'Solo una ocurrencia pagada puede referenciar un gasto.',
-      })
-    }
-  })
+
+function validateOccurrenceTransaction(
+  occurrence: z.infer<typeof backupRecurringPaymentOccurrenceBaseSchema>,
+  context: z.RefinementCtx,
+): void {
+  if (occurrence.status === 'paid' && occurrence.transactionId === null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['transactionId'],
+      message: 'Una ocurrencia pagada debe referenciar un gasto.',
+    })
+  }
+  if (occurrence.status !== 'paid' && occurrence.transactionId !== null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['transactionId'],
+      message: 'Solo una ocurrencia pagada puede referenciar un gasto.',
+    })
+  }
+}
+
+export const backupRecurringPaymentOccurrenceSchema =
+  backupRecurringPaymentOccurrenceBaseSchema
+    .extend({ amount: positiveCentsSchema })
+    .superRefine(validateOccurrenceTransaction)
 
 export const backupUserSettingsSchema = z
   .object({
@@ -156,6 +172,15 @@ export const backupUserSettingsSchema = z
     theme: z.enum(['light', 'dark', 'system']),
     createdAt: instantSchema,
     updatedAt: instantSchema,
+  })
+  .strict()
+
+export const backupBalanceAnchorSchema = z
+  .object({
+    ...syncableShape,
+    amount: signedCentsSchema,
+    capturedAt: instantSchema,
+    ledgerCutoffAt: instantSchema,
   })
   .strict()
 
@@ -170,6 +195,7 @@ export const backupDataSchema = z
     recurringPaymentOccurrences: z.array(
       backupRecurringPaymentOccurrenceSchema,
     ),
+    balanceAnchors: z.array(backupBalanceAnchorSchema),
     userSettings: z.array(backupUserSettingsSchema).max(1),
   })
   .strict()
@@ -190,5 +216,43 @@ export const backupVersionEnvelopeSchema = z
   })
   .passthrough()
 
+const legacyBackupIncomeV1Schema = backupIncomeSchema.omit({
+  status: true,
+  affectsBalance: true,
+  balanceEffectiveAt: true,
+})
+const legacyBackupExpenseV1Schema = backupExpenseSchema.omit({
+  affectsBalance: true,
+  balanceEffectiveAt: true,
+})
+const legacyBackupOccurrenceV1Schema =
+  backupRecurringPaymentOccurrenceBaseSchema.superRefine(
+    validateOccurrenceTransaction,
+  )
+
+export const legacyBackupDataV1Schema = z
+  .object({
+    periods: z.array(backupPeriodSchema),
+    incomes: z.array(legacyBackupIncomeV1Schema),
+    expenses: z.array(legacyBackupExpenseV1Schema),
+    categories: z.array(backupCategorySchema),
+    categoryBudgets: z.array(backupCategoryBudgetSchema),
+    recurringPayments: z.array(backupRecurringPaymentSchema),
+    recurringPaymentOccurrences: z.array(legacyBackupOccurrenceV1Schema),
+    userSettings: z.array(backupUserSettingsSchema).max(1),
+  })
+  .strict()
+
+export const legacyBackupFileV1Schema = z
+  .object({
+    schemaVersion: z.literal(BACKUP_SCHEMA_VERSION_V1),
+    appName: z.union([z.literal(APP_NAME), z.literal(LEGACY_BACKUP_APP_NAME)]),
+    exportedAt: instantSchema,
+    ownerId: ownerIdSchema,
+    data: legacyBackupDataV1Schema,
+  })
+  .strict()
+
 export type BackupData = z.infer<typeof backupDataSchema>
 export type BackupFile = z.infer<typeof backupFileSchema>
+export type LegacyBackupFileV1 = z.infer<typeof legacyBackupFileV1Schema>

@@ -2,6 +2,7 @@ import type { SupportedReceiptMimeType } from '@domain/ports'
 import { ReceiptImageError } from './ReceiptImageError'
 
 export const MAX_RECEIPT_IMAGE_BYTES = 10 * 1024 * 1024
+export const MAX_RECEIPT_OCR_IMAGE_BYTES = 3_000_000
 export const SUPPORTED_RECEIPT_MIME_TYPES = [
   'image/jpeg',
   'image/png',

@@ -22,7 +22,8 @@ export function buildPeriodAggregatedData(
     (income) =>
       income.ownerId === period.ownerId &&
       income.periodId === period.id &&
-      income.deletedAt === null,
+      income.deletedAt === null &&
+      (!('status' in income) || income.status === 'received'),
   )
   const activeExpenses = expenses.filter(
     (expense) =>

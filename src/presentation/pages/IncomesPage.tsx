@@ -129,10 +129,9 @@ export function IncomesPage() {
     }
   }
 
-  const total = (incomes.data ?? []).reduce(
-    (sum, income) => sum + income.amount,
-    0,
-  )
+  const totalReceived = (incomes.data ?? [])
+    .filter((income) => !('status' in income) || income.status === 'received')
+    .reduce((sum, income) => sum + income.amount, 0)
   return (
     <>
       <PageHeader
@@ -141,8 +140,8 @@ export function IncomesPage() {
         description={`${activePeriod.startDate} — ${activePeriod.endDate}`}
         actions={
           <div className="summary-pill">
-            <span>Total</span>
-            <MoneyDisplay amount={total} />
+            <span>Total recibido</span>
+            <MoneyDisplay amount={totalReceived} />
           </div>
         }
       />

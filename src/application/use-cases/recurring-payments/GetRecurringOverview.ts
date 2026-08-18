@@ -1,4 +1,3 @@
-import { computePendingCommitments } from '@domain/calculations'
 import type {
   IRecurringPaymentOccurrenceRepository,
   IRecurringPaymentRepository,
@@ -17,9 +16,6 @@ export class GetRecurringOverview {
     return {
       payments,
       occurrences,
-      pendingCommitments: periodId
-        ? computePendingCommitments(occurrences, payments, periodId)
-        : 0,
     }
   }
 }

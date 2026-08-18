@@ -1,4 +1,5 @@
 export * from './category-budget.schema'
+export * from './balance-anchor.schema'
 export * from './category.schema'
 export * from './expense.schema'
 export * from './income.schema'

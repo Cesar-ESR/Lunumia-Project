@@ -1,4 +1,8 @@
-import type { ExplainChangesInput, PeriodSummaryInput } from '../contracts.ts'
+import type {
+  ExplainChangesInput,
+  PeriodSummaryInput,
+  PlanningAnalysisInput,
+} from '../contracts.ts'
 
 const AI_CURRENCY = 'MXN'
 const AI_MONEY_LOCALE = 'es-MX'
@@ -8,22 +12,39 @@ const moneyFormatter = new Intl.NumberFormat(AI_MONEY_LOCALE, {
 })
 
 export function buildPeriodSummaryPromptContext(input: PeriodSummaryInput) {
-  const data = input.aggregatedData
+  const data = input.facts
   return {
-    totalIncome: formatCurrency(data.totalIncome),
-    totalExpenses: formatCurrency(data.totalExpenses),
+    context: input.context,
+    receivedIncome: formatCurrency(data.receivedIncomeCents),
+    expenses: formatCurrency(data.expenseCents),
     categoryBreakdown: data.categoryBreakdown.map((category) => ({
       categoryName: category.categoryName,
-      total: formatCurrency(category.total),
+      total: formatCurrency(category.totalCents),
       percentage: formatPercentage(category.percentage),
     })),
     topExpenses: data.topExpenses?.map((expense) => ({
       description: expense.description,
-      amount: formatCurrency(expense.amount),
+      amount: formatCurrency(expense.amountCents),
     })),
     periodType: data.periodType,
     startDate: data.startDate,
     endDate: data.endDate,
+  }
+}
+
+export function buildPlanningPromptContext(input: PlanningAnalysisInput) {
+  const facts = input.facts
+  return {
+    context: input.context,
+    currentBalance: formatNullableCurrency(facts.currentBalanceCents),
+    committed: formatCurrency(facts.committedCents),
+    expectedIncome: formatCurrency(facts.expectedIncomeCents),
+    projectedAvailable: formatNullableCurrency(facts.projectedAvailableCents),
+    projectedClosingBalance: formatNullableCurrency(
+      facts.projectedClosingBalanceCents,
+    ),
+    projectionCoverage: facts.projectionCoverage,
+    projectionHorizonEnd: facts.projectionHorizonEnd,
   }
 }
 
@@ -45,6 +66,10 @@ export function buildExplainChangesPromptContext(input: ExplainChangesInput) {
 
 export function formatCurrency(amountCents: number): string {
   return moneyFormatter.format(amountCents / 100)
+}
+
+function formatNullableCurrency(amountCents: number | null): string | null {
+  return amountCents === null ? null : formatCurrency(amountCents)
 }
 
 function formatPercentage(value: number, showPositiveSign = false): string {

@@ -10,7 +10,15 @@ import {
 const valid = {
   merchant: 'Comercio',
   date: '2026-08-02',
+  subtotal: 10_000,
+  tax: 2_345,
+  tip: null,
+  discount: null,
+  otherFees: null,
   total: 12_345,
+  amountPaid: 12_345,
+  amountEvidence: 'TOTAL 123.45',
+  amountAmbiguous: false,
   currency: 'MXN',
   confidence: 0.95,
   rawText: 'TOTAL 123.45',
@@ -25,6 +33,12 @@ describe('ReceiptResultSchema', () => {
     expect(
       ReceiptResultSchema.safeParse({ ...valid, total: 12.34 }).success,
     ).toBe(false)
+  })
+
+  it('acepta una sugerencia negativa para que el validador la clasifique', () => {
+    expect(ReceiptResultSchema.safeParse({ ...valid, total: -1 }).success).toBe(
+      true,
+    )
   })
 
   it('rechaza confidence fuera de rango', () => {
@@ -60,7 +74,15 @@ describe('ReceiptResultSchema', () => {
       ReceiptResultSchema.parse({
         merchant: null,
         date: null,
+        subtotal: null,
+        tax: null,
+        tip: null,
+        discount: null,
+        otherFees: null,
         total: 0,
+        amountPaid: null,
+        amountEvidence: null,
+        amountAmbiguous: false,
         currency: null,
         confidence: 0,
         rawText: null,
@@ -68,7 +90,15 @@ describe('ReceiptResultSchema', () => {
     ).toEqual({
       merchant: null,
       date: null,
+      subtotal: null,
+      tax: null,
+      tip: null,
+      discount: null,
+      otherFees: null,
       total: 0,
+      amountPaid: null,
+      amountEvidence: null,
+      amountAmbiguous: false,
       currency: null,
       confidence: 0,
       rawText: null,
@@ -80,7 +110,6 @@ describe('ReceiptResultSchema', () => {
 
   it.each([
     ['timestamp en fecha', { date: '2026-08-02T00:00:00.000Z' }],
-    ['total negativo', { total: -1 }],
     ['total NaN', { total: Number.NaN }],
     ['total infinito', { total: Number.POSITIVE_INFINITY }],
     ['moneda minúscula', { currency: 'mxn' }],

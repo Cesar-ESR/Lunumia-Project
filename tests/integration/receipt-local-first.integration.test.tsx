@@ -107,6 +107,24 @@ describe('Receipt local-first integration', () => {
       },
       detectedCurrency: 'MXN',
       confidence: 0.98,
+      amountProposal: {
+        subtotal: 10_000,
+        tax: 2_345,
+        tip: null,
+        discount: null,
+        otherFees: null,
+        total: 12_345,
+        amountPaid: 12_345,
+        amountEvidence: 'TOTAL 123.45',
+        amountAmbiguous: false,
+        currency: 'MXN',
+        confidence: 0.98,
+      },
+      amountValidation: {
+        status: 'valid' as const,
+        reasons: [] as const,
+        totalCents: 12_345,
+      },
     }))
     render(
       <ReceiptCaptureFlow
@@ -135,7 +153,9 @@ describe('Receipt local-first integration', () => {
     )
     await screen.findByRole('heading', { name: 'Datos del gasto' })
     await user.selectOptions(screen.getByLabelText('Categoría'), categoryId)
-    await user.dblClick(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.dblClick(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
 
     await screen.findByText('Gasto guardado en este dispositivo.')
     const expenses = await db.expenses.toArray()
@@ -193,7 +213,9 @@ describe('Receipt local-first integration', () => {
     await user.type(screen.getByLabelText('Monto (MXN)'), '10.00')
     await user.type(screen.getByLabelText('Descripción'), 'Prueba')
     await user.selectOptions(screen.getByLabelText('Categoría'), categoryId)
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     expect(
       await screen.findByText('No pudimos guardar el gasto.'),
     ).toBeVisible()
@@ -248,7 +270,9 @@ describe('Receipt local-first integration', () => {
     await user.type(screen.getByLabelText('Monto (MXN)'), '5.00')
     await user.type(screen.getByLabelText('Descripción'), 'Manual')
     await user.selectOptions(screen.getByLabelText('Categoría'), categoryId)
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
     await screen.findByText('Gasto guardado en este dispositivo.')
     expect(createExpense).toHaveBeenCalledOnce()
     expect(recognizeReceipt).not.toHaveBeenCalled()

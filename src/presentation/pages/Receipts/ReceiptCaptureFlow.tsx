@@ -14,6 +14,7 @@ import { CurrencyMismatchWarning } from './CurrencyMismatchWarning'
 import { ReceiptErrorPanel } from './ReceiptErrorPanel'
 import { ReceiptPreview } from './ReceiptPreview'
 import { ReceiptSourceSelector } from './ReceiptSourceSelector'
+import { ReceiptAmountValidationSection } from './ReceiptAmountValidationSection'
 import type { ReceiptFlowState, ReceiptFormContext } from './receipt-flow-state'
 import { toReceiptFlowFailure } from './receipt-flow-errors'
 
@@ -179,6 +180,8 @@ export function ReceiptCaptureFlow({
       ),
       detectedCurrency: null,
       confidence: null,
+      amountProposal: null,
+      amountValidation: null,
     })
   }
 
@@ -235,8 +238,8 @@ export function ReceiptCaptureFlow({
   return (
     <div className="receipt-flow">
       <p className="receipt-privacy">
-        La imagen se utiliza temporalmente para reconocer los datos y no se
-        guarda en tu cuenta.
+        La imagen se envía temporalmente mediante Supabase Edge a Groq para
+        reconocer los datos; Lunumia no la guarda en tu cuenta.
       </p>
 
       {state.status === 'idle' ||
@@ -300,7 +303,7 @@ export function ReceiptCaptureFlow({
                 categories={categories}
                 initialValues={formContext.draft}
                 currency={currency}
-                submitLabel="Guardar gasto"
+                submitLabel="Confirmar monto y guardar gasto"
                 submitDisabled={
                   state.status === 'submitting' ||
                   (mismatch && !currencyReviewed)
@@ -308,15 +311,13 @@ export function ReceiptCaptureFlow({
                 resetOnSuccess={false}
                 focusOnMount
                 idPrefix="receipt-expense"
-                beforeFields={
+                beforeFields={({ amountCents }) => (
                   <>
-                    {formContext.confidence !== null &&
-                    formContext.confidence < 0.5 ? (
-                      <div className="notice warning" role="status">
-                        El reconocimiento tuvo confianza baja. Revisa con
-                        cuidado todos los campos.
-                      </div>
-                    ) : null}
+                    <ReceiptAmountValidationSection
+                      proposal={formContext.amountProposal}
+                      amountCents={amountCents}
+                      configuredCurrency={currency}
+                    />
                     {mismatch && formContext.detectedCurrency ? (
                       <CurrencyMismatchWarning
                         detectedCurrency={formContext.detectedCurrency}
@@ -330,7 +331,7 @@ export function ReceiptCaptureFlow({
                       <strong>{currency}</strong>
                     </div>
                   </>
-                }
+                )}
                 onSubmit={(value) => submitExpense(value, formContext)}
                 onCancel={cancelFlow}
               />

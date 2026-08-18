@@ -167,7 +167,7 @@ export class GroqAIProvider implements AIProvider {
       PeriodSummaryResponseSchema,
       await this.complete(
         operation,
-        'Redacta un resumen breve en español usando únicamente los datos recibidos. Todos los importes y porcentajes proporcionados ya fueron calculados y formateados por la aplicación. Reproduce literalmente esos valores cuando los menciones: no realices cálculos, conversiones ni reformateos numéricos; no cambies separadores, no sumes ni restes, no modifiques porcentajes y no inventes cifras. Responde solo JSON con text y highlights.',
+        'Redacta un resumen histórico breve en español usando únicamente los hechos recibidos. receivedIncome contiene sólo ingresos realizados; expected y cancelled no son ingresos históricos y no están incluidos. Todos los importes y porcentajes ya fueron calculados por la aplicación. Explícalos sin recalcular, estimar, sumar, restar, convertir, alterar o inventar cifras. No presentes proyecciones como hechos actuales. Reproduce literalmente los valores cuando los menciones. Responde solo JSON con text y highlights.',
         buildPeriodSummaryPromptContext(input),
         signal,
         PERIOD_SUMMARY_RESPONSE_FORMAT,

@@ -1,5 +1,6 @@
 import {
   buildExplainChangesPromptContext,
+  buildPlanningPromptContext,
   buildPeriodSummaryPromptContext,
   formatCurrency,
 } from './prompt-context.ts'
@@ -22,18 +23,19 @@ describe('contexto monetario para Groq', () => {
 
   it('prepara period-summary sin AmountCents raw', () => {
     const context = buildPeriodSummaryPromptContext({
-      aggregatedData: {
-        totalIncome: 700_000,
-        totalExpenses: 21_300,
+      context: 'historical',
+      facts: {
+        receivedIncomeCents: 700_000,
+        expenseCents: 21_300,
         categoryBreakdown: [
           {
             categoryId,
             categoryName: 'Comida',
-            total: 14_000,
+            totalCents: 14_000,
             percentage: 65.73,
           },
         ],
-        topExpenses: [{ description: 'Hamburguesa', amount: 12_000 }],
+        topExpenses: [{ description: 'Hamburguesa', amountCents: 12_000 }],
         periodType: 'monthly',
         startDate: '2026-08-01',
         endDate: '2026-08-31',
@@ -41,8 +43,9 @@ describe('contexto monetario para Groq', () => {
     })
 
     expect(context).toEqual({
-      totalIncome: '$7,000.00',
-      totalExpenses: '$213.00',
+      context: 'historical',
+      receivedIncome: '$7,000.00',
+      expenses: '$213.00',
       categoryBreakdown: [
         {
           categoryName: 'Comida',
@@ -56,6 +59,32 @@ describe('contexto monetario para Groq', () => {
       endDate: '2026-08-31',
     })
     expect(JSON.stringify(context)).not.toMatch(/700000|21300|14000|12000/)
+  })
+
+  it('prepara planificación sin recalcular y conserva null y negativos', () => {
+    const context = buildPlanningPromptContext({
+      context: 'planning',
+      facts: {
+        currentBalanceCents: null,
+        committedCents: 25_00,
+        expectedIncomeCents: 30_00,
+        projectedAvailableCents: -35_00,
+        projectedClosingBalanceCents: -5_00,
+        projectionCoverage: 'overdue_only',
+        projectionHorizonEnd: null,
+      },
+    })
+
+    expect(context).toEqual({
+      context: 'planning',
+      currentBalance: null,
+      committed: '$25.00',
+      expectedIncome: '$30.00',
+      projectedAvailable: '-$35.00',
+      projectedClosingBalance: '-$5.00',
+      projectionCoverage: 'overdue_only',
+      projectionHorizonEnd: null,
+    })
   })
 
   it('prepara explain-changes después del cálculo TypeScript', () => {

@@ -43,12 +43,14 @@ describe('PurchaseSimulatorPage', () => {
     services.simulator.simulatePurchase.execute = vi
       .fn<typeof services.simulator.simulatePurchase.execute>()
       .mockResolvedValue({
-        currentAvailable: 5000,
-        afterPurchaseAvailable: -5000,
-        categoryBudgetRemaining: -1000,
-        isNegative: true,
+        projectedAvailableBeforePurchase: 5000,
+        projectedAvailableAfterPurchase: -5000,
+        financialAffordability: 'exceeds',
         categoryBudgetBefore: 0,
         categoryBudgetAfter: -10000,
+        budgetFit: 'exceeds',
+        projectionCoverage: 'full_period',
+        projectionHorizonEnd: '2026-07-31',
       })
     renderSimulator(services)
     await simulate(user)
@@ -57,6 +59,38 @@ describe('PurchaseSimulatorPage', () => {
         'Esta compra dejaría tu dinero disponible en negativo.',
       ),
     ).toBeInTheDocument()
+  })
+
+  it('no convierte un saldo desconocido en cero', async () => {
+    const user = userEvent.setup()
+    const { services } = createApplicationServicesMock()
+    services.simulator.simulatePurchase.execute = vi
+      .fn<typeof services.simulator.simulatePurchase.execute>()
+      .mockResolvedValue({
+        projectedAvailableBeforePurchase: null,
+        projectedAvailableAfterPurchase: null,
+        financialAffordability: 'unknown',
+        categoryBudgetBefore: 5000,
+        categoryBudgetAfter: 4000,
+        budgetFit: 'within',
+        projectionCoverage: 'overdue_only',
+        projectionHorizonEnd: null,
+      })
+    renderSimulator(services)
+    await simulate(user)
+
+    expect(await screen.findByText('No configurado')).toBeInTheDocument()
+    expect(screen.getByText('No evaluable')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Configura tu saldo para evaluar si esta compra cabe en tu dinero disponible.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('La proyección sólo considera compromisos vencidos.'),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('$50.00')).toBeInTheDocument()
+    expect(screen.getByLabelText('$40.00')).toBeInTheDocument()
   })
 
   it('valida montos inválidos y no muestra resultados engañosos', async () => {

@@ -15,9 +15,17 @@ export interface ReceiptRecognitionInput {
 export interface ReceiptRecognitionResult {
   merchant: string | null
   date: DateOnly | null
-  total: AmountCents | null
+  subtotal: number | null
+  tax: number | null
+  tip: number | null
+  discount: number | null
+  otherFees: number | null
+  total: number | null
+  amountPaid: number | null
+  amountEvidence: string | null
+  amountAmbiguous: boolean
   currency: string | null
-  confidence: number
+  confidence: number | null
   rawText: string | null
 }
 

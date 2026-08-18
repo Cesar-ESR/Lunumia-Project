@@ -20,18 +20,19 @@ const suggestBody = {
   categories: [{ id: categoryId, name: 'Comida' }],
 }
 const summaryBody = {
-  aggregatedData: {
-    totalIncome: 700_000,
-    totalExpenses: 21_300,
+  context: 'historical',
+  facts: {
+    receivedIncomeCents: 700_000,
+    expenseCents: 21_300,
     categoryBreakdown: [
       {
         categoryId,
         categoryName: 'Comida',
-        total: 14_000,
+        totalCents: 14_000,
         percentage: 65.73,
       },
     ],
-    topExpenses: [{ description: 'Hamburguesa', amount: 12_000 }],
+    topExpenses: [{ description: 'Hamburguesa', amountCents: 12_000 }],
     periodType: 'monthly',
     startDate: '2026-08-01',
     endDate: '2026-08-31',
@@ -265,6 +266,30 @@ describe('ai-insights router', () => {
     await expect(response.json()).resolves.toMatchObject({
       code: 'invalid_request',
     })
+  })
+
+  it('39.c period-summary rechaza contexto de planificación no expuesto', async () => {
+    const { handler, provider } = createHandler()
+    const response = await handler(
+      request('period-summary', {
+        context: 'planning',
+        facts: {
+          currentBalanceCents: -1_000,
+          committedCents: 2_000,
+          expectedIncomeCents: 3_000,
+          projectedAvailableCents: -3_000,
+          projectedClosingBalanceCents: 0,
+          projectionCoverage: 'full_period',
+          projectionHorizonEnd: '2026-08-31',
+        },
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'invalid_request',
+    })
+    expect(provider.generatePeriodSummary).not.toHaveBeenCalled()
   })
 
   it('39.a rate limit devuelve 429 con CORS', async () => {

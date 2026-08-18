@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ReceiptRecognitionResponseSchema } from '../schemas/contracts'
 import { MockOCRProvider } from './MockOCRProvider'
 import { createOCRProvider } from './ProviderFactory'
+import { GroqVisionOCRProvider } from './GroqVisionOCRProvider'
 
 describe('proveedores OCR de recognize-receipt', () => {
   it('MockOCRProvider produce una respuesta válida y determinista', async () => {
@@ -29,5 +30,30 @@ describe('proveedores OCR de recognize-receipt', () => {
     expect(() =>
       createOCRProvider({ provider: 'mock', runtimeEnvironment: 'production' }),
     ).toThrowError(expect.objectContaining({ code: 'provider_unavailable' }))
+  })
+
+  it('factory selecciona Groq Vision en producción', () => {
+    expect(
+      createOCRProvider({
+        provider: 'groq',
+        runtimeEnvironment: 'production',
+        groqApiKey: 'server-key',
+        ocrModel: 'qwen/qwen3.6-27b',
+      }),
+    ).toBeInstanceOf(GroqVisionOCRProvider)
+  })
+
+  it.each([
+    ['', 'qwen/qwen3.6-27b'],
+    ['server-key', ''],
+  ])('factory exige key y modelo Groq (%s, %s)', (groqApiKey, ocrModel) => {
+    expect(() =>
+      createOCRProvider({
+        provider: 'groq',
+        runtimeEnvironment: 'production',
+        groqApiKey,
+        ocrModel,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'provider_unavailable' }))
   })
 })

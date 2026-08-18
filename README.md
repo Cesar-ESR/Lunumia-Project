@@ -151,6 +151,8 @@ Configura secretos en Supabase, nunca en variables `VITE_*`:
 pnpm exec supabase secrets set AI_PROVIDER=groq --project-ref <PROJECT_REF>
 pnpm exec supabase secrets set GROQ_MODEL=openai/gpt-oss-20b --project-ref <PROJECT_REF>
 pnpm exec supabase secrets set GROQ_API_KEY="<YOUR_GROQ_API_KEY>" --project-ref <PROJECT_REF>
+pnpm exec supabase secrets set OCR_PROVIDER=groq --project-ref <PROJECT_REF>
+pnpm exec supabase secrets set OCR_MODEL=qwen/qwen3.6-27b --project-ref <PROJECT_REF>
 ```
 
 `GROQ_MODEL` es configurable; `openai/gpt-oss-20b` es el modelo operativo
@@ -160,8 +162,9 @@ falla de forma segura si falta la configuración requerida.
 Otras variables backend reconocidas por el código son:
 
 - `AI_ENVIRONMENT`, `AI_TIMEOUT_MS` y `ALLOWED_ORIGINS` para IA.
-- `OCR_PROVIDER`, `OCR_ENVIRONMENT`, `OCR_TIMEOUT_MS` y `ALLOWED_ORIGINS` para
-  recibos.
+- `OCR_PROVIDER=groq`, `OCR_MODEL`, `OCR_ENVIRONMENT`, `OCR_TIMEOUT_MS` y
+  `ALLOWED_ORIGINS` para recibos. `OCR_MODEL` es obligatorio en producción y
+  queda separado de `GROQ_MODEL`; ambos reutilizan `GROQ_API_KEY` server-side.
 - `SUPABASE_URL` y las claves públicas inyectadas por el runtime de Supabase.
 - `SUPABASE_SERVICE_ROLE_KEY` únicamente en `delete-account`; jamás debe llegar
   al frontend.
@@ -289,8 +292,10 @@ Cámara o galería
   → validación y compresión
   → ReceiptRecognitionProvider
   → Edge Function recognize-receipt
+  → Groq Vision / Qwen multimodal
   → formulario editable
-  → confirmación del usuario
+  → validación determinística del monto
+  → confirmación explícita del usuario
   → gasto local
 ```
 
@@ -299,10 +304,24 @@ categoría antes de crear el gasto. La imagen solo se mantiene durante el flujo
 de captura/vista previa; no se persiste con el gasto. Ante timeout, baja
 confianza o respuesta inválida se ofrece entrada manual.
 
-El proveedor versionado actualmente es `MockOCRProvider`, permitido únicamente
-en `development`, `local` o `test`. Antes de ofrecer OCR real en producción se
-debe integrar un proveedor productivo detrás de la interfaz `OCRProvider`. El
-flujo manual continúa funcionando mientras ese proveedor no exista.
+`MockOCRProvider` permanece permitido únicamente en `development`, `local` o
+`test`. Producción selecciona `GroqVisionOCRProvider` con `OCR_PROVIDER=groq` y
+un modelo multimodal configurable en `OCR_MODEL`. La función solicita JSON
+Object Mode, valida localmente la respuesta con un esquema estricto y convierte
+decimales normalizados a centavos mediante aritmética entera exacta.
+La salida comprimida se limita a 3,000,000 bytes para mantener el request con
+imagen base64 por debajo del límite de 4 MiB de Groq.
+
+Qwen solo propone comercio, fecha, moneda y componentes visibles del monto. El
+validador puro clasifica la propuesta como `valid`, `needs_review` o `invalid`,
+pero nunca recalcula ni reemplaza el total. El usuario puede corregir el monto y
+debe pulsar **Confirmar monto y guardar gasto** antes de invocar `CreateExpense`.
+
+La imagen del recibo viaja del dispositivo a Supabase Edge y de ahí a Groq.
+Lunumia no persiste ni registra la imagen, el texto crudo, el prompt completo o
+la respuesta cruda en este flujo; la captura comprimida permanece en memoria
+hasta aceptar o descartar la propuesta. La retención aplicable del proveedor y
+el texto de privacidad deben validarse antes del despliegue productivo.
 
 La captura nativa solicita `includeMetadata: false`. Solo se conserva en memoria
 el archivo JPEG/PNG validado y comprimido necesario para el flujo; la imagen y

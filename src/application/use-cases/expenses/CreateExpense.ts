@@ -5,6 +5,10 @@ import type {
   IPeriodRepository,
 } from '@domain/repositories'
 import type { Clock, IdGenerator } from '@application/services/IdGenerator'
+import {
+  assertRequestedPeriod,
+  resolveMovementPeriod,
+} from '@application/use-cases/movements/resolveMovementPeriod'
 export class CreateExpense {
   constructor(
     private readonly expenses: IExpenseRepository,
@@ -15,16 +19,21 @@ export class CreateExpense {
   ) {}
   async execute(input: unknown) {
     const value = createExpenseSchema.parse(input)
-    if (
-      !(await this.periods.findById(value.periodId)) ||
-      !(await this.categories.findById(value.categoryId))
+    const period = await resolveMovementPeriod(
+      this.periods,
+      value.ownerId,
+      value.date,
     )
-      throw new Error('El periodo o la categoría no existe.')
+    assertRequestedPeriod(value.periodId, period, value.date)
+    if (!(await this.categories.findById(value.categoryId)))
+      throw new Error('La categoría no existe.')
     const now = this.clock.now()
     return this.expenses.create({
       id: this.ids.generate(),
       ...value,
       recurringOccurrenceId: null,
+      affectsBalance: value.affectsBalance ?? true,
+      balanceEffectiveAt: now,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

@@ -16,7 +16,13 @@ describe('cálculos financieros', () => {
         .timePercentage,
     ).toBe(0))
   it('indica compras que dejan disponible negativo', () =>
-    expect(simulatePurchaseImpact(100, 101, 50).isNegative).toBe(true))
+    expect(
+      simulatePurchaseImpact({
+        projectedAvailableCents: 100,
+        purchaseAmountCents: 101,
+        categoryBudgetRemainingCents: 50,
+      }).financialAffordability,
+    ).toBe('exceeds'))
   it('retorna null cuando no hay periodo previo', () =>
     expect(computeCategoryChangePercentage(10, 0)).toBeNull())
 })

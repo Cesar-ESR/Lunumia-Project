@@ -19,6 +19,11 @@ export class GenerateOccurrencesForPeriod {
     const period = await this.periods.findById(periodId)
     if (!period || period.ownerId !== ownerId)
       throw new Error('El periodo no existe.')
+    const today = this.clock.now().slice(0, 10)
+    if (today < period.startDate || today > period.endDate)
+      throw new Error(
+        'Sólo se pueden materializar ocurrencias para el periodo actual.',
+      )
     const created = []
     let skippedExisting = 0
     for (const payment of await this.payments.findActive()) {
@@ -50,6 +55,7 @@ export class GenerateOccurrencesForPeriod {
             periodId,
             dueDate,
             status: 'pending',
+            amount: payment.amount,
             transactionId: null,
             createdAt: now,
             updatedAt: now,

@@ -1,4 +1,7 @@
 import {
+  AIAnalysisRequestSchema,
+  buildHistoricalAnalysisRequest,
+  buildPlanningAnalysisRequest,
   CategoryChangeExplanationSchema,
   CategorySuggestionSchema,
   ExplainChangesRequestSchema,
@@ -8,12 +11,18 @@ import {
   PeriodSummarySchema,
   SuggestCategoryRequestSchema,
 } from './index'
+import type { FinancialSnapshot } from '@domain/calculations'
+import type { PeriodAggregatedData } from '@domain/ports'
+import {
+  AIAnalysisRequestSchema as EdgeAIAnalysisRequestSchema,
+  parsePeriodSummaryRequest as parseEdgePeriodSummaryRequest,
+} from '../../../supabase/functions/ai-insights/contracts.ts'
 
 const categoryId = '11111111-1111-4111-8111-111111111111'
 const secondCategoryId = '22222222-2222-4222-8222-222222222222'
 const category = { id: categoryId, name: 'Comida' }
 const suggestion = { categoryId, confidence: 0.75 }
-const aggregatedData = {
+const aggregatedData: PeriodAggregatedData = {
   totalIncome: 100_00,
   totalExpenses: 40_00,
   categoryBreakdown: [
@@ -28,6 +37,21 @@ const aggregatedData = {
   periodType: 'monthly' as const,
   startDate: '2026-08-01',
   endDate: '2026-08-31',
+}
+const historicalRequest = buildHistoricalAnalysisRequest(aggregatedData)
+
+const planningSnapshot: FinancialSnapshot = {
+  currentBalanceCents: -10_00,
+  spentCents: 40_00,
+  committedCents: 25_00,
+  upcomingCommittedCents: 20_00,
+  overdueCommittedCents: 5_00,
+  projectedAvailableCents: -35_00,
+  expectedIncomeCents: 30_00,
+  overdueExpectedIncomeCents: 0,
+  projectedClosingBalanceCents: -5_00,
+  projectionHorizonEnd: '2026-08-31',
+  projectionCoverage: 'full_period',
 }
 
 describe('contratos de IA', () => {
@@ -170,7 +194,8 @@ describe('contratos de IA', () => {
   it('18. rechaza importes decimales', () => {
     expect(
       PeriodSummaryRequestSchema.safeParse({
-        aggregatedData: { ...aggregatedData, totalExpenses: 1.5 },
+        ...historicalRequest,
+        facts: { ...historicalRequest.facts, expenseCents: 1.5 },
       }).success,
     ).toBe(false)
   })
@@ -198,8 +223,109 @@ describe('contratos de IA', () => {
   it('20. rechaza DateOnly inválido', () => {
     expect(
       PeriodSummaryRequestSchema.safeParse({
-        aggregatedData: { ...aggregatedData, startDate: '2026-02-30' },
+        ...historicalRequest,
+        facts: { ...historicalRequest.facts, startDate: '2026-02-30' },
       }).success,
     ).toBe(false)
+  })
+
+  it('21. convierte datos deterministas a hechos históricos explícitos', () => {
+    const source = structuredClone(aggregatedData)
+    const request = buildHistoricalAnalysisRequest(aggregatedData)
+
+    expect(request).toEqual({
+      context: 'historical',
+      facts: {
+        receivedIncomeCents: 100_00,
+        expenseCents: 40_00,
+        categoryBreakdown: [
+          {
+            categoryId,
+            categoryName: 'Comida',
+            totalCents: 40_00,
+            percentage: 100,
+          },
+        ],
+        topExpenses: [{ description: 'Mercado', amountCents: 40_00 }],
+        periodType: 'monthly',
+        startDate: '2026-08-01',
+        endDate: '2026-08-31',
+      },
+    })
+    expect(JSON.stringify(request)).not.toMatch(
+      /totalIncome|expected|cancelled|status/,
+    )
+    expect(aggregatedData).toEqual(source)
+  })
+
+  it('22. planificación expone solo agregados precalculados y conserva signo', () => {
+    const source = structuredClone(planningSnapshot)
+    const request = buildPlanningAnalysisRequest(planningSnapshot)
+
+    expect(request).toEqual({
+      context: 'planning',
+      facts: {
+        currentBalanceCents: -10_00,
+        committedCents: 25_00,
+        expectedIncomeCents: 30_00,
+        projectedAvailableCents: -35_00,
+        projectedClosingBalanceCents: -5_00,
+        projectionCoverage: 'full_period',
+        projectionHorizonEnd: '2026-08-31',
+      },
+    })
+    expect(JSON.stringify(request)).not.toMatch(
+      /incomes|expenses|occurrences|spentCents|upcoming|overdue/,
+    )
+    expect(planningSnapshot).toEqual(source)
+  })
+
+  it('23. planificación conserva null cuando no hay saldo base', () => {
+    const request = buildPlanningAnalysisRequest({
+      ...planningSnapshot,
+      currentBalanceCents: null,
+      projectedAvailableCents: null,
+      projectedClosingBalanceCents: null,
+      projectionHorizonEnd: null,
+      projectionCoverage: 'overdue_only',
+    })
+
+    expect(request.facts).toMatchObject({
+      currentBalanceCents: null,
+      projectedAvailableCents: null,
+      projectedClosingBalanceCents: null,
+      projectionHorizonEnd: null,
+      projectionCoverage: 'overdue_only',
+    })
+  })
+
+  it('24. discrimina contexto y rechaza una etiqueta desconocida', () => {
+    expect(
+      AIAnalysisRequestSchema.safeParse({
+        ...historicalRequest,
+        context: 'forecast',
+      }).success,
+    ).toBe(false)
+  })
+
+  it('25. rechaza agregados de planificación negativos', () => {
+    const request = buildPlanningAnalysisRequest(planningSnapshot)
+    expect(
+      AIAnalysisRequestSchema.safeParse({
+        ...request,
+        facts: { ...request.facts, committedCents: -1 },
+      }).success,
+    ).toBe(false)
+  })
+
+  it('26. cliente y Edge aceptan los mismos contratos Domain 2.0', () => {
+    const planningRequest = buildPlanningAnalysisRequest(planningSnapshot)
+
+    expect(parseEdgePeriodSummaryRequest(historicalRequest)).toEqual(
+      historicalRequest,
+    )
+    expect(EdgeAIAnalysisRequestSchema.parse(planningRequest)).toEqual(
+      planningRequest,
+    )
   })
 })

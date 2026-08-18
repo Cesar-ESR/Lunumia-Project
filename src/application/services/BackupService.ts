@@ -2,10 +2,16 @@ import { z } from 'zod'
 import {
   backupFileSchema,
   backupVersionEnvelopeSchema,
+  legacyBackupFileV1Schema,
   type BackupData,
   type BackupFile,
 } from '@application/contracts/backup.schema'
-import { APP_NAME, CURRENT_BACKUP_SCHEMA_VERSION } from '@shared/constants'
+import {
+  APP_NAME,
+  BACKUP_SCHEMA_VERSION_V1,
+  BACKUP_SCHEMA_VERSION_V2,
+  CURRENT_BACKUP_SCHEMA_VERSION,
+} from '@shared/constants'
 import type { BackupDataSource } from './BackupDataSource'
 import { BackupError } from './BackupErrors'
 
@@ -90,6 +96,10 @@ export function validateBackupIntegrity(data: BackupData): void {
   assertUnique(
     data.recurringPaymentOccurrences.map(({ id }) => id),
     'data.recurringPaymentOccurrences',
+  )
+  assertUnique(
+    data.balanceAnchors.map(({ id }) => id),
+    'data.balanceAnchors',
   )
   assertUnique(
     data.userSettings.map(({ id }) => id),
@@ -260,7 +270,54 @@ export function validateBackupIntegrity(data: BackupData): void {
 }
 
 type BackupMigration = (input: unknown) => unknown
-const backupMigrations: Partial<Record<number, BackupMigration>> = {}
+
+function migrateBackupV1ToV2(input: unknown): unknown {
+  const parsed = legacyBackupFileV1Schema.safeParse(input)
+  if (!parsed.success) {
+    throw new BackupError('INVALID_BACKUP_FILE', formatZodError(parsed.error))
+  }
+
+  const legacy = parsed.data
+  const paymentsById = new Map(
+    legacy.data.recurringPayments.map((payment) => [payment.id, payment]),
+  )
+  const recurringPaymentOccurrences =
+    legacy.data.recurringPaymentOccurrences.map((occurrence, index) => {
+      const payment = paymentsById.get(occurrence.recurringPaymentId)
+      if (!payment) {
+        throw new BackupError(
+          'BACKUP_INTEGRITY_ERROR',
+          `data.recurringPaymentOccurrences.${index}.amount no puede migrarse: el pago recurrente ${occurrence.recurringPaymentId} no existe en el respaldo.`,
+        )
+      }
+      return { ...occurrence, amount: payment.amount }
+    })
+
+  return {
+    ...legacy,
+    schemaVersion: BACKUP_SCHEMA_VERSION_V2,
+    data: {
+      ...legacy.data,
+      incomes: legacy.data.incomes.map((income) => ({
+        ...income,
+        status: 'received' as const,
+        affectsBalance: true,
+        balanceEffectiveAt: income.createdAt,
+      })),
+      expenses: legacy.data.expenses.map((expense) => ({
+        ...expense,
+        affectsBalance: true,
+        balanceEffectiveAt: expense.createdAt,
+      })),
+      recurringPaymentOccurrences,
+      balanceAnchors: [],
+    },
+  }
+}
+
+const backupMigrations: Partial<Record<number, BackupMigration>> = {
+  [BACKUP_SCHEMA_VERSION_V1]: migrateBackupV1ToV2,
+}
 
 function migrateBackup(input: unknown, sourceVersion: number): unknown {
   let migrated = input
@@ -350,7 +407,7 @@ export class BackupService {
         `El respaldo usa la versión ${envelope.data.schemaVersion}. Actualiza ${APP_NAME} para importarlo.`,
       )
     }
-    if (envelope.data.schemaVersion < 1) {
+    if (envelope.data.schemaVersion < BACKUP_SCHEMA_VERSION_V1) {
       throw new BackupError(
         'UNSUPPORTED_BACKUP_VERSION',
         'La versión del respaldo no es compatible.',

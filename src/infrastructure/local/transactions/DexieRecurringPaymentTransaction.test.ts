@@ -1,6 +1,8 @@
 import Dexie from 'dexie'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GastoClaroDB } from '../database'
+import { DeleteExpense } from '@application/use-cases/expenses/DeleteExpense'
+import { DexieExpenseRepository } from '../repositories/DexieExpenseRepository'
 import { DexieRecurringPaymentTransaction } from './DexieRecurringPaymentTransaction'
 
 let database: GastoClaroDB | undefined
@@ -50,6 +52,7 @@ describe('DexieRecurringPaymentTransaction', () => {
       periodId: 'period',
       dueDate: '2026-01-01',
       status: 'pending',
+      amount: 100,
       transactionId: null,
     })
     let count = 0
@@ -113,6 +116,7 @@ describe('DexieRecurringPaymentTransaction', () => {
       periodId: 'period',
       dueDate: '2026-01-01',
       status: 'pending',
+      amount: 100,
       transactionId: null,
     })
     let count = 0
@@ -141,5 +145,183 @@ describe('DexieRecurringPaymentTransaction', () => {
     expect(
       (await database.recurringPaymentOccurrences.get('occurrence'))?.status,
     ).toBe('pending')
+  })
+
+  it('usa el snapshot de occurrence por defecto y acepta un monto real distinto', async () => {
+    database = new GastoClaroDB('payment-actual-amount')
+    await database.periods.add(period)
+    await database.recurringPayments.add({
+      ...base,
+      id: 'payment',
+      name: 'Rent',
+      amount: 999,
+      frequency: 'monthly',
+      dueDate: '2026-01-01',
+      endDate: null,
+      categoryId: 'category',
+      status: 'active',
+    })
+    await database.recurringPaymentOccurrences.bulkAdd([
+      {
+        ...base,
+        id: 'snapshot-default',
+        recurringPaymentId: 'payment',
+        periodId: 'period',
+        dueDate: '2026-01-01',
+        status: 'pending',
+        amount: 125,
+        transactionId: null,
+      },
+      {
+        ...base,
+        id: 'actual-override',
+        recurringPaymentId: 'payment',
+        periodId: 'period',
+        dueDate: '2026-01-02',
+        status: 'pending',
+        amount: 200,
+        transactionId: null,
+      },
+    ])
+    let count = 0
+    const transaction = new DexieRecurringPaymentTransaction(
+      database,
+      {
+        generate: () =>
+          `10000000-0000-4000-8000-${String(++count).padStart(12, '0')}`,
+      },
+      { now: () => '2026-01-02T00:00:00.000Z' },
+    )
+
+    const defaultResult = await transaction.markOccurrenceAsPaid({
+      ownerId,
+      occurrenceId: 'snapshot-default',
+      paidDate: '2026-01-02',
+    })
+    const actualResult = await transaction.markOccurrenceAsPaid({
+      ownerId,
+      occurrenceId: 'actual-override',
+      paidDate: '2026-01-02',
+      actualAmountCents: 240,
+    })
+
+    expect(defaultResult.expense).toMatchObject({
+      amount: 125,
+      affectsBalance: true,
+      balanceEffectiveAt: '2026-01-02T00:00:00.000Z',
+    })
+    expect(actualResult.expense.amount).toBe(240)
+  })
+
+  it('soft-deletea el gasto vinculado y revierte paid a pending atómicamente', async () => {
+    database = new GastoClaroDB('payment-linked-delete')
+    await database.periods.add(period)
+    await database.recurringPayments.add({
+      ...base,
+      id: 'payment',
+      name: 'Rent',
+      amount: 100,
+      frequency: 'monthly',
+      dueDate: '2026-01-01',
+      endDate: null,
+      categoryId: 'category',
+      status: 'active',
+    })
+    await database.recurringPaymentOccurrences.add({
+      ...base,
+      id: 'occurrence',
+      recurringPaymentId: 'payment',
+      periodId: 'period',
+      dueDate: '2026-01-01',
+      status: 'pending',
+      amount: 100,
+      transactionId: null,
+    })
+    let count = 0
+    const transaction = new DexieRecurringPaymentTransaction(
+      database,
+      {
+        generate: () =>
+          `20000000-0000-4000-8000-${String(++count).padStart(12, '0')}`,
+      },
+      { now: () => '2026-01-02T00:00:00.000Z' },
+    )
+    const paid = await transaction.markOccurrenceAsPaid({
+      ownerId,
+      occurrenceId: 'occurrence',
+      paidDate: '2026-01-02',
+    })
+
+    await new DeleteExpense(
+      new DexieExpenseRepository(database, ownerId),
+      transaction,
+    ).execute(paid.expense.id)
+
+    expect(await database.expenses.get(paid.expense.id)).toMatchObject({
+      deletedAt: '2026-01-02T00:00:00.000Z',
+    })
+    expect(
+      await database.recurringPaymentOccurrences.get('occurrence'),
+    ).toMatchObject({ status: 'pending', transactionId: null })
+    expect(await database.syncOperations.count()).toBe(3)
+  })
+
+  it('revierte el tombstone si falla entre gasto y occurrence', async () => {
+    database = new GastoClaroDB('payment-linked-delete-rollback')
+    await database.periods.add(period)
+    await database.recurringPayments.add({
+      ...base,
+      id: 'payment',
+      name: 'Rent',
+      amount: 100,
+      frequency: 'monthly',
+      dueDate: '2026-01-01',
+      endDate: null,
+      categoryId: 'category',
+      status: 'active',
+    })
+    await database.recurringPaymentOccurrences.add({
+      ...base,
+      id: 'occurrence',
+      recurringPaymentId: 'payment',
+      periodId: 'period',
+      dueDate: '2026-01-01',
+      status: 'pending',
+      amount: 100,
+      transactionId: null,
+    })
+    let count = 0
+    const generatedIds = {
+      generate: () =>
+        `30000000-0000-4000-8000-${String(++count).padStart(12, '0')}`,
+    }
+    const paid = await new DexieRecurringPaymentTransaction(
+      database,
+      generatedIds,
+      { now: () => '2026-01-02T00:00:00.000Z' },
+    ).markOccurrenceAsPaid({
+      ownerId,
+      occurrenceId: 'occurrence',
+      paidDate: '2026-01-02',
+    })
+    const queueBefore = await database.syncOperations.toArray()
+    const failing = new DexieRecurringPaymentTransaction(
+      database,
+      generatedIds,
+      { now: () => '2026-01-03T00:00:00.000Z' },
+      (step) => {
+        if (step === 'delete:expense-soft-deleted')
+          throw new Error('fallo de reversión')
+      },
+    )
+
+    await expect(
+      failing.deleteLinkedExpense(ownerId, paid.expense.id),
+    ).rejects.toThrow('fallo de reversión')
+    expect(await database.expenses.get(paid.expense.id)).toEqual(paid.expense)
+    expect(
+      await database.recurringPaymentOccurrences.get('occurrence'),
+    ).toEqual(paid.occurrence)
+    expect(await database.syncOperations.toArray()).toEqual(queueBefore)
   })
 })

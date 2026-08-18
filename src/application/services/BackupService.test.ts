@@ -7,6 +7,7 @@ import {
   CATEGORY_ID,
   createBackupData,
   createBackupFile,
+  createLegacyBackupFileV1,
 } from '../../../tests/backup-fixtures'
 
 function createSource(data = createBackupData()): BackupDataSource {
@@ -21,12 +22,12 @@ describe('BackupService', () => {
     const service = new BackupService(createSource(), () => BACKUP_NOW)
     const file = await service.exportBackup('guest:source')
     expect(file).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       appName: 'Lunumia',
       exportedAt: BACKUP_NOW,
       ownerId: 'guest:source',
     })
-    expect(service.serialize(file)).toContain('\n  "schemaVersion": 1')
+    expect(service.serialize(file)).toContain('\n  "schemaVersion": 2')
   })
 
   it('valida sin recortar los textos persistidos del respaldo', async () => {
@@ -74,14 +75,78 @@ describe('BackupService', () => {
     ).toThrow('appName')
   })
 
-  it('acepta respaldos históricos de GastoClaro sin cambiar sus datos', () => {
+  it('migra respaldos v1 de GastoClaro de forma determinista', () => {
     const service = new BackupService(createSource())
-    const legacy = { ...createBackupFile(), appName: 'GastoClaro' }
+    const legacy = { ...createLegacyBackupFileV1(), appName: 'GastoClaro' }
 
     const prepared = service.prepareImport(JSON.stringify(legacy))
 
     expect(prepared.file.appName).toBe('GastoClaro')
-    expect(prepared.file.data).toEqual(legacy.data)
+    expect(prepared.file.schemaVersion).toBe(2)
+    expect(prepared.file.data.incomes[0]).toMatchObject({
+      status: 'received',
+      affectsBalance: true,
+      balanceEffectiveAt: BACKUP_NOW,
+    })
+    expect(prepared.file.data.expenses[0]).toMatchObject({
+      affectsBalance: true,
+      balanceEffectiveAt: BACKUP_NOW,
+    })
+    expect(prepared.file.data.recurringPaymentOccurrences[0]?.amount).toBe(
+      legacy.data.recurringPayments[0]?.amount,
+    )
+    expect(prepared.file.data.balanceAnchors).toEqual([])
+    expect(service.prepareImport(JSON.stringify(legacy)).file).toEqual(
+      prepared.file,
+    )
+  })
+
+  it('falla explícitamente si una occurrence v1 no tiene parent', () => {
+    const source = createSource()
+    const service = new BackupService(source)
+    const legacy = createLegacyBackupFileV1()
+    legacy.data.recurringPayments = []
+
+    expect(() => service.prepareImport(JSON.stringify(legacy))).toThrowError(
+      expect.objectContaining({
+        code: 'BACKUP_INTEGRITY_ERROR',
+        message: expect.stringContaining('no puede migrarse'),
+      }),
+    )
+    expect(source.replace).not.toHaveBeenCalled()
+  })
+
+  it('no aplica defaults legacy a un backup v2 corrupto', () => {
+    const service = new BackupService(createSource())
+    const missingStatus = structuredClone(createBackupFile()) as unknown as {
+      data: { incomes: Array<Record<string, unknown>> }
+    }
+    delete missingStatus.data.incomes[0]?.status
+    expect(() => service.prepareImport(JSON.stringify(missingStatus))).toThrow(
+      'status',
+    )
+
+    const missingAmount = structuredClone(createBackupFile()) as unknown as {
+      data: { recurringPaymentOccurrences: Array<Record<string, unknown>> }
+    }
+    delete missingAmount.data.recurringPaymentOccurrences[0]?.amount
+    expect(() => service.prepareImport(JSON.stringify(missingAmount))).toThrow(
+      'amount',
+    )
+  })
+
+  it('preserva el amount snapshot actual aunque difiera de la regla', () => {
+    const service = new BackupService(createSource())
+    const file = createBackupFile()
+    file.data.recurringPayments[0]!.amount = 9_000
+    file.data.recurringPaymentOccurrences[0]!.amount = 5_000
+
+    const prepared = service.prepareImport(JSON.stringify(file))
+
+    expect(prepared.file.data.recurringPayments[0]?.amount).toBe(9_000)
+    expect(prepared.file.data.recurringPaymentOccurrences[0]?.amount).toBe(
+      5_000,
+    )
   })
 
   it('rechaza una versión futura con instrucción de actualización', () => {
@@ -91,6 +156,21 @@ describe('BackupService', () => {
         JSON.stringify({ ...createBackupFile(), schemaVersion: 99 }),
       ),
     ).toThrow('Actualiza Lunumia')
+  })
+
+  it('rechaza versión ausente o de tipo inválido', () => {
+    const service = new BackupService(createSource())
+    const { schemaVersion, ...withoutVersion } = createBackupFile()
+    void schemaVersion
+
+    expect(() => service.prepareImport(JSON.stringify(withoutVersion))).toThrow(
+      'schemaVersion',
+    )
+    expect(() =>
+      service.prepareImport(
+        JSON.stringify({ ...createBackupFile(), schemaVersion: '2' }),
+      ),
+    ).toThrow('schemaVersion')
   })
 
   it('no inventa migraciones para versiones históricas inexistentes', () => {
@@ -128,11 +208,22 @@ describe('BackupService', () => {
     )
   })
 
+  it('rechaza IDs duplicados de BalanceAnchor', () => {
+    const service = new BackupService(createSource())
+    const file = createBackupFile()
+    file.data.balanceAnchors.push({ ...file.data.balanceAnchors[0]! })
+
+    expect(() => service.prepareImport(JSON.stringify(file))).toThrow(
+      'data.balanceAnchors.1',
+    )
+  })
+
   it('entrega el resumen e importa solo después de una preparación válida', async () => {
     const source = createSource()
     const service = new BackupService(source)
     const prepared = service.prepareImport(JSON.stringify(createBackupFile()))
     expect(prepared.summary.counts.expenses).toBe(1)
+    expect(prepared.summary.counts.balanceAnchors).toBe(1)
     expect(prepared.file.data.categories[0]?.id).toBe(CATEGORY_ID)
     await service.importBackup('guest:destination', prepared.file)
     expect(source.replace).toHaveBeenCalledWith(

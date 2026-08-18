@@ -6,6 +6,7 @@ import { BackupService } from './BackupService'
 import {
   createBackupData,
   createBackupFile,
+  createLegacyBackupFileV1,
 } from '../../../tests/backup-fixtures'
 
 type InvalidVariant =
@@ -92,6 +93,37 @@ describe('Feature: gasto-claro-app, Property 18: Zod rechaza respaldos inválido
           expect(existing.expenses[0]?.amount).toBe(50)
         },
       ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('normaliza v1 de forma determinista sin anchors ni fallback cero', () => {
+    const service = new BackupService({
+      readActive: async () => createBackupData(),
+      replace: async () => undefined,
+    })
+
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 10_000_000 }), (amount) => {
+        const legacy = createLegacyBackupFileV1('guest:legacy', amount)
+        const serialized = JSON.stringify(legacy)
+        const first = service.prepareImport(serialized).file
+        const second = service.prepareImport(serialized).file
+
+        expect(first).toEqual(second)
+        expect(first.data.balanceAnchors).toEqual([])
+        expect(first.data.recurringPaymentOccurrences[0]?.amount).toBe(amount)
+        expect(first.data.recurringPaymentOccurrences[0]?.amount).not.toBe(0)
+        expect(first.data.incomes[0]).toMatchObject({
+          status: 'received',
+          affectsBalance: true,
+          balanceEffectiveAt: first.data.incomes[0]?.createdAt,
+        })
+        expect(first.data.expenses[0]).toMatchObject({
+          affectsBalance: true,
+          balanceEffectiveAt: first.data.expenses[0]?.createdAt,
+        })
+      }),
       { numRuns: 100 },
     )
   })

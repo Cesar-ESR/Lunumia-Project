@@ -1,10 +1,4 @@
-import type {
-  CategoryBudget,
-  Expense,
-  Income,
-  RecurringPayment,
-  RecurringPaymentOccurrence,
-} from '@domain/entities'
+import type { CategoryBudget, Expense } from '@domain/entities'
 import type {
   AmountCents,
   DateOnly,
@@ -12,17 +6,33 @@ import type {
 } from '@domain/value-objects'
 
 export type {
+  CalculateFinancialSnapshotInput,
   FinancialSnapshot,
   ProjectionCoverage,
 } from './financial-snapshot'
-export type { PlanningProjection } from './planning-projection'
+export { calculateFinancialSnapshot } from './financial-snapshot'
+export type {
+  CalculatePlanningProjectionInput,
+  PlanningProjection,
+} from './planning-projection'
+export { calculatePlanningProjection } from './planning-projection'
+export type {
+  ProjectedRecurringPayment,
+  ProjectRecurringPaymentsForRangeInput,
+} from './recurring-projection'
+export { projectRecurringPaymentsForRange } from './recurring-projection'
+export { calculateCurrentBalance } from './balance'
+export type { CommitmentTotals } from './commitments'
+export { calculateCommitments } from './commitments'
+export type {
+  BudgetFit,
+  FinancialAffordability,
+  SimulationResult,
+} from './simulator'
+export { simulatePurchaseImpact } from './simulator'
 
 const sum = (values: readonly { amount: AmountCents }[]): number =>
   values.reduce((total, value) => total + value.amount, 0)
-export const computeCurrentBalance = (
-  incomes: readonly Income[],
-  expenses: readonly Expense[],
-): SignedMoneyCents => sum(incomes) - sum(expenses)
 export const computeBudgetRemaining = (
   budget: CategoryBudget,
   expenses: readonly Expense[],
@@ -52,31 +62,6 @@ export const computeBudgetUsagePercentage = (
       ) /
         budget.amount) *
       100
-export const computePendingCommitments = (
-  occurrences: readonly RecurringPaymentOccurrence[],
-  payments: readonly RecurringPayment[],
-  periodId: string,
-): AmountCents =>
-  occurrences
-    .filter(
-      (occurrence) =>
-        occurrence.periodId === periodId &&
-        occurrence.status === 'pending' &&
-        occurrence.deletedAt === null,
-    )
-    .reduce(
-      (total, occurrence) =>
-        total +
-        (payments.find(
-          (payment) => payment.id === occurrence.recurringPaymentId,
-        )?.amount ?? 0),
-      0,
-    )
-export const computeRealAvailableMoney = (
-  incomes: readonly Income[],
-  expenses: readonly Expense[],
-  pending: AmountCents,
-): SignedMoneyCents => computeCurrentBalance(incomes, expenses) - pending
 export interface SpendingPace {
   spentPercentage: number
   timePercentage: number
@@ -111,22 +96,6 @@ export function computeSpendingPace(
           : 'adequate',
   }
 }
-export interface SimulationResult {
-  currentAvailable: SignedMoneyCents
-  afterPurchaseAvailable: SignedMoneyCents
-  categoryBudgetRemaining: SignedMoneyCents
-  isNegative: boolean
-}
-export const simulatePurchaseImpact = (
-  currentAvailable: SignedMoneyCents,
-  purchaseAmount: AmountCents,
-  categoryBudgetRemaining: SignedMoneyCents,
-): SimulationResult => ({
-  currentAvailable,
-  afterPurchaseAvailable: currentAvailable - purchaseAmount,
-  categoryBudgetRemaining: categoryBudgetRemaining - purchaseAmount,
-  isNegative: currentAvailable - purchaseAmount < 0,
-})
 export const computeCategoryChangePercentage = (
   current: AmountCents,
   previous: AmountCents,

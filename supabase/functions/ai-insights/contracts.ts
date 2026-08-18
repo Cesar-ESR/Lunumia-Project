@@ -23,6 +23,7 @@ const dateOnlySchema = z.string().refine((value) => {
   )
 })
 const amountCentsSchema = z.number().int().finite().nonnegative()
+const signedCentsSchema = z.number().int().finite().safe()
 const uniqueCategoryIds = <T extends { categoryId: string }>(items: T[]) =>
   new Set(items.map(({ categoryId }) => categoryId)).size === items.length
 
@@ -48,7 +49,7 @@ const categoryBreakdownSchema = z
   .object({
     categoryId: z.string().uuid(),
     categoryName: z.string().trim().min(1).max(AI_LIMITS.categoryName),
-    total: amountCentsSchema,
+    totalCents: amountCentsSchema,
     percentage: z.number().finite(),
   })
   .strict()
@@ -56,16 +57,17 @@ const categoryBreakdownSchema = z
 const topExpenseSchema = z
   .object({
     description: z.string().trim().min(1).max(AI_LIMITS.topExpenseDescription),
-    amount: amountCentsSchema,
+    amountCents: amountCentsSchema,
   })
   .strict()
 
-export const PeriodSummaryRequestSchema = z
+export const HistoricalAnalysisRequestSchema = z
   .object({
-    aggregatedData: z
+    context: z.literal('historical'),
+    facts: z
       .object({
-        totalIncome: amountCentsSchema,
-        totalExpenses: amountCentsSchema,
+        receivedIncomeCents: amountCentsSchema,
+        expenseCents: amountCentsSchema,
         categoryBreakdown: z
           .array(categoryBreakdownSchema)
           .max(AI_LIMITS.categories)
@@ -82,6 +84,30 @@ export const PeriodSummaryRequestSchema = z
       .refine(({ startDate, endDate }) => startDate <= endDate),
   })
   .strict()
+
+export const PlanningAnalysisRequestSchema = z
+  .object({
+    context: z.literal('planning'),
+    facts: z
+      .object({
+        currentBalanceCents: signedCentsSchema.nullable(),
+        committedCents: amountCentsSchema,
+        expectedIncomeCents: amountCentsSchema,
+        projectedAvailableCents: signedCentsSchema.nullable(),
+        projectedClosingBalanceCents: signedCentsSchema.nullable(),
+        projectionCoverage: z.enum(['full_period', 'overdue_only']),
+        projectionHorizonEnd: dateOnlySchema.nullable(),
+      })
+      .strict(),
+  })
+  .strict()
+
+export const AIAnalysisRequestSchema = z.discriminatedUnion('context', [
+  HistoricalAnalysisRequestSchema,
+  PlanningAnalysisRequestSchema,
+])
+
+export const PeriodSummaryRequestSchema = HistoricalAnalysisRequestSchema
 
 const categoryChangeSchema = z
   .object({
@@ -131,6 +157,10 @@ export const CategoryChangeExplanationsResponseSchema = z
 
 export type SuggestCategoryInput = z.infer<typeof SuggestCategoryRequestSchema>
 export type PeriodSummaryInput = z.infer<typeof PeriodSummaryRequestSchema>
+export type PlanningAnalysisInput = z.infer<
+  typeof PlanningAnalysisRequestSchema
+>
+export type AIAnalysisInput = z.infer<typeof AIAnalysisRequestSchema>
 export type ExplainChangesInput = z.infer<typeof ExplainChangesRequestSchema>
 export type CategorySuggestionOutput = z.infer<
   typeof CategorySuggestionResponseSchema
@@ -152,10 +182,16 @@ export function parseSuggestCategoryRequest(value: unknown) {
 }
 
 export function parsePeriodSummaryRequest(value: unknown) {
-  if (isRecord(value) && isRecord(value.aggregatedData)) {
-    guardCategoryLimit(value.aggregatedData, 'categoryBreakdown')
+  if (isRecord(value) && isRecord(value.facts)) {
+    guardCategoryLimit(value.facts, 'categoryBreakdown')
   }
   return parseRequest(PeriodSummaryRequestSchema, value)
+}
+
+export function parseAIAnalysisRequest(value: unknown): AIAnalysisInput {
+  if (isRecord(value) && isRecord(value.facts))
+    guardCategoryLimit(value.facts, 'categoryBreakdown')
+  return parseRequest(AIAnalysisRequestSchema, value)
 }
 
 export function parseExplainChangesRequest(value: unknown) {

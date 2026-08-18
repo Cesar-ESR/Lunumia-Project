@@ -1,6 +1,11 @@
 import type { Period } from '@domain/entities'
 import type { ReceiptRecognitionResult } from '@domain/ports'
 import type { AmountCents, DateOnly } from '@domain/value-objects'
+import {
+  validateReceiptAmount,
+  type ReceiptAmountProposal,
+  type ReceiptAmountValidation,
+} from '@domain/rules'
 
 export interface ReceiptExpenseDraft {
   description: string
@@ -13,7 +18,9 @@ export interface ReceiptExpenseDraft {
 export interface ReceiptRecognitionProposal {
   draft: ReceiptExpenseDraft
   detectedCurrency: string | null
-  confidence: number
+  confidence: number | null
+  amountProposal: ReceiptAmountProposal
+  amountValidation: ReceiptAmountValidation
 }
 
 export function mapReceiptToExpenseDraft(
@@ -21,16 +28,35 @@ export function mapReceiptToExpenseDraft(
   periods: Period[],
   activePeriodId: string | null,
 ): ReceiptRecognitionProposal {
+  const amountProposal: ReceiptAmountProposal = {
+    subtotal: result.subtotal,
+    tax: result.tax,
+    tip: result.tip,
+    discount: result.discount,
+    otherFees: result.otherFees,
+    total: result.total,
+    amountPaid: result.amountPaid,
+    amountEvidence: result.amountEvidence,
+    amountAmbiguous: result.amountAmbiguous,
+    currency: result.currency,
+    confidence: result.confidence,
+  }
+  const amountValidation = validateReceiptAmount(amountProposal)
   return {
     draft: {
       description: result.merchant ?? '',
-      amount: result.total,
+      amount:
+        amountValidation.status === 'invalid'
+          ? null
+          : (result.total as AmountCents),
       date: result.date ?? '',
       categoryId: '',
       periodId: resolveReceiptPeriodId(result.date, periods, activePeriodId),
     },
     detectedCurrency: result.currency,
     confidence: result.confidence,
+    amountProposal,
+    amountValidation,
   }
 }
 

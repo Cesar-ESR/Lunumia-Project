@@ -111,7 +111,20 @@ describe('GroqAIProvider', () => {
     expect(userMessage).toContain('65.73%')
     expect(userMessage).toContain('34.27%')
     expect(userMessage).not.toMatch(/700000|21300|14000|7300/)
-    expect(systemPrompt).toContain('importes y porcentajes proporcionados')
+    expect(systemPrompt).toContain(
+      'importes y porcentajes ya fueron calculados por la aplicación',
+    )
+    expect(systemPrompt).toContain('resumen histórico')
+    expect(systemPrompt).toContain(
+      'receivedIncome contiene sólo ingresos realizados',
+    )
+    expect(systemPrompt).toContain(
+      'expected y cancelled no son ingresos históricos',
+    )
+    expect(systemPrompt).toContain('sin recalcular')
+    expect(systemPrompt).toContain(
+      'No presentes proyecciones como hechos actuales',
+    )
     expect(systemPrompt).toContain('Reproduce literalmente')
     expect(systemPrompt).not.toMatch(
       /dividir entre 100|calcular porcentajes|convertir centavos/i,
@@ -475,28 +488,29 @@ function groqCompletion(content: unknown): Response {
 
 function summaryInput() {
   return {
-    aggregatedData: {
-      totalIncome: 700_000,
-      totalExpenses: 21_300,
+    context: 'historical' as const,
+    facts: {
+      receivedIncomeCents: 700_000,
+      expenseCents: 21_300,
       categoryBreakdown: [
         {
           categoryId,
           categoryName: 'Comida',
-          total: 14_000,
+          totalCents: 14_000,
           percentage: 65.73,
         },
         {
           categoryId: secondCategoryId,
           categoryName: 'Transporte',
-          total: 7_300,
+          totalCents: 7_300,
           percentage: 34.27,
         },
       ],
       topExpenses: [
-        { description: 'Hamburguesa', amount: 12_000 },
-        { description: 'Uber al trabajo', amount: 5_000 },
-        { description: 'Pasaje', amount: 2_300 },
-        { description: 'Agua', amount: 2_000 },
+        { description: 'Hamburguesa', amountCents: 12_000 },
+        { description: 'Uber al trabajo', amountCents: 5_000 },
+        { description: 'Pasaje', amountCents: 2_300 },
+        { description: 'Agua', amountCents: 2_000 },
       ],
       periodType: 'monthly' as const,
       startDate: '2026-08-01',

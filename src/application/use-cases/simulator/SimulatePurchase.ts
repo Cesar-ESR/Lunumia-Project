@@ -7,12 +7,12 @@ import type {
   ICategoryBudgetRepository,
   IExpenseRepository,
 } from '@domain/repositories'
-import type { AmountCents, DateOnly } from '@domain/value-objects'
-import { GetDashboardSummary } from '../dashboard/GetDashboardSummary'
+import type { AmountCents } from '@domain/value-objects'
+import type { GetFinancialSnapshot } from '../dashboard/GetFinancialSnapshot'
 
 export class SimulatePurchase {
   constructor(
-    private readonly dashboard: GetDashboardSummary,
+    private readonly financialSnapshot: Pick<GetFinancialSnapshot, 'execute'>,
     private readonly budgets: ICategoryBudgetRepository,
     private readonly expenses: IExpenseRepository,
   ) {}
@@ -20,22 +20,23 @@ export class SimulatePurchase {
     period: Period
     categoryId: string
     amount: AmountCents
-    today: DateOnly
   }) {
-    const [summary, budget, expenses] = await Promise.all([
-      this.dashboard.execute(input.period, input.today),
+    const [snapshot, budget, expenses] = await Promise.all([
+      this.financialSnapshot.execute(),
       this.budgets.findByPeriodAndCategory(input.period.id, input.categoryId),
       this.expenses.findByPeriod(input.period.id),
     ])
-    const before = budget ? computeBudgetRemaining(budget, expenses) : 0
+    const categoryBudgetRemaining = budget
+      ? computeBudgetRemaining(budget, expenses)
+      : null
     return {
-      ...simulatePurchaseImpact(
-        summary.realAvailableMoney,
-        input.amount,
-        before,
-      ),
-      categoryBudgetBefore: budget ? before : null,
-      categoryBudgetAfter: budget ? before - input.amount : null,
+      ...simulatePurchaseImpact({
+        projectedAvailableCents: snapshot.projectedAvailableCents,
+        purchaseAmountCents: input.amount,
+        categoryBudgetRemainingCents: categoryBudgetRemaining,
+      }),
+      projectionCoverage: snapshot.projectionCoverage,
+      projectionHorizonEnd: snapshot.projectionHorizonEnd,
     }
   }
 }

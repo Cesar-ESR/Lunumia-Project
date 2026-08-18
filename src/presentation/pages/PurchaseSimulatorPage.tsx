@@ -40,7 +40,6 @@ export function PurchaseSimulatorPage() {
       period: activePeriod,
       categoryId,
       amount,
-      today: getLocalDateOnly(),
     })
     return { categories, result }
   }, [activePeriod, amount, categoryId, services])
@@ -195,7 +194,7 @@ export function PurchaseSimulatorPage() {
           </div>
         </section>
         <section
-          className={`panel simulation-result ${result?.isNegative ? 'negative-result' : ''}`}
+          className={`panel simulation-result ${result?.financialAffordability === 'exceeds' ? 'negative-result' : ''}`}
           aria-live="polite"
         >
           <h2>Resultado</h2>
@@ -217,12 +216,24 @@ export function PurchaseSimulatorPage() {
             <>
               <div className="simulation-grid">
                 <div>
-                  <span>Disponible actual</span>
-                  <MoneyDisplay amount={result.currentAvailable} />
+                  <span>Disponible proyectado actual</span>
+                  {result.projectedAvailableBeforePurchase === null ? (
+                    <strong>No configurado</strong>
+                  ) : (
+                    <MoneyDisplay
+                      amount={result.projectedAvailableBeforePurchase}
+                    />
+                  )}
                 </div>
                 <div>
                   <span>Disponible después</span>
-                  <MoneyDisplay amount={result.afterPurchaseAvailable} />
+                  {result.projectedAvailableAfterPurchase === null ? (
+                    <strong>No evaluable</strong>
+                  ) : (
+                    <MoneyDisplay
+                      amount={result.projectedAvailableAfterPurchase}
+                    />
+                  )}
                 </div>
                 <div>
                   <span>Presupuesto antes</span>
@@ -242,10 +253,15 @@ export function PurchaseSimulatorPage() {
                 </div>
               </div>
               <p className="simulation-message">
-                {result.isNegative
-                  ? 'Esta compra dejaría tu dinero disponible en negativo.'
-                  : 'Esta compra se mantiene dentro de tu dinero disponible actual.'}
+                {result.financialAffordability === 'unknown'
+                  ? 'Configura tu saldo para evaluar si esta compra cabe en tu dinero disponible.'
+                  : result.financialAffordability === 'exceeds'
+                    ? 'Esta compra dejaría tu dinero disponible en negativo.'
+                    : 'Esta compra se mantiene dentro de tu dinero disponible actual.'}
               </p>
+              {result.projectionCoverage === 'overdue_only' ? (
+                <p>La proyección sólo considera compromisos vencidos.</p>
+              ) : null}
               <button
                 type="button"
                 className="button"

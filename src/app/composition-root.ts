@@ -10,11 +10,17 @@ import { CreateExpense } from '@application/use-cases/expenses/CreateExpense'
 import { DeleteExpense } from '@application/use-cases/expenses/DeleteExpense'
 import { ListExpensesByPeriod } from '@application/use-cases/expenses/ListExpensesByPeriod'
 import { UpdateExpense } from '@application/use-cases/expenses/UpdateExpense'
-import { GetDashboardSummary } from '@application/use-cases/dashboard/GetDashboardSummary'
+import { GetDashboardBudgetSummary } from '@application/use-cases/dashboard/GetDashboardBudgetSummary'
+import { GetFinancialSnapshot } from '@application/use-cases/dashboard/GetFinancialSnapshot'
 import { CreateIncome } from '@application/use-cases/incomes/CreateIncome'
 import { DeleteIncome } from '@application/use-cases/incomes/DeleteIncome'
 import { ListIncomesByPeriod } from '@application/use-cases/incomes/ListIncomesByPeriod'
 import { UpdateIncome } from '@application/use-cases/incomes/UpdateIncome'
+import { CreateExpectedIncome } from '@application/use-cases/incomes/CreateExpectedIncome'
+import { MarkIncomeAsReceived } from '@application/use-cases/incomes/MarkIncomeAsReceived'
+import { CancelExpectedIncome } from '@application/use-cases/incomes/CancelExpectedIncome'
+import { SetCurrentBalance } from '@application/use-cases/balance/SetCurrentBalance'
+import { ReconcileCurrentBalance } from '@application/use-cases/balance/ReconcileCurrentBalance'
 import { CreatePeriod } from '@application/use-cases/periods/CreatePeriod'
 import { DeletePeriod } from '@application/use-cases/periods/DeletePeriod'
 import { ListPeriods } from '@application/use-cases/periods/ListPeriods'
@@ -85,6 +91,7 @@ import {
 } from '@infrastructure/platform'
 import {
   DexieCategoryBudgetRepository,
+  DexieBalanceAnchorRepository,
   DexieCategoryRepository,
   DexieExpenseRepository,
   DexieIncomeRepository,
@@ -115,6 +122,10 @@ export interface ApplicationServices {
   ownerId: string
   initialize: Executable<InitializeLocalOwner>
   settings: { getUserSettings: Executable<GetUserSettings> }
+  balance: {
+    setCurrentBalance: Executable<SetCurrentBalance>
+    reconcileCurrentBalance: Executable<ReconcileCurrentBalance>
+  }
   periods: {
     createPeriod: Executable<CreatePeriod>
     updatePeriod: Executable<UpdatePeriod>
@@ -124,6 +135,9 @@ export interface ApplicationServices {
   }
   incomes: {
     createIncome: Executable<CreateIncome>
+    createExpectedIncome: Executable<CreateExpectedIncome>
+    markIncomeAsReceived: Executable<MarkIncomeAsReceived>
+    cancelExpectedIncome: Executable<CancelExpectedIncome>
     updateIncome: Executable<UpdateIncome>
     deleteIncome: Executable<DeleteIncome>
     listIncomesByPeriod: Executable<ListIncomesByPeriod>
@@ -158,7 +172,10 @@ export interface ApplicationServices {
     listOccurrencesByPeriod: Executable<ListOccurrencesByPeriod>
     getOverview: Executable<GetRecurringOverview>
   }
-  dashboard: { getSummary: Executable<GetDashboardSummary> }
+  dashboard: {
+    getBudgetSummary: Executable<GetDashboardBudgetSummary>
+    getFinancialSnapshot: Executable<GetFinancialSnapshot>
+  }
   simulator: { simulatePurchase: Executable<SimulatePurchase> }
   backup: {
     exportBackup(): Promise<BackupFile>
@@ -237,6 +254,11 @@ export function createApplicationServices(
   const clock = { now: () => new Date().toISOString() }
   const syncDependencies = { ids, clock }
   const periods = new DexiePeriodRepository(database, ownerId, syncDependencies)
+  const anchors = new DexieBalanceAnchorRepository(
+    database,
+    ownerId,
+    syncDependencies,
+  )
   const incomes = new DexieIncomeRepository(database, ownerId, syncDependencies)
   const expenses = new DexieExpenseRepository(
     database,
@@ -263,17 +285,27 @@ export function createApplicationServices(
     ownerId,
     syncDependencies,
   )
+  const recurringPaymentTransaction = new DexieRecurringPaymentTransaction(
+    database,
+    ids,
+    clock,
+  )
   const settings = new DexieUserSettingsRepository(
     database,
     ownerId,
     syncDependencies,
   )
-  const getDashboardSummary = new GetDashboardSummary(
+  const getDashboardBudgetSummary = new GetDashboardBudgetSummary(
+    budgets,
+    expenses,
+  )
+  const getFinancialSnapshot = new GetFinancialSnapshot(
+    periods,
+    anchors,
     incomes,
     expenses,
-    budgets,
     occurrences,
-    payments,
+    clock,
   )
   const backupService = new BackupService(
     new BackupAdapter(database, syncDependencies),
@@ -327,6 +359,10 @@ export function createApplicationServices(
       clock,
     ),
     settings: { getUserSettings: new GetUserSettings(settings) },
+    balance: {
+      setCurrentBalance: new SetCurrentBalance(anchors, ids, clock),
+      reconcileCurrentBalance: new ReconcileCurrentBalance(anchors, ids, clock),
+    },
     periods: {
       createPeriod: new CreatePeriod(periods, ids, clock),
       updatePeriod: new UpdatePeriod(periods, clock),
@@ -336,7 +372,15 @@ export function createApplicationServices(
     },
     incomes: {
       createIncome: new CreateIncome(incomes, periods, ids, clock),
-      updateIncome: new UpdateIncome(incomes, clock),
+      createExpectedIncome: new CreateExpectedIncome(
+        incomes,
+        periods,
+        ids,
+        clock,
+      ),
+      markIncomeAsReceived: new MarkIncomeAsReceived(incomes, clock),
+      cancelExpectedIncome: new CancelExpectedIncome(incomes, clock),
+      updateIncome: new UpdateIncome(incomes, periods, clock),
       deleteIncome: new DeleteIncome(incomes),
       listIncomesByPeriod: new ListIncomesByPeriod(incomes),
     },
@@ -348,8 +392,8 @@ export function createApplicationServices(
         ids,
         clock,
       ),
-      updateExpense: new UpdateExpense(expenses, clock),
-      deleteExpense: new DeleteExpense(expenses),
+      updateExpense: new UpdateExpense(expenses, periods, categories, clock),
+      deleteExpense: new DeleteExpense(expenses, recurringPaymentTransaction),
       listExpensesByPeriod: new ListExpensesByPeriod(expenses),
     },
     categories: {
@@ -398,17 +442,20 @@ export function createApplicationServices(
         clock,
       ),
       markOccurrenceAsPaid: new MarkOccurrenceAsPaid(
-        new DexieRecurringPaymentTransaction(database, ids, clock),
+        recurringPaymentTransaction,
       ),
       markOccurrenceAsSkipped: new MarkOccurrenceAsSkipped(occurrences, clock),
       listRecurringPayments: new ListRecurringPayments(payments),
       listOccurrencesByPeriod: new ListOccurrencesByPeriod(occurrences),
       getOverview: new GetRecurringOverview(payments, occurrences),
     },
-    dashboard: { getSummary: getDashboardSummary },
+    dashboard: {
+      getBudgetSummary: getDashboardBudgetSummary,
+      getFinancialSnapshot,
+    },
     simulator: {
       simulatePurchase: new SimulatePurchase(
-        getDashboardSummary,
+        getFinancialSnapshot,
         budgets,
         expenses,
       ),

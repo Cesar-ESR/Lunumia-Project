@@ -1,5 +1,6 @@
 import {
   AI_REQUEST_LIMITS,
+  buildHistoricalAnalysisRequest,
   ExplainChangesRequestSchema,
   InvalidAIResponseError,
   parseCategoryChangeExplanations,
@@ -65,9 +66,10 @@ export class EdgeFunctionAIAdapter implements AIInsightsProvider {
   async generatePeriodSummary(
     aggregatedData: PeriodAggregatedData,
   ): Promise<PeriodSummary> {
-    const request = parseLocalRequest(PeriodSummaryRequestSchema, {
-      aggregatedData,
-    })
+    const request = parseLocalRequest(
+      PeriodSummaryRequestSchema,
+      buildHistoricalAnalysisRequest(aggregatedData),
+    )
     const data = await this.invoke('period-summary', request)
     return this.parseResponse(() => parsePeriodSummary(data))
   }
@@ -145,9 +147,9 @@ function hasTooManyCategories(value: unknown): boolean {
   if (Array.isArray(value.changes))
     return value.changes.length > AI_REQUEST_LIMITS.categories
   return (
-    isRecord(value.aggregatedData) &&
-    Array.isArray(value.aggregatedData.categoryBreakdown) &&
-    value.aggregatedData.categoryBreakdown.length > AI_REQUEST_LIMITS.categories
+    isRecord(value.facts) &&
+    Array.isArray(value.facts.categoryBreakdown) &&
+    value.facts.categoryBreakdown.length > AI_REQUEST_LIMITS.categories
   )
 }
 

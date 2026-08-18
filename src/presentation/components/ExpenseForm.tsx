@@ -70,7 +70,9 @@ export function ExpenseForm({
   resetOnSuccess?: boolean
   focusOnMount?: boolean
   idPrefix?: string
-  beforeFields?: ReactNode
+  beforeFields?:
+    | ReactNode
+    | ((value: { amountText: string; amountCents: number | null }) => ReactNode)
   categorySuggestionAction?: SuggestExpenseCategoryAction | null
   aiSuggestionEnabled?: boolean
   aiIdentityKey?: string
@@ -208,7 +210,12 @@ export function ExpenseForm({
       noValidate
     >
       {serverError ? <Notice tone="error" message={serverError} /> : null}
-      {beforeFields}
+      {typeof beforeFields === 'function'
+        ? beforeFields({
+            amountText: form.amount,
+            amountCents: parseMoneyInputToCents(form.amount),
+          })
+        : beforeFields}
       <FormField
         id={amountId}
         label={`Monto${currency ? ` (${currency})` : ''}`}

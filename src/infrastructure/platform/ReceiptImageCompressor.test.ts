@@ -199,4 +199,14 @@ describe('ReceiptImageCompressor', () => {
     expect(warn).not.toHaveBeenCalled()
     expect(error).not.toHaveBeenCalled()
   })
+
+  it('rechaza una compresión que excedería el request base64 de Groq', async () => {
+    const { compressor, toBlob } = setup(1920, 1080)
+    toBlob.mockResolvedValueOnce(
+      new Blob([new Uint8Array(3_000_000)], { type: 'image/jpeg' }),
+    )
+    await expect(compressor.compress(selected())).rejects.toMatchObject({
+      code: 'file_too_large',
+    })
+  })
 })

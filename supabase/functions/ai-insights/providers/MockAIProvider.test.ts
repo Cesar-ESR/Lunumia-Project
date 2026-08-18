@@ -8,18 +8,19 @@ const suggestionInput = {
   categories: [{ id: firstCategoryId, name: 'Comida' }],
 }
 const summaryInput = {
-  aggregatedData: {
-    totalIncome: 10_000,
-    totalExpenses: 4_000,
+  context: 'historical' as const,
+  facts: {
+    receivedIncomeCents: 10_000,
+    expenseCents: 4_000,
     categoryBreakdown: [
       {
         categoryId: firstCategoryId,
         categoryName: 'Comida',
-        total: 4_000,
+        totalCents: 4_000,
         percentage: 100,
       },
     ],
-    topExpenses: [{ description: 'Dato privado', amount: 4_000 }],
+    topExpenses: [{ description: 'Dato privado', amountCents: 4_000 }],
     periodType: 'monthly' as const,
     startDate: '2026-08-01',
     endDate: '2026-08-31',
@@ -138,6 +139,10 @@ describe('MockAIProvider configurable', () => {
     expect(provider.calls[0]?.payload).toEqual({
       descriptionLength: suggestionInput.description.length,
       categoryCount: 1,
+    })
+    expect(provider.calls[1]?.payload).toMatchObject({
+      context: 'historical',
+      periodType: 'monthly',
     })
     const audit = JSON.stringify(provider.calls)
     expect(audit).not.toContain(suggestionInput.description)

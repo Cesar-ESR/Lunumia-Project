@@ -15,6 +15,8 @@ const publishableKey =
 const providerName = Deno.env.get('OCR_PROVIDER') ?? ''
 const runtimeEnvironment = Deno.env.get('OCR_ENVIRONMENT') ?? 'production'
 const timeoutMs = readProviderTimeout(Deno.env.get('OCR_TIMEOUT_MS'))
+const groqApiKey = Deno.env.get('GROQ_API_KEY') ?? ''
+const ocrModel = Deno.env.get('OCR_MODEL') ?? ''
 const allowedOrigins = readAllowedOrigins([
   Deno.env.get('ALLOWED_ORIGIN') ?? '',
   Deno.env.get('ALLOWED_ORIGINS') ?? '',
@@ -45,7 +47,12 @@ const handler = createRecognizeReceiptHandler({
     return error || !data.user ? null : { userId: data.user.id }
   },
   createProvider: () =>
-    createOCRProvider({ provider: providerName, runtimeEnvironment }),
+    createOCRProvider({
+      provider: providerName,
+      runtimeEnvironment,
+      groqApiKey,
+      ocrModel,
+    }),
 })
 
 Deno.serve(handler)

@@ -1,7 +1,17 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from '../App'
-import { OWNER_ID, createApplicationServicesMock } from '../test/test-factories'
+import {
+  OWNER_ID,
+  createApplicationServicesMock,
+  createFinancialSnapshotMock,
+} from '../test/test-factories'
 
 function renderRecurringPayments(
   services: ReturnType<typeof createApplicationServicesMock>['services'],
@@ -11,6 +21,20 @@ function renderRecurringPayments(
 }
 
 describe('RecurringPaymentsPage', () => {
+  it('usa committedCents del snapshot sin reconstruirlo desde pagos', async () => {
+    const { services } = createApplicationServicesMock({
+      financialSnapshot: createFinancialSnapshotMock({
+        committedCents: 12_345,
+      }),
+    })
+    renderRecurringPayments(services)
+
+    const pending = await screen.findByText('Pendientes')
+    expect(
+      await within(pending.parentElement!).findByLabelText('$123.45'),
+    ).toBeInTheDocument()
+  })
+
   it('asocia errores en español con los controles inválidos', async () => {
     const user = userEvent.setup()
     const { services } = createApplicationServicesMock()

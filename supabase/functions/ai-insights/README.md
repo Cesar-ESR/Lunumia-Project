@@ -3,11 +3,21 @@
 Función autenticada con rutas `suggest-category`, `period-summary` y
 `explain-changes`. No persiste solicitudes ni respuestas y no modifica datos.
 
-Los contratos HTTP de `period-summary` y `explain-changes` conservan los
-importes como enteros `AmountCents`. Después de validar el request con Zod, el
-proveedor construye de forma determinista un contexto monetario de presentación
-en MXN para el MVP. Groq solo recibe ese contexto ya formateado, nunca interpreta
-unidades monetarias internas y no realiza cálculos ni conversiones.
+El payload canónico de `period-summary` usa `context: "historical"` y sólo
+transporta ingresos recibidos, gastos, totales por categoría y gastos
+destacados ya calculados. `expected` y `cancelled` no se comunican como ingreso
+realizado. El contrato Domain 2.0 también valida un contexto `planning` mínimo
+con `expectedIncomeCents`, `committedCents`, proyecciones, cobertura y horizonte
+ya calculados, pero no expone una ruta de planificación mientras el producto no
+tenga esa funcionalidad.
+
+Los importes estructurados se conservan como integer cents. Los saldos y
+proyecciones admiten negativos y `null`; los agregados admiten sólo valores no
+negativos. No se envían entidades `Income`, occurrences, reglas recurrentes,
+metadatos de sync, IDs de operaciones, JWT ni claves internas. Después de
+validar con Zod, el proveedor construye de forma determinista un contexto
+monetario de presentación en MXN. Groq sólo explica ese contexto ya formateado:
+no calcula, decide, persiste ni convierte verdad financiera.
 
 ## Configuración local
 

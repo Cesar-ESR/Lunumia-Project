@@ -1,16 +1,21 @@
 import { vi } from 'vitest'
 import type { ApplicationServices } from '../../app/composition-root'
 import type {
+  BalanceAnchor,
   Category,
   CategoryBudget,
   Expense,
+  ExpenseV2,
   Income,
+  IncomeV2,
   Period,
   RecurringPayment,
   RecurringPaymentOccurrence,
+  RecurringPaymentOccurrenceV2,
   UserSettings,
 } from '@domain/entities'
-import type { DashboardSummary } from '@application/use-cases/dashboard/GetDashboardSummary'
+import type { DashboardBudgetSummary } from '@application/use-cases/dashboard/GetDashboardBudgetSummary'
+import type { FinancialSnapshot } from '@domain/calculations'
 
 export const OWNER_ID = 'guest:test-owner'
 export const PERIOD_ID = '11111111-1111-4111-8111-111111111111'
@@ -47,7 +52,7 @@ export const createCategoryMock = (
 })
 export const createExpenseMock = (
   overrides: Partial<Expense> = {},
-): Expense => ({
+): ExpenseV2 => ({
   id: EXPENSE_ID,
   periodId: PERIOD_ID,
   categoryId: CATEGORY_ID,
@@ -55,15 +60,22 @@ export const createExpenseMock = (
   description: 'Supermercado',
   date: '2026-07-10',
   recurringOccurrenceId: null,
+  affectsBalance: true,
+  balanceEffectiveAt: NOW,
   ...syncable,
   ...overrides,
 })
-export const createIncomeMock = (overrides: Partial<Income> = {}): Income => ({
+export const createIncomeMock = (
+  overrides: Partial<Income> = {},
+): IncomeV2 => ({
   id: '44444444-4444-4444-8444-444444444444',
   periodId: PERIOD_ID,
   amount: 200000,
   description: 'Sueldo',
   date: '2026-07-01',
+  status: 'received',
+  affectsBalance: true,
+  balanceEffectiveAt: NOW,
   ...syncable,
   ...overrides,
 })
@@ -93,38 +105,65 @@ export const createRecurringPaymentMock = (
 })
 export const createOccurrenceMock = (
   overrides: Partial<RecurringPaymentOccurrence> = {},
-): RecurringPaymentOccurrence => ({
+): RecurringPaymentOccurrenceV2 => ({
   id: '77777777-7777-4777-8777-777777777777',
   recurringPaymentId: '66666666-6666-4666-8666-666666666666',
   periodId: PERIOD_ID,
   dueDate: '2026-07-15',
   status: 'pending',
+  amount: 50000,
   transactionId: null,
   ...syncable,
   ...overrides,
 })
-export const createDashboardSummaryMock = (
-  overrides: Partial<DashboardSummary> = {},
-): DashboardSummary => ({
-  currentBalance: 150000,
+export const createDashboardBudgetSummaryMock = (
+  overrides: Partial<DashboardBudgetSummary> = {},
+): DashboardBudgetSummary => ({
   totalBudget: 100000,
   budgetRemaining: 65000,
-  pendingCommitments: 25000,
-  realAvailableMoney: 125000,
   spendingPace: { spentPercentage: 35, timePercentage: 50, pace: 'low' },
+  ...overrides,
+})
+
+export const createFinancialSnapshotMock = (
+  overrides: Partial<FinancialSnapshot> = {},
+): FinancialSnapshot => ({
+  currentBalanceCents: 125000,
+  spentCents: 25000,
+  committedCents: 10000,
+  upcomingCommittedCents: 10000,
+  overdueCommittedCents: 0,
+  projectedAvailableCents: 115000,
+  expectedIncomeCents: 0,
+  overdueExpectedIncomeCents: 0,
+  projectedClosingBalanceCents: 115000,
+  projectionHorizonEnd: '2026-07-31',
+  projectionCoverage: 'full_period',
   ...overrides,
 })
 
 export function createApplicationServicesMock({
   activePeriod = createPeriodMock(),
-  summary = createDashboardSummaryMock(),
-}: { activePeriod?: Period | null; summary?: DashboardSummary } = {}) {
+  budgetSummary = createDashboardBudgetSummaryMock(),
+  financialSnapshot = createFinancialSnapshotMock(),
+}: {
+  activePeriod?: Period | null
+  budgetSummary?: DashboardBudgetSummary
+  financialSnapshot?: FinancialSnapshot
+} = {}) {
   const category = createCategoryMock()
   const expense = createExpenseMock()
   const income = createIncomeMock()
   const budget = createBudgetMock()
   const payment = createRecurringPaymentMock()
   const occurrence = createOccurrenceMock()
+  const anchor: BalanceAnchor = {
+    id: '99999999-9999-4999-8999-999999999999',
+    amount: 150000,
+    capturedAt: NOW,
+    ledgerCutoffAt: NOW,
+    ...syncable,
+  }
   const settings: UserSettings = {
     id: '88888888-8888-4888-8888-888888888888',
     ownerId: OWNER_ID,
@@ -134,9 +173,12 @@ export function createApplicationServicesMock({
     createdAt: NOW,
     updatedAt: NOW,
   }
-  const getSummary = vi
-    .fn<ApplicationServices['dashboard']['getSummary']['execute']>()
-    .mockResolvedValue(summary)
+  const getBudgetSummary = vi
+    .fn<ApplicationServices['dashboard']['getBudgetSummary']['execute']>()
+    .mockResolvedValue(budgetSummary)
+  const getFinancialSnapshot = vi
+    .fn<ApplicationServices['dashboard']['getFinancialSnapshot']['execute']>()
+    .mockResolvedValue(financialSnapshot)
   const createExpense = vi
     .fn<ApplicationServices['expenses']['createExpense']['execute']>()
     .mockResolvedValue(expense)
@@ -172,6 +214,20 @@ export function createApplicationServicesMock({
           .mockResolvedValue(settings),
       },
     },
+    balance: {
+      setCurrentBalance: {
+        execute: vi
+          .fn<ApplicationServices['balance']['setCurrentBalance']['execute']>()
+          .mockResolvedValue(anchor),
+      },
+      reconcileCurrentBalance: {
+        execute: vi
+          .fn<
+            ApplicationServices['balance']['reconcileCurrentBalance']['execute']
+          >()
+          .mockResolvedValue(anchor),
+      },
+    },
     periods: {
       createPeriod: {
         execute: vi
@@ -202,6 +258,37 @@ export function createApplicationServicesMock({
         execute: vi
           .fn<ApplicationServices['incomes']['createIncome']['execute']>()
           .mockResolvedValue(income),
+      },
+      createExpectedIncome: {
+        execute: vi
+          .fn<
+            ApplicationServices['incomes']['createExpectedIncome']['execute']
+          >()
+          .mockResolvedValue({
+            ...income,
+            status: 'expected',
+            affectsBalance: false,
+            balanceEffectiveAt: null,
+          }),
+      },
+      markIncomeAsReceived: {
+        execute: vi
+          .fn<
+            ApplicationServices['incomes']['markIncomeAsReceived']['execute']
+          >()
+          .mockResolvedValue(income),
+      },
+      cancelExpectedIncome: {
+        execute: vi
+          .fn<
+            ApplicationServices['incomes']['cancelExpectedIncome']['execute']
+          >()
+          .mockResolvedValue({
+            ...income,
+            status: 'cancelled',
+            affectsBalance: false,
+            balanceEffectiveAt: null,
+          }),
       },
       updateIncome: {
         execute: vi
@@ -353,22 +440,26 @@ export function createApplicationServicesMock({
           .mockResolvedValue({
             payments: [payment],
             occurrences: [occurrence],
-            pendingCommitments: payment.amount,
           }),
       },
     },
-    dashboard: { getSummary: { execute: getSummary } },
+    dashboard: {
+      getBudgetSummary: { execute: getBudgetSummary },
+      getFinancialSnapshot: { execute: getFinancialSnapshot },
+    },
     simulator: {
       simulatePurchase: {
         execute: vi
           .fn<ApplicationServices['simulator']['simulatePurchase']['execute']>()
           .mockResolvedValue({
-            currentAvailable: 125000,
-            afterPurchaseAvailable: 115000,
-            categoryBudgetRemaining: 40000,
-            isNegative: false,
+            projectedAvailableBeforePurchase: 125000,
+            projectedAvailableAfterPurchase: 115000,
+            financialAffordability: 'within',
             categoryBudgetBefore: 50000,
             categoryBudgetAfter: 40000,
+            budgetFit: 'within',
+            projectionCoverage: 'full_period',
+            projectionHorizonEnd: activePeriod?.endDate ?? null,
           }),
       },
     },
@@ -410,7 +501,8 @@ export function createApplicationServicesMock({
   return {
     services,
     mocks: {
-      getSummary,
+      getBudgetSummary,
+      getFinancialSnapshot,
       createExpense,
       prepareReceiptImage,
       recognizeReceipt,

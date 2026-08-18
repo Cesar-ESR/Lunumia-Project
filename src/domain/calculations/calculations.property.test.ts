@@ -1,18 +1,9 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import type {
-  CategoryBudget,
-  Expense,
-  Income,
-  RecurringPayment,
-  RecurringPaymentOccurrence,
-} from '@domain/entities'
+import type { CategoryBudget, Expense } from '@domain/entities'
 import {
   computeBudgetRemaining,
   computeCategoryChangePercentage,
-  computeCurrentBalance,
-  computePendingCommitments,
-  computeRealAvailableMoney,
   computeSpendingPace,
   simulatePurchaseImpact,
 } from './index'
@@ -26,13 +17,6 @@ const base = {
   deletedAt: null,
   syncStatus: 'synced' as const,
 }
-const income = (amount: number): Income => ({
-  ...base,
-  periodId: 'period',
-  amount,
-  description: '',
-  date: '2026-01-01',
-})
 const expense = (amount: number): Expense => ({
   ...base,
   periodId: 'period',
@@ -48,55 +32,7 @@ const budget = (amount: number): CategoryBudget => ({
   categoryId: 'category',
   amount,
 })
-const payment = (id: string, amount: number): RecurringPayment => ({
-  ...base,
-  id,
-  name: '',
-  amount,
-  frequency: 'monthly',
-  dueDate: '2026-01-01',
-  endDate: null,
-  categoryId: 'category',
-  status: 'active',
-})
-const occurrence = (
-  paymentId: string,
-  periodId: string,
-  status: RecurringPaymentOccurrence['status'],
-): RecurringPaymentOccurrence => ({
-  ...base,
-  id: `${paymentId}-${periodId}`,
-  recurringPaymentId: paymentId,
-  periodId,
-  dueDate: '2026-01-01',
-  status,
-  transactionId: null,
-})
-
 describe('propiedades de cálculos financieros', () => {
-  it('P5 y P8: saldo y disponible real son deterministas', () => {
-    fc.assert(
-      fc.property(
-        fc.array(cents, { maxLength: 30 }),
-        fc.array(cents, { maxLength: 30 }),
-        cents,
-        (incomeValues, expenseValues, pending) => {
-          const incomes = incomeValues.map(income)
-          const expenses = expenseValues.map(expense)
-          const balance = computeCurrentBalance(incomes, expenses)
-          expect(balance).toBe(
-            incomeValues.reduce((a, b) => a + b, 0) -
-              expenseValues.reduce((a, b) => a + b, 0),
-          )
-          expect(computeCurrentBalance(incomes, expenses)).toBe(balance)
-          expect(computeRealAvailableMoney(incomes, expenses, pending)).toBe(
-            balance - pending,
-          )
-        },
-      ),
-      { numRuns: 100 },
-    )
-  })
   it('P6: presupuesto restante equivale al presupuesto menos gastos aplicables', () => {
     fc.assert(
       fc.property(
@@ -110,24 +46,6 @@ describe('propiedades de cálculos financieros', () => {
           )
         },
       ),
-      { numRuns: 100 },
-    )
-  })
-  it('P7: solo suma ocurrencias pending no eliminadas', () => {
-    fc.assert(
-      fc.property(cents, cents, (pendingAmount, paidAmount) => {
-        const payments = [
-          payment('pending', pendingAmount),
-          payment('paid', paidAmount),
-        ]
-        const occurrences = [
-          occurrence('pending', 'period', 'pending'),
-          occurrence('paid', 'other', 'paid'),
-        ]
-        expect(computePendingCommitments(occurrences, payments, 'period')).toBe(
-          pendingAmount,
-        )
-      }),
       { numRuns: 100 },
     )
   })
@@ -163,9 +81,18 @@ describe('propiedades de cálculos financieros', () => {
         cents,
         fc.integer({ min: -1_000_000, max: 1_000_000 }),
         (available, purchase, category) => {
-          const result = simulatePurchaseImpact(available, purchase, category)
-          expect(result.afterPurchaseAvailable).toBe(available - purchase)
-          expect(result.isNegative).toBe(result.afterPurchaseAvailable < 0)
+          const result = simulatePurchaseImpact({
+            projectedAvailableCents: available,
+            purchaseAmountCents: purchase,
+            categoryBudgetRemainingCents: category,
+          })
+          expect(result.projectedAvailableAfterPurchase).toBe(
+            available - purchase,
+          )
+          expect(result.financialAffordability).toBe(
+            result.projectedAvailableAfterPurchase! < 0 ? 'exceeds' : 'within',
+          )
+          expect(result.categoryBudgetAfter).toBe(category - purchase)
         },
       ),
       { numRuns: 100 },
