@@ -2,11 +2,14 @@ import {
   AI_REQUEST_LIMITS,
   buildHistoricalAnalysisRequest,
   ExplainChangesRequestSchema,
+  InsufficientPlanningContextError,
   InvalidAIResponseError,
   parseCategoryChangeExplanations,
   parseCategorySuggestion,
   parsePeriodSummary,
+  parsePlanningAnalysisResponse,
   PeriodSummaryRequestSchema,
+  requireCompletePlanningAnalysisRequest,
   SuggestCategoryRequestSchema,
 } from '@application/contracts'
 import type {
@@ -16,12 +19,15 @@ import type {
   CategorySuggestion,
   PeriodAggregatedData,
   PeriodSummary,
+  PlanningAnalysisInput,
+  PlanningAnalysisResponse,
 } from '@domain/ports'
 import { AIInsightsError, type AIErrorCode } from './AIInsightsError'
 
 const functionErrorCodes = new Set<AIErrorCode>([
   'unauthenticated',
   'invalid_request',
+  'insufficient_planning_context',
   'description_too_long',
   'too_many_categories',
   'rate_limited',
@@ -85,6 +91,25 @@ export class EdgeFunctionAIAdapter implements AIInsightsProvider {
         new Set(request.changes.map(({ categoryId }) => categoryId)),
       ),
     )
+  }
+
+  async analyzePlanning(
+    input: PlanningAnalysisInput,
+  ): Promise<PlanningAnalysisResponse> {
+    let request
+    try {
+      request = requireCompletePlanningAnalysisRequest(input)
+    } catch (reason) {
+      if (reason instanceof InsufficientPlanningContextError)
+        throw new AIInsightsError('insufficient_planning_context', {
+          cause: reason,
+        })
+      throw new AIInsightsError('invalid_request', {
+        cause: reason instanceof Error ? reason : undefined,
+      })
+    }
+    const data = await this.invoke('planning-analysis', request)
+    return this.parseResponse(() => parsePlanningAnalysisResponse(data))
   }
 
   private async invoke(
@@ -163,6 +188,8 @@ async function translateFunctionError(
     return new AIInsightsError(code as AIErrorCode, { retryAfterSeconds })
   if (status === 401) return new AIInsightsError('unauthenticated')
   if (status === 400) return new AIInsightsError('invalid_request')
+  if (status === 422)
+    return new AIInsightsError('insufficient_planning_context')
   if (status === 429)
     return new AIInsightsError('rate_limited', { retryAfterSeconds })
   if (status === 504) return new AIInsightsError('provider_timeout')

@@ -52,7 +52,7 @@ export function ExpensesPage() {
               <Link className="button" to="/expenses/receipt">
                 Escanear recibo
               </Link>
-              <Link className="button secondary" to="/periods">
+              <Link className="button secondary" to="/plan/periodos">
                 Administrar periodos
               </Link>
             </div>
@@ -187,10 +187,16 @@ export function ExpensesPage() {
         title="Eliminar gasto"
         description={
           deletion
-            ? `Se eliminará “${deletion.description}” por ${formatCentsForInput(deletion.amount)} MXN.`
+            ? deletion.recurringOccurrenceId
+              ? `Se eliminará “${deletion.description}” por ${formatCentsForInput(deletion.amount)} MXN. También se deshará el pago vinculado y su ocurrencia volverá a pendiente.`
+              : `Se eliminará “${deletion.description}” por ${formatCentsForInput(deletion.amount)} MXN.`
             : ''
         }
-        confirmLabel="Eliminar gasto"
+        confirmLabel={
+          deletion?.recurringOccurrenceId
+            ? 'Eliminar gasto y deshacer pago'
+            : 'Eliminar gasto'
+        }
         isPending={isDeleting}
         onCancel={() => setDeletion(null)}
         onConfirm={() => void confirmDelete()}

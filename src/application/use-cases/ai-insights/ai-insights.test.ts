@@ -70,6 +70,11 @@ function fakeProvider(): AIInsightsProvider {
     explainCategoryChanges: vi.fn(async () => [
       { categoryId, explanation: 'Subió' },
     ]),
+    analyzePlanning: vi.fn(async () => ({
+      summary: 'Explicación',
+      observations: [],
+      considerations: [],
+    })),
   }
 }
 

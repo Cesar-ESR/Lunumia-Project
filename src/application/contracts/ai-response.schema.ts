@@ -2,6 +2,7 @@ import type {
   CategoryChangeExplanation,
   CategorySuggestion,
   PeriodSummary,
+  PlanningAnalysisResponse,
 } from '@domain/ports'
 import { z } from 'zod'
 
@@ -26,6 +27,14 @@ export const PeriodSummarySchema = z
   .object({
     text: z.string().trim().min(1).max(1_000),
     highlights: z.array(z.string().trim().min(1).max(200)).max(5),
+  })
+  .strict()
+
+export const PlanningAnalysisResponseSchema = z
+  .object({
+    summary: z.string().trim().min(1).max(600),
+    observations: z.array(z.string().trim().min(1).max(200)).max(4),
+    considerations: z.array(z.string().trim().min(1).max(200)).max(3),
   })
   .strict()
 
@@ -59,6 +68,14 @@ export function parseCategorySuggestion(
 
 export function parsePeriodSummary(value: unknown): PeriodSummary {
   const parsed = PeriodSummarySchema.safeParse(value)
+  if (!parsed.success) throw new InvalidAIResponseError()
+  return parsed.data
+}
+
+export function parsePlanningAnalysisResponse(
+  value: unknown,
+): PlanningAnalysisResponse {
+  const parsed = PlanningAnalysisResponseSchema.safeParse(value)
   if (!parsed.success) throw new InvalidAIResponseError()
   return parsed.data
 }

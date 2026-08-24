@@ -1,4 +1,7 @@
 import type { CapturedImage } from '@infrastructure/platform'
+import { Button } from '../../components/Button'
+import { LoadingState } from '../../components/LoadingState'
+import { Surface } from '../../components/Surface'
 
 export function ReceiptPreview({
   image,
@@ -22,75 +25,51 @@ export function ReceiptPreview({
   onCancel?(): void
 }) {
   return (
-    <section
-      className="panel receipt-preview"
+    <Surface
+      className="ln-receipt-preview"
       aria-labelledby="receipt-preview-title"
     >
       <div>
         <p className="eyebrow">Vista previa</p>
         <h2 id="receipt-preview-title">Imagen del recibo</h2>
       </div>
-      <div className="receipt-image-frame">
+      <div className="ln-receipt-image-frame">
         <img
           src={image.previewUrl}
           alt="Vista previa del recibo seleccionado"
         />
       </div>
-      <p className="receipt-image-meta">
+      <p className="ln-receipt-image-meta">
         {image.compressedWidth} × {image.compressedHeight} px ·{' '}
         {image.mimeType === 'image/jpeg' ? 'JPEG' : 'PNG'}
       </p>
       {isRecognizing ? (
-        <div
-          className="receipt-recognition-status"
-          role="status"
-          aria-live="polite"
-        >
-          <span className="spinner" aria-hidden="true" />
-          <div>
-            <strong>Analizando recibo…</strong>
-            <span>Esto puede tomar unos segundos.</span>
-          </div>
-        </div>
+        <LoadingState message="Analizando recibo… Esto puede tomar unos segundos." />
       ) : null}
-      {isSelecting ? (
-        <p className="receipt-inline-status" role="status" aria-live="polite">
-          <span className="spinner" aria-hidden="true" />
-          Preparando otra imagen…
-        </p>
-      ) : null}
+      {isSelecting ? <LoadingState message="Preparando otra imagen…" /> : null}
       {!readonly ? (
-        <div className="receipt-preview-actions">
-          <button
-            className="button"
+        <div className="ln-receipt-actions">
+          <Button
             disabled={isRecognizing || isSelecting || !canAnalyze}
             onClick={onAnalyze}
           >
             Analizar recibo
-          </button>
-          <button
-            className="button secondary"
+          </Button>
+          <Button
+            variant="secondary"
             disabled={isSelecting}
             onClick={onReplace}
           >
             Elegir otra imagen
-          </button>
-          <button
-            className="button ghost"
-            disabled={isSelecting}
-            onClick={onManual}
-          >
+          </Button>
+          <Button variant="ghost" disabled={isSelecting} onClick={onManual}>
             Registrar manualmente
-          </button>
-          <button
-            className="button ghost"
-            disabled={isSelecting}
-            onClick={onCancel}
-          >
+          </Button>
+          <Button variant="ghost" disabled={isSelecting} onClick={onCancel}>
             Cancelar
-          </button>
+          </Button>
         </div>
       ) : null}
-    </section>
+    </Surface>
   )
 }

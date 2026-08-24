@@ -50,11 +50,24 @@ const explainBody = {
     },
   ],
 }
+const planningBody = {
+  context: 'planning' as const,
+  facts: {
+    currentBalanceCents: 100_000,
+    committedCents: 22_222,
+    expectedIncomeCents: 33_333,
+    projectedAvailableCents: 77_777,
+    projectedClosingBalanceCents: -12_345,
+    projectionCoverage: 'overdue_only' as const,
+    projectionHorizonEnd: '2026-08-31',
+  },
+}
 
 function createProvider(): AIProvider & {
   suggestCategory: ReturnType<typeof vi.fn>
   generatePeriodSummary: ReturnType<typeof vi.fn>
   explainCategoryChanges: ReturnType<typeof vi.fn>
+  analyzePlanning: ReturnType<typeof vi.fn>
 } {
   return {
     suggestCategory: vi.fn(async () => ({ categoryId, confidence: 0.8 })),
@@ -65,6 +78,11 @@ function createProvider(): AIProvider & {
     explainCategoryChanges: vi.fn(async () => [
       { categoryId, explanation: 'Cambio explicado.' },
     ]),
+    analyzePlanning: vi.fn(async () => ({
+      summary: 'Explicación de la proyección.',
+      observations: [],
+      considerations: [],
+    })),
   }
 }
 
@@ -384,6 +402,73 @@ describe('ai-insights router', () => {
     expect(userMessage).toContain('$213.00')
     expect(userMessage).not.toMatch(/700000|21300/)
     expect(groqRequest.response_format.json_schema.strict).toBe(true)
+  })
+
+  it('41.b planning-analysis valida y llama únicamente al método dedicado', async () => {
+    const { handler, provider } = createHandler()
+
+    const response = await handler(request('planning-analysis', planningBody))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      summary: 'Explicación de la proyección.',
+      observations: [],
+      considerations: [],
+    })
+    expect(provider.analyzePlanning).toHaveBeenCalledWith(
+      planningBody,
+      expect.any(AbortSignal),
+    )
+    expect(provider.suggestCategory).not.toHaveBeenCalled()
+    expect(provider.generatePeriodSummary).not.toHaveBeenCalled()
+    expect(provider.explainCategoryChanges).not.toHaveBeenCalled()
+  })
+
+  it('41.c planning-analysis rechaza payload inválido con 400', async () => {
+    const { handler, provider } = createHandler()
+    const response = await handler(
+      request('planning-analysis', {
+        ...planningBody,
+        facts: { ...planningBody.facts, committedCents: 1.5 },
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(provider.analyzePlanning).not.toHaveBeenCalled()
+  })
+
+  it('41.d planning-analysis rechaza hechos críticos desconocidos con 422', async () => {
+    const { handler, provider } = createHandler()
+    const response = await handler(
+      request('planning-analysis', {
+        ...planningBody,
+        facts: { ...planningBody.facts, projectedAvailableCents: null },
+      }),
+    )
+
+    expect(response.status).toBe(422)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'insufficient_planning_context',
+    })
+    expect(provider.analyzePlanning).not.toHaveBeenCalled()
+  })
+
+  it('41.e planning-analysis rechaza respuesta con campos financieros', async () => {
+    const provider = createProvider()
+    provider.analyzePlanning.mockResolvedValue({
+      summary: 'Explicación',
+      observations: [],
+      considerations: [],
+      projectedBalanceCents: 1,
+    })
+    const { handler } = createHandler({ provider })
+
+    const response = await handler(request('planning-analysis', planningBody))
+
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'invalid_provider_response',
+    })
   })
 
   it('42. explain-changes llama únicamente al método correspondiente', async () => {

@@ -61,7 +61,7 @@ describe('contexto monetario para Groq', () => {
     expect(JSON.stringify(context)).not.toMatch(/700000|21300|14000|12000/)
   })
 
-  it('prepara planificación sin recalcular y conserva null y negativos', () => {
+  it('prepara planificación en integer cents sin recalcular y conserva null y negativos', () => {
     const context = buildPlanningPromptContext({
       context: 'planning',
       facts: {
@@ -77,13 +77,15 @@ describe('contexto monetario para Groq', () => {
 
     expect(context).toEqual({
       context: 'planning',
-      currentBalance: null,
-      committed: '$25.00',
-      expectedIncome: '$30.00',
-      projectedAvailable: '-$35.00',
-      projectedClosingBalance: '-$5.00',
-      projectionCoverage: 'overdue_only',
-      projectionHorizonEnd: null,
+      facts: {
+        currentBalanceCents: null,
+        committedCents: 25_00,
+        expectedIncomeCents: 30_00,
+        projectedAvailableCents: -35_00,
+        projectedClosingBalanceCents: -5_00,
+        projectionCoverage: 'overdue_only',
+        projectionHorizonEnd: null,
+      },
     })
   })
 

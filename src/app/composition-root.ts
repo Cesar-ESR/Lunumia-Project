@@ -1,4 +1,5 @@
 import { DeleteCategoryBudget } from '@application/use-cases/budgets/DeleteCategoryBudget'
+import { GetCategoryBudgetSummaries } from '@application/use-cases/budgets/GetCategoryBudgetSummaries'
 import { ListBudgetsByPeriod } from '@application/use-cases/budgets/ListBudgetsByPeriod'
 import { UpsertCategoryBudget } from '@application/use-cases/budgets/UpsertCategoryBudget'
 import { CreateCategory } from '@application/use-cases/categories/CreateCategory'
@@ -80,6 +81,7 @@ import { EdgeFunctionOCRAdapter } from '@infrastructure/ocr/EdgeFunctionOCRAdapt
 import { EdgeFunctionAIAdapter } from '@infrastructure/ai/EdgeFunctionAIAdapter'
 import {
   ExplainCategoryChanges,
+  ExplainPlanning,
   GeneratePeriodSummary,
   PrepareCategoryChanges,
   PreparePeriodSummary,
@@ -108,10 +110,13 @@ import type { PlatformAdapter } from '@infrastructure/platform'
 import type { ExternalUrlProvider } from '@infrastructure/platform/ExternalUrlProvider'
 import { CapacitorNetworkStatusProvider } from '@infrastructure/sync/CapacitorNetworkStatusProvider'
 import {
+  CapacitorBackButtonAdapter,
   CapacitorExternalUrlProvider,
   CapacitorPlatformAdapter,
+  WebBackButtonAdapter,
   WebExternalUrlProvider,
 } from '@infrastructure/platform'
+import type { BackButtonAdapter } from '@infrastructure/platform'
 import { NativeAuthCallbackLifecycle } from '@infrastructure/auth/NativeAuthCallbackLifecycle'
 import { NativeAuthSessionLifecycle } from '@infrastructure/auth/NativeAuthSessionLifecycle'
 import { getAuthRedirectUrl } from '@infrastructure/auth/AuthRedirectUrl'
@@ -159,6 +164,7 @@ export interface ApplicationServices {
     upsertCategoryBudget: Executable<UpsertCategoryBudget>
     deleteCategoryBudget: Executable<DeleteCategoryBudget>
     listBudgetsByPeriod: Executable<ListBudgetsByPeriod>
+    getCategoryBudgetSummaries: Executable<GetCategoryBudgetSummaries>
   }
   recurringPayments: {
     createRecurringPayment: Executable<CreateRecurringPayment>
@@ -197,6 +203,7 @@ export interface ApplicationServices {
     suggestExpenseCategory: Executable<SuggestExpenseCategory>
     generatePeriodSummary: Executable<GeneratePeriodSummary>
     explainCategoryChanges: Executable<ExplainCategoryChanges>
+    explainPlanning: Executable<ExplainPlanning>
   } | null
   sync: Pick<
     SyncCoordinator,
@@ -204,6 +211,7 @@ export interface ApplicationServices {
   > | null
   syncOrchestrator: SyncOrchestrator | null
   externalUrls: ExternalUrlProvider
+  backButton: BackButtonAdapter
 }
 
 export interface AuthRuntime {
@@ -226,6 +234,7 @@ export interface PlatformServices {
   receiptImages: PlatformAdapter
   network: NetworkStatusProvider
   externalUrls: ExternalUrlProvider
+  backButton: BackButtonAdapter
 }
 
 export function createPlatformServices(
@@ -236,11 +245,13 @@ export function createPlatformServices(
         receiptImages: new CapacitorPlatformAdapter(),
         network: new CapacitorNetworkStatusProvider(),
         externalUrls: new CapacitorExternalUrlProvider(),
+        backButton: new CapacitorBackButtonAdapter(),
       }
     : {
         receiptImages: new WebPlatformAdapter(),
         network: new WebNetworkStatusProvider(),
         externalUrls: new WebExternalUrlProvider(),
+        backButton: new WebBackButtonAdapter(),
       }
 }
 
@@ -332,6 +343,7 @@ export function createApplicationServices(
         suggestExpenseCategory: new SuggestExpenseCategory(aiProvider),
         generatePeriodSummary: new GeneratePeriodSummary(aiProvider),
         explainCategoryChanges: new ExplainCategoryChanges(aiProvider),
+        explainPlanning: new ExplainPlanning(aiProvider),
       }
     : null
   const sync = supabase
@@ -420,6 +432,11 @@ export function createApplicationServices(
       ),
       deleteCategoryBudget: new DeleteCategoryBudget(budgets),
       listBudgetsByPeriod: new ListBudgetsByPeriod(budgets),
+      getCategoryBudgetSummaries: new GetCategoryBudgetSummaries(
+        budgets,
+        expenses,
+        categories,
+      ),
     },
     recurringPayments: {
       createRecurringPayment: new CreateRecurringPayment(
@@ -481,6 +498,7 @@ export function createApplicationServices(
     sync,
     syncOrchestrator,
     externalUrls: platformServices.externalUrls,
+    backButton: platformServices.backButton,
   }
 }
 

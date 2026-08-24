@@ -10,19 +10,27 @@ export function CurrencyMismatchWarning({
   onReviewedChange(value: boolean): void
 }) {
   return (
-    <div className="notice warning" role="alert">
-      <p>
-        El recibo parece estar en {detectedCurrency}, pero tu moneda configurada
-        es {configuredCurrency}. Revisa el importe antes de guardar.
-      </p>
-      <label className="receipt-review-check">
-        <input
-          type="checkbox"
-          checked={reviewed}
-          onChange={(event) => onReviewedChange(event.target.checked)}
-        />
-        Revisé el importe y deseo continuar en {configuredCurrency}.
-      </label>
-    </div>
+    <Notice
+      tone="warning"
+      role="alert"
+      title="Revisa la moneda detectada"
+      message={
+        <>
+          <p>
+            El recibo parece estar en {detectedCurrency}, pero tu moneda
+            configurada es {configuredCurrency}. No convertiremos el importe.
+          </p>
+          <label className="ln-receipt-review-check">
+            <input
+              type="checkbox"
+              checked={reviewed}
+              onChange={(event) => onReviewedChange(event.target.checked)}
+            />
+            Revisé el importe y deseo continuar en {configuredCurrency}.
+          </label>
+        </>
+      }
+    />
   )
 }
+import { Notice } from '../../components/Notice'

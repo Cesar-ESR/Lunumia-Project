@@ -3,20 +3,31 @@ import type { ReactNode } from 'react'
 export function EmptyState({
   title,
   description,
+  icon,
   action,
+  secondaryAction,
 }: {
   title: string
   description: string
+  icon?: ReactNode
   action?: ReactNode
+  secondaryAction?: ReactNode
 }) {
   return (
-    <section className="state-card empty-state">
-      <div className="state-icon" aria-hidden="true">
-        ○
-      </div>
+    <section className="ln-state ln-state--empty">
+      {icon ? (
+        <div className="ln-state__icon" aria-hidden="true">
+          {icon}
+        </div>
+      ) : null}
       <h2>{title}</h2>
       <p>{description}</p>
-      {action}
+      {action || secondaryAction ? (
+        <div className="ln-state__actions">
+          {action}
+          {secondaryAction}
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -43,6 +43,18 @@ const change = {
   changePercentage: 100,
   absoluteChange: 2_000,
 }
+const planningInput = {
+  context: 'planning' as const,
+  facts: {
+    currentBalanceCents: 100_000,
+    committedCents: 22_222,
+    expectedIncomeCents: 33_333,
+    projectedAvailableCents: 77_777,
+    projectedClosingBalanceCents: -12_345,
+    projectionCoverage: 'overdue_only' as const,
+    projectionHorizonEnd: '2026-08-31' as const,
+  },
+}
 
 function createClient(data: unknown = null, error: unknown = null) {
   const invoke = vi.fn(async () => ({ data, error }))
@@ -207,5 +219,78 @@ describe('EdgeFunctionAIAdapter', () => {
     const adapter = new EdgeFunctionAIAdapter(client)
     await adapter.suggestCategory('Sin coincidencia', [category])
     expect(invoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('33. envía planificación agregada exacta por la ruta dedicada', async () => {
+    const response = {
+      summary: 'Explicación',
+      observations: ['Cobertura limitada.'],
+      considerations: [],
+    }
+    const { client, invoke } = createClient(response)
+
+    await expect(
+      new EdgeFunctionAIAdapter(client).analyzePlanning(planningInput),
+    ).resolves.toEqual(response)
+    expect(invoke).toHaveBeenCalledWith('ai-insights/planning-analysis', {
+      method: 'POST',
+      body: planningInput,
+    })
+    expect(JSON.stringify(invoke.mock.calls[0])).not.toMatch(
+      /description|receipt|expense|movement|merchant|notes|service_role/i,
+    )
+  })
+
+  it('34. conserva negativos, cobertura y horizonte sin derivar importes', async () => {
+    const { client, invoke } = createClient({
+      summary: 'Explicación',
+      observations: [],
+      considerations: [],
+    })
+
+    await new EdgeFunctionAIAdapter(client).analyzePlanning(planningInput)
+
+    expect(invoke).toHaveBeenCalledWith('ai-insights/planning-analysis', {
+      method: 'POST',
+      body: planningInput,
+    })
+  })
+
+  it('35. rechaza respuesta de planificación con autoridad financiera', async () => {
+    const { client } = createClient({
+      summary: 'Explicación',
+      observations: [],
+      considerations: [],
+      safeToSpendCents: 50_000,
+    })
+
+    await expect(
+      new EdgeFunctionAIAdapter(client).analyzePlanning(planningInput),
+    ).rejects.toMatchObject({ code: 'invalid_ai_response' })
+  })
+
+  it('36. rechaza contexto insuficiente localmente sin invocar Edge', async () => {
+    const { client, invoke } = createClient()
+
+    await expect(
+      new EdgeFunctionAIAdapter(client).analyzePlanning({
+        ...planningInput,
+        facts: { ...planningInput.facts, currentBalanceCents: null },
+      }),
+    ).rejects.toMatchObject({ code: 'insufficient_planning_context' })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('37. traduce insufficient_planning_context de Edge', async () => {
+    const { client } = createClient(null, {
+      context: Response.json(
+        { code: 'insufficient_planning_context' },
+        { status: 422 },
+      ),
+    })
+
+    await expect(
+      new EdgeFunctionAIAdapter(client).analyzePlanning(planningInput),
+    ).rejects.toMatchObject({ code: 'insufficient_planning_context' })
   })
 })

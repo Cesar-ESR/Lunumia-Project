@@ -231,9 +231,7 @@ describe('SyncMapper', () => {
         status,
         affectsBalance,
         balanceEffectiveAt:
-          balanceEffectiveAt === null
-            ? null
-            : '2026-08-01T09:00:00.000Z',
+          balanceEffectiveAt === null ? null : '2026-08-01T09:00:00.000Z',
       })
     },
   )

@@ -20,6 +20,15 @@ import {
   formatCentsForInput,
   parseMoneyInputToCents,
 } from '../utils/money-input'
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard'
+
+interface ExpenseEditableFormState {
+  amount: string
+  description: string
+  date: string
+  categoryId: string
+  periodId: string
+}
 
 export interface ExpenseFormValue {
   ownerId: string
@@ -28,6 +37,7 @@ export interface ExpenseFormValue {
   amount: number
   description: string
   date: string
+  affectsBalance: boolean
 }
 
 export interface ExpenseFormInitialValues {
@@ -80,17 +90,18 @@ export function ExpenseForm({
   onCancel?(): void
 }) {
   const availablePeriods = periods?.length ? periods : [period]
-  const [form, setForm] = useState(() => {
+  const [initialForm] = useState<ExpenseEditableFormState>(() => {
+    let initial: ExpenseEditableFormState
     if (initialExpense)
-      return {
+      initial = {
         amount: formatCentsForInput(initialExpense.amount),
         description: initialExpense.description,
         date: initialExpense.date,
         categoryId: initialExpense.categoryId,
         periodId: initialExpense.periodId,
       }
-    if (initialValues)
-      return {
+    else if (initialValues)
+      initial = {
         amount:
           initialValues.amount === null
             ? ''
@@ -100,15 +111,27 @@ export function ExpenseForm({
         categoryId: initialValues.categoryId,
         periodId: initialValues.periodId,
       }
-    return {
-      amount: '',
-      description: '',
-      date: getLocalDateOnly(),
-      categoryId: '',
-      periodId: period.id,
-    }
+    else
+      initial = {
+        amount: '',
+        description: '',
+        date: getLocalDateOnly(),
+        categoryId: '',
+        periodId: period.id,
+      }
+    return initial
   })
+  const [form, setForm] = useState<ExpenseEditableFormState>(initialForm)
   const [errors, setErrors] = useState<FieldErrors>({})
+  const [balanceTreatment, setBalanceTreatment] = useState<
+    'include' | 'already-included'
+  >(
+    initialExpense &&
+      'affectsBalance' in initialExpense &&
+      !initialExpense.affectsBalance
+      ? 'already-included'
+      : 'include',
+  )
   const [serverError, setServerError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
   const formElementRef = useRef<HTMLFormElement>(null)
@@ -121,6 +144,22 @@ export function ExpenseForm({
     ownerId,
     description: form.description,
     categories,
+  })
+  const initialBalanceTreatment =
+    initialExpense &&
+    'affectsBalance' in initialExpense &&
+    !initialExpense.affectsBalance
+      ? 'already-included'
+      : 'include'
+  const dirty =
+    Object.entries(form).some(
+      ([key, value]) =>
+        initialForm[key as keyof ExpenseEditableFormState] !== value,
+    ) || balanceTreatment !== initialBalanceTreatment
+  const { requestLeave, guardDialog } = useUnsavedChangesGuard({
+    dirty,
+    pending: isPending,
+    onDiscard: categorySuggestion.invalidate,
   })
 
   useEffect(() => {
@@ -145,6 +184,7 @@ export function ExpenseForm({
       amount,
       description: form.description,
       date: form.date,
+      affectsBalance: balanceTreatment === 'include',
     }
     const parsed = createExpenseSchema.safeParse(input)
     const next = parsed.success ? {} : zodFieldErrors(parsed.error)
@@ -172,7 +212,10 @@ export function ExpenseForm({
     categorySuggestion.invalidate()
     setIsPending(true)
     try {
-      await onSubmit(parsed.data)
+      await onSubmit({
+        ...parsed.data,
+        affectsBalance: balanceTreatment === 'include',
+      })
       if (!initialExpense && resetOnSuccess)
         setForm({
           amount: '',
@@ -181,6 +224,7 @@ export function ExpenseForm({
           categoryId: '',
           periodId: period.id,
         })
+      if (!initialExpense && resetOnSuccess) setBalanceTreatment('include')
     } catch (reason) {
       setServerError(friendlyError(reason))
     } finally {
@@ -354,13 +398,40 @@ export function ExpenseForm({
           </select>
         </FormField>
       ) : null}
+      <fieldset className="ln-choice-fieldset ln-balance-question">
+        <legend>¿Este gasto ya estaba reflejado en tu saldo actual?</legend>
+        <label>
+          <input
+            type="radio"
+            name={`${idPrefix}-balance-treatment`}
+            checked={balanceTreatment === 'already-included'}
+            onChange={() => setBalanceTreatment('already-included')}
+          />
+          <span>
+            <strong>Sí, sólo agregarlo al historial</strong>
+            <small>No volverá a descontarse de tu saldo.</small>
+          </span>
+        </label>
+        <label>
+          <input
+            type="radio"
+            name={`${idPrefix}-balance-treatment`}
+            checked={balanceTreatment === 'include'}
+            onChange={() => setBalanceTreatment('include')}
+          />
+          <span>
+            <strong>No, descontarlo de mi situación actual</strong>
+            <small>Se tratará como un gasto nuevo.</small>
+          </span>
+        </label>
+      </fieldset>
       <div className="form-actions">
         {onCancel ? (
           <button
             type="button"
             className="button ghost"
             disabled={isPending}
-            onClick={onCancel}
+            onClick={() => requestLeave(onCancel)}
           >
             Cancelar
           </button>
@@ -372,6 +443,7 @@ export function ExpenseForm({
               (initialExpense ? 'Guardar cambios' : 'Agregar gasto'))}
         </button>
       </div>
+      {guardDialog}
     </form>
   )
 }

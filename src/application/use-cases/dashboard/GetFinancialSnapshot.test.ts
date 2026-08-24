@@ -210,6 +210,14 @@ describe('GetFinancialSnapshot', () => {
       projectedClosingBalanceCents: 950,
       projectionHorizonEnd: '2026-08-31',
       projectionCoverage: 'full_period',
+      resourceUsage: {
+        referenceAt: cutoff,
+        resourceBaseCents: 1_100,
+        spentCents: 50,
+        currentAvailableCents: 1_050,
+        canCalculatePercentage: true,
+        status: 'available',
+      },
     })
   })
 

@@ -1,0 +1,187 @@
+:root {
+  color-scheme: light;
+
+  /* Lunumia brand identity. */
+  --brand-primary: #1267d6;
+  --brand-primary-hover: #0f56b5;
+  --brand-primary-pressed: #0d478f;
+  --brand-primary-soft: #eaf4ff;
+  --brand-primary-border: #b8dcff;
+  --brand-secondary: #6b5cff;
+  --brand-secondary-hover: #5746d8;
+  --brand-secondary-soft: #f0edff;
+  --brand-accent: #13bff2;
+  --brand-accent-soft: #e4f8ff;
+  --brand-gradient: linear-gradient(
+    135deg,
+    #13bff2 0%,
+    #267cf5 48%,
+    #6b5cff 78%,
+    #8b4dff 100%
+  );
+
+  /* Light surfaces and interaction borders. */
+  --surface-background: #f6f8fc;
+  --surface-default: #ffffff;
+  --surface-subtle: #eef3f8;
+  --surface-selected: #eaf4ff;
+  --surface-planned: #f0edff;
+  --surface-disabled: #e9eef3;
+  --surface-hover: #f2f7fc;
+  --navigation-sidebar-surface: #eef5ff;
+  --navigation-topbar-surface: #f4f8ff;
+  --navigation-border: #d7e6fa;
+  --navigation-active-surface: #dcebff;
+  --navigation-hover-surface: #e4f0ff;
+  --border-default: #d7e1eb;
+  --border-strong: #b8c7d6;
+  --border-interactive: #7d91a6;
+  --border-brand: #89bcf5;
+  --border-planned: #b6afff;
+
+  /* Text. Bright cyan is deliberately absent from text roles. */
+  --text-primary: #101820;
+  --text-secondary: #405367;
+  --text-muted: #65778a;
+  --text-disabled: #7d8c9a;
+  --text-on-brand: #ffffff;
+  --text-link: #1267d6;
+  --text-planned: #5746d8;
+  --text-navigation: #4e647d;
+
+  /* Status semantics remain independent from brand semantics. */
+  --semantic-success-foreground: #187a55;
+  --semantic-success-background: #e7f5ef;
+  --semantic-warning-foreground: #9a5b00;
+  --semantic-warning-background: #fff3d9;
+  --semantic-danger-foreground: #b93845;
+  --semantic-danger-background: #fceaec;
+  --semantic-info-foreground: #1267d6;
+  --semantic-info-background: #eaf4ff;
+  --semantic-planned-foreground: #6b5cff;
+  --semantic-planned-background: #f0edff;
+  --semantic-neutral-foreground: #64748b;
+  --semantic-neutral-background: #eef2f6;
+
+  /* Charts differentiate series; they do not encode financial status. */
+  --chart-1: #1267d6;
+  --chart-2: #6b5cff;
+  --chart-3: #13a5d8;
+  --chart-4: #187a55;
+  --chart-5: #c47a00;
+  --chart-6: #b94e82;
+  --chart-7: #536b8a;
+  --chart-8: #8a65c7;
+
+  --focus-color: #1267d6;
+  --focus-ring: rgba(18, 103, 214, 0.28);
+  --focus-width: 3px;
+
+  /* Component-facing semantic mappings. */
+  --color-bg: var(--surface-background);
+  --color-surface: var(--surface-default);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-selected: var(--surface-selected);
+  --color-surface-planned: var(--surface-planned);
+  --color-surface-elevated: var(--surface-default);
+  --color-navigation-sidebar: var(--navigation-sidebar-surface);
+  --color-navigation-topbar: var(--navigation-topbar-surface);
+  --color-navigation-border: var(--navigation-border);
+  --color-navigation-active: var(--navigation-active-surface);
+  --color-navigation-hover: var(--navigation-hover-surface);
+  --color-navigation-text: var(--text-navigation);
+  --color-navigation-active-text: var(--brand-primary-hover);
+  --color-border: var(--border-default);
+  --color-border-strong: var(--border-strong);
+  --color-control-border: var(--border-interactive);
+  --color-brand-border: var(--border-brand);
+  --color-planned-border: var(--border-planned);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-pressed: var(--brand-primary-pressed);
+  --color-brand-emphasis: var(--brand-primary);
+  --color-brand-subtle: var(--brand-primary-soft);
+  --color-positive: var(--semantic-success-foreground);
+  --color-positive-subtle: var(--semantic-success-background);
+  --color-warning: var(--semantic-warning-foreground);
+  --color-warning-subtle: var(--semantic-warning-background);
+  --color-danger: var(--semantic-danger-foreground);
+  --color-danger-subtle: var(--semantic-danger-background);
+  --color-info: var(--semantic-info-foreground);
+  --color-info-subtle: var(--semantic-info-background);
+  --color-planned: var(--text-planned);
+  --color-planned-accent: var(--semantic-planned-foreground);
+  --color-planned-subtle: var(--semantic-planned-background);
+  --color-neutral: var(--semantic-neutral-foreground);
+  --color-neutral-subtle: var(--semantic-neutral-background);
+  --color-focus: var(--focus-color);
+  --color-disabled-bg: var(--surface-disabled);
+  --color-disabled-text: var(--text-disabled);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+
+  --shadow-base: 0 1px 2px rgba(16, 24, 32, 0.06);
+  --shadow-popover: 0 8px 24px rgba(16, 24, 32, 0.14);
+  --shadow-dialog: 0 16px 48px rgba(16, 24, 32, 0.22);
+
+  --motion-fast: 100ms;
+  --motion-standard: 160ms;
+  --motion-enter: 200ms;
+  --motion-overlay: 240ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --text-caption-size: 0.75rem;
+  --text-caption-line: 1.0625rem;
+  --text-small-size: 0.875rem;
+  --text-small-line: 1.25rem;
+  --text-body-size: 1rem;
+  --text-body-line: 1.5rem;
+  --text-h3-size: 1.125rem;
+  --text-h3-line: 1.5rem;
+  --text-h2-size: 1.5rem;
+  --text-h2-line: 1.875rem;
+  --text-h1-size: 2rem;
+  --text-h1-line: 2.375rem;
+  --text-money-primary-size: 2.5rem;
+  --text-money-primary-line: 2.75rem;
+  --text-money-supporting-size: 1.375rem;
+  --text-money-supporting-line: 1.625rem;
+
+  --content-max: 75rem;
+  --form-max: 40rem;
+  --sidebar-width: 16.5rem;
+  --rail-width: 4.5rem;
+  --context-bar-height: 4rem;
+  --bottom-nav-height: 4rem;
+
+  /* Transitional aliases used by legacy screen styles. */
+  --ink: var(--color-text-primary);
+  --muted: var(--color-text-secondary);
+  --surface: var(--color-surface);
+  --surface-soft: var(--color-surface-subtle);
+  --line: var(--color-border);
+  --brand: var(--color-brand);
+  --brand-dark: var(--color-brand-emphasis);
+  --accent: var(--color-brand-subtle);
+  --danger: var(--color-danger);
+  --warning: var(--color-warning);
+  --shadow: var(--shadow-base);
+}

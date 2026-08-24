@@ -4,6 +4,7 @@ import {
   type ReceiptAmountValidationReason,
 } from '@domain/rules'
 import { formatCentsForInput } from '../../utils/money-input'
+import { Surface } from '../../components/Surface'
 
 const reasonMessages: Record<ReceiptAmountValidationReason, string> = {
   total_missing: 'No pudimos identificar el total.',
@@ -32,13 +33,14 @@ export function ReceiptAmountValidationSection({
 }) {
   if (!proposal)
     return (
-      <section
-        className="receipt-amount-validation"
+      <Surface
+        variant="subtle"
+        className="ln-receipt-amount-validation"
         aria-labelledby="amount-validation-title"
       >
         <h3 id="amount-validation-title">Validación del monto</h3>
         <p>No pudimos identificar el total. Ingresa el monto manualmente.</p>
-      </section>
+      </Surface>
     )
 
   const original = validateReceiptAmount(proposal, [configuredCurrency])
@@ -51,8 +53,9 @@ export function ReceiptAmountValidationSection({
   const reasons = manuallyCorrected ? [] : original.reasons
 
   return (
-    <section
-      className="receipt-amount-validation"
+    <Surface
+      variant="subtle"
+      className="ln-receipt-amount-validation"
       aria-labelledby="amount-validation-title"
     >
       <h3 id="amount-validation-title">Validación del monto</h3>
@@ -93,6 +96,6 @@ export function ReceiptAmountValidationSection({
         </ul>
       ) : null}
       <p>El monto editable aparece a continuación y tu corrección prevalece.</p>
-    </section>
+    </Surface>
   )
 }

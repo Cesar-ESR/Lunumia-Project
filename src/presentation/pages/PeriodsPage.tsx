@@ -1,16 +1,27 @@
 import { useState, type FormEvent } from 'react'
+import { CalendarDays, CheckCircle2 } from 'lucide-react'
 import { createPeriodSchema } from '@application/contracts'
+import type { Period } from '@domain/entities'
+import { Button } from '../components/Button'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { FormField } from '../components/FormField'
 import { LoadingState } from '../components/LoadingState'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
+import { Surface } from '../components/Surface'
 import { useApplicationServices } from '../context/ApplicationServicesContext'
 import { usePeriod } from '../context/PeriodContext'
 import { friendlyError, zodFieldErrors, type FieldErrors } from '../utils/forms'
+import { formatCompactDate } from '../utils/movement-view-model'
 
 const initialForm = { type: 'monthly' as const, startDate: '', endDate: '' }
+type PeriodForm = {
+  type: 'monthly' | 'biweekly'
+  startDate: string
+  endDate: string
+}
 
 export function PeriodsPage() {
   const services = useApplicationServices()
@@ -22,17 +33,32 @@ export function PeriodsPage() {
     setActivePeriod,
     refreshPeriods,
   } = usePeriod()
-  const [form, setForm] = useState<{
-    type: 'monthly' | 'biweekly'
-    startDate: string
-    endDate: string
-  }>(initialForm)
+  const [form, setForm] = useState<PeriodForm>(initialForm)
+  const [editing, setEditing] = useState<Period | null>(null)
+  const [deleting, setDeleting] = useState<Period | null>(null)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [notice, setNotice] = useState<{
     message: string
     tone: 'success' | 'error'
   } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const resetForm = () => {
+    setForm(initialForm)
+    setEditing(null)
+    setErrors({})
+  }
+
+  const beginEdit = (period: Period) => {
+    setEditing(period)
+    setForm({
+      type: period.type,
+      startDate: period.startDate,
+      endDate: period.endDate,
+    })
+    setErrors({})
+    setNotice(null)
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -47,13 +73,53 @@ export function PeriodsPage() {
     setIsSubmitting(true)
     setNotice(null)
     try {
-      const created = await services.periods.createPeriod.execute(input)
-      if (!activePeriod) await setActivePeriod(created.id)
+      if (editing)
+        await services.periods.updatePeriod.execute(editing.id, input)
+      else {
+        const created = await services.periods.createPeriod.execute(input)
+        if (!activePeriod) await setActivePeriod(created.id)
+      }
       await refreshPeriods()
-      setForm(initialForm)
-      setNotice({ message: 'Periodo creado correctamente.', tone: 'success' })
+      setNotice({
+        message: editing
+          ? 'Periodo actualizado correctamente.'
+          : 'Periodo creado correctamente.',
+        tone: 'success',
+      })
+      resetForm()
     } catch (reason) {
       setNotice({ message: friendlyError(reason), tone: 'error' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const selectPeriod = async (periodId: string) => {
+    setNotice(null)
+    try {
+      await setActivePeriod(periodId)
+      setNotice({
+        tone: 'success',
+        message:
+          'Periodo seleccionado para navegar por el plan y la actividad.',
+      })
+    } catch (reason) {
+      setNotice({ tone: 'error', message: friendlyError(reason) })
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleting) return
+    setIsSubmitting(true)
+    setNotice(null)
+    try {
+      await services.periods.deletePeriod.execute(deleting.id)
+      if (editing?.id === deleting.id) resetForm()
+      setDeleting(null)
+      await refreshPeriods()
+      setNotice({ tone: 'success', message: 'Periodo eliminado.' })
+    } catch (reason) {
+      setNotice({ tone: 'error', message: friendlyError(reason) })
     } finally {
       setIsSubmitting(false)
     }
@@ -64,75 +130,108 @@ export function PeriodsPage() {
       <PageHeader
         eyebrow="Organización"
         title="Periodos"
-        description="Divide tu dinero en intervalos claros y elige cuál quieres consultar."
+        description="Crea intervalos y elige cuál quieres consultar en Plan y Movimientos. Esta selección no redefine por sí sola el periodo vigente de FinancialSnapshot."
       />
       {notice ? <Notice {...notice} /> : null}
-      <section className="panel split-layout">
-        <form onSubmit={handleSubmit} noValidate>
-          <h2>Crear periodo</h2>
-          <div className="form-grid">
-            <FormField id="period-type" label="Tipo" error={errors.type}>
-              <select
+      <div className="ln-management-layout">
+        <Surface
+          className="ln-management-form"
+          aria-labelledby="period-form-title"
+        >
+          <div className="ln-management-heading">
+            <CalendarDays aria-hidden="true" />
+            <div>
+              <p className="eyebrow">Organizar</p>
+              <h2 id="period-form-title">
+                {editing ? 'Editar periodo' : 'Crear periodo'}
+              </h2>
+            </div>
+          </div>
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-grid">
+              <FormField
                 id="period-type"
-                value={form.type}
-                aria-describedby={errors.type ? 'period-type-error' : undefined}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    type: event.target.value as 'monthly' | 'biweekly',
-                  })
-                }
+                label="Tipo"
+                error={errors.type}
+                required
               >
-                <option value="monthly">Mensual</option>
-                <option value="biweekly">Quincenal</option>
-              </select>
-            </FormField>
-            <span />
-            <FormField
-              id="period-start"
-              label="Fecha inicial"
-              error={errors.startDate}
-            >
-              <input
+                <select
+                  id="period-type"
+                  value={form.type}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      type: event.target.value as 'monthly' | 'biweekly',
+                    })
+                  }
+                >
+                  <option value="monthly">Mensual</option>
+                  <option value="biweekly">Quincenal</option>
+                </select>
+              </FormField>
+              <span />
+              <FormField
                 id="period-start"
-                type="date"
-                value={form.startDate}
-                aria-describedby={
-                  errors.startDate ? 'period-start-error' : undefined
-                }
-                onChange={(event) =>
-                  setForm({ ...form, startDate: event.target.value })
-                }
-              />
-            </FormField>
-            <FormField
-              id="period-end"
-              label="Fecha final"
-              error={errors.endDate}
-            >
-              <input
+                label="Fecha inicial"
+                error={errors.startDate}
+                required
+              >
+                <input
+                  id="period-start"
+                  type="date"
+                  value={form.startDate}
+                  onChange={(event) =>
+                    setForm({ ...form, startDate: event.target.value })
+                  }
+                />
+              </FormField>
+              <FormField
                 id="period-end"
-                type="date"
-                value={form.endDate}
-                aria-describedby={
-                  errors.endDate ? 'period-end-error' : undefined
-                }
-                onChange={(event) =>
-                  setForm({ ...form, endDate: event.target.value })
-                }
-              />
-            </FormField>
+                label="Fecha final"
+                error={errors.endDate}
+                required
+              >
+                <input
+                  id="period-end"
+                  type="date"
+                  value={form.endDate}
+                  onChange={(event) =>
+                    setForm({ ...form, endDate: event.target.value })
+                  }
+                />
+              </FormField>
+            </div>
+            <div className="ln-form-actions">
+              {editing ? (
+                <Button
+                  variant="secondary"
+                  onClick={resetForm}
+                  disabled={isSubmitting}
+                >
+                  Cancelar edición
+                </Button>
+              ) : null}
+              <Button
+                type="submit"
+                loading={isSubmitting}
+                loadingLabel="Guardando…"
+              >
+                {editing ? 'Guardar cambios' : 'Crear periodo'}
+              </Button>
+            </div>
+          </form>
+        </Surface>
+
+        <section aria-labelledby="period-list-title">
+          <div className="ln-section-heading">
+            <div>
+              <p className="eyebrow">Contexto de navegación</p>
+              <h2 id="period-list-title">Periodos disponibles</h2>
+              <p>“Seleccionado” indica el periodo que estás explorando.</p>
+            </div>
           </div>
-          <div className="form-actions">
-            <button className="button" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Guardando…' : 'Crear periodo'}
-            </button>
-          </div>
-        </form>
-        <div>
-          <h2>Periodos disponibles</h2>
           {isLoading ? (
-            <LoadingState message="Cargando periodos…" />
+            <LoadingState variant="skeleton" message="Cargando periodos…" />
           ) : error ? (
             <ErrorState
               message={error.message}
@@ -144,38 +243,69 @@ export function PeriodsPage() {
               description="Crea tu primer periodo para comenzar a registrar movimientos."
             />
           ) : (
-            <div className="record-list">
-              {periods.map((period) => (
-                <article
-                  key={period.id}
-                  className={`record-card ${activePeriod?.id === period.id ? 'active-record' : ''}`}
-                >
-                  <div>
-                    <span className="badge">
-                      {period.type === 'monthly' ? 'Mensual' : 'Quincenal'}
-                    </span>
-                    {activePeriod?.id === period.id ? (
-                      <span className="badge accent">Activo</span>
-                    ) : null}
-                    <h3>
-                      {period.startDate} — {period.endDate}
-                    </h3>
-                  </div>
-                  {activePeriod?.id !== period.id ? (
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() => void setActivePeriod(period.id)}
-                    >
-                      Usar este periodo
-                    </button>
-                  ) : null}
-                </article>
-              ))}
+            <div className="ln-management-list">
+              {periods.map((period) => {
+                const selected = activePeriod?.id === period.id
+                return (
+                  <Surface
+                    as="article"
+                    className="ln-management-row"
+                    key={period.id}
+                  >
+                    <div>
+                      <span className="ln-status-label">
+                        {period.type === 'monthly' ? 'Mensual' : 'Quincenal'}
+                      </span>
+                      <h3>
+                        {formatCompactDate(period.startDate)} —{' '}
+                        {formatCompactDate(period.endDate)}
+                      </h3>
+                      {selected ? (
+                        <p className="ln-management-selected">
+                          <CheckCircle2 aria-hidden="true" /> Periodo
+                          seleccionado
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="ln-management-actions">
+                      {!selected ? (
+                        <Button
+                          variant="secondary"
+                          onClick={() => void selectPeriod(period.id)}
+                        >
+                          Seleccionar
+                        </Button>
+                      ) : null}
+                      <Button variant="ghost" onClick={() => beginEdit(period)}>
+                        Editar
+                      </Button>
+                      <Button
+                        variant="danger"
+                        onClick={() => setDeleting(period)}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </Surface>
+                )
+              })}
             </div>
           )}
-        </div>
-      </section>
+        </section>
+      </div>
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        title="Eliminar periodo"
+        description={
+          deleting
+            ? `Se eliminará el periodo ${formatCompactDate(deleting.startDate)} — ${formatCompactDate(deleting.endDate)}. Esta acción usa las reglas actuales de eliminación de periodos.`
+            : ''
+        }
+        confirmLabel="Eliminar periodo"
+        isPending={isSubmitting}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </>
   )
 }

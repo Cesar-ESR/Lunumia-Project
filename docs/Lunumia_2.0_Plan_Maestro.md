@@ -144,22 +144,22 @@ periodo B
 
 ## Navegación actual → Lunumia 2.0
 
-| Actual | Lunumia 2.0 | Decisión |
-|---|---|---|
-| Dashboard | **Inicio** | Rediseñar |
-| Periodos | Periodo actual + Historial + Planificación | Dividir conceptualmente |
-| Gastos | Movimientos → Gastos | Integrar |
-| Ingresos | Movimientos → Ingresos recibidos | Integrar |
-| Recurrentes | Próximos pagos / reglas de recurrencia | Reubicar |
-| Categorías | Gestión contextual | Quitar del menú principal |
-| Presupuestos | **Presupuesto** | Mantener + rediseñar |
-| Simulador | Planificación → ¿Qué pasa si...? | Integrar |
-| Insights | **Análisis** | Renombrar + rediseñar |
-| Configuración | **Configuración** | Mantener |
-| — | **Movimientos** | Nueva vista agregadora |
-| — | **Planificación** | Nueva vista conceptual |
-| — | **Historial** | Nueva presentación |
-| — | **Onboarding 2.0** | Nueva experiencia |
+| Actual        | Lunumia 2.0                                | Decisión                  |
+| ------------- | ------------------------------------------ | ------------------------- |
+| Dashboard     | **Inicio**                                 | Rediseñar                 |
+| Periodos      | Periodo actual + Historial + Planificación | Dividir conceptualmente   |
+| Gastos        | Movimientos → Gastos                       | Integrar                  |
+| Ingresos      | Movimientos → Ingresos recibidos           | Integrar                  |
+| Recurrentes   | Próximos pagos / reglas de recurrencia     | Reubicar                  |
+| Categorías    | Gestión contextual                         | Quitar del menú principal |
+| Presupuestos  | **Presupuesto**                            | Mantener + rediseñar      |
+| Simulador     | Planificación → ¿Qué pasa si...?           | Integrar                  |
+| Insights      | **Análisis**                               | Renombrar + rediseñar     |
+| Configuración | **Configuración**                          | Mantener                  |
+| —             | **Movimientos**                            | Nueva vista agregadora    |
+| —             | **Planificación**                          | Nueva vista conceptual    |
+| —             | **Historial**                              | Nueva presentación        |
+| —             | **Onboarding 2.0**                         | Nueva experiencia         |
 
 ## Navegación objetivo
 
@@ -208,12 +208,12 @@ Nómina debía llegar
 
 # 6. Métricas principales de Inicio
 
-| Métrica | Pregunta |
-|---|---|
-| **Saldo actual** | ¿Cuánto dinero tengo ahora según Lunumia? |
-| **Gastado** | ¿Cuánto dinero ya salió durante mi periodo actual? |
-| **Comprometido** | ¿Cuánto tengo pendiente hasta el final del horizonte actual, incluyendo vencidos? |
-| **Disponible proyectado** | ¿Cuánto me quedaría después de cubrir esos compromisos? |
+| Métrica                   | Pregunta                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| **Saldo actual**          | ¿Cuánto dinero tengo ahora según Lunumia?                                         |
+| **Gastado**               | ¿Cuánto dinero ya salió durante mi periodo actual?                                |
+| **Comprometido**          | ¿Cuánto tengo pendiente hasta el final del horizonte actual, incluyendo vencidos? |
+| **Disponible proyectado** | ¿Cuánto me quedaría después de cubrir esos compromisos?                           |
 
 Nunca volver a utilizar:
 
@@ -460,10 +460,7 @@ Saldo actual     -$500
 # 10. IncomeStatus
 
 ```ts
-type IncomeStatus =
-  | 'expected'
-  | 'received'
-  | 'cancelled'
+type IncomeStatus = 'expected' | 'received' | 'cancelled'
 ```
 
 ## `expected`
@@ -1125,14 +1122,14 @@ No configurado
 
 # 27. Lenguaje de producto
 
-| Evitar | Usar |
-|---|---|
-| Periodos como sección principal | Periodo actual / Historial / Planificación |
-| Recurrentes como lenguaje principal | Próximos pagos / recurrencia |
-| Insights | Análisis |
-| Dinero disponible real | Saldo actual / Disponible proyectado |
-| Simulador | ¿Qué pasa si...? |
-| Ahorro para cualquier remanente | Margen / Resultado / Disponible |
+| Evitar                              | Usar                                       |
+| ----------------------------------- | ------------------------------------------ |
+| Periodos como sección principal     | Periodo actual / Historial / Planificación |
+| Recurrentes como lenguaje principal | Próximos pagos / recurrencia               |
+| Insights                            | Análisis                                   |
+| Dinero disponible real              | Saldo actual / Disponible proyectado       |
+| Simulador                           | ¿Qué pasa si...?                           |
+| Ahorro para cualquier remanente     | Margen / Resultado / Disponible            |
 
 Evitar:
 
@@ -4040,102 +4037,102 @@ release: roll out Lunumia 2.0
 
 # 104. Decisiones congeladas
 
-| Decisión | Estado |
-|---|---|
-| `Period` se conserva internamente | ✅ |
-| Current period se resuelve por fecha | ✅ |
-| `activePeriodId` no define semánticamente “hoy” | ✅ |
-| Movimiento debe pertenecer al periodo de su fecha | ✅ |
-| `Expense` representa gasto realizado | ✅ |
-| `Income` usa expected / received / cancelled | ✅ |
-| `BalanceAnchor` es fuente del saldo base | ✅ |
-| Balance puede ser negativo | ✅ |
-| `createdAt` no es momento financiero | ✅ |
-| `balanceEffectiveAt` define impacto temporal en balance | ✅ |
-| `affectsBalance` evita doble conteo | ✅ |
-| Comprometido incluye vencidos anteriores | ✅ |
-| Expected vencido se deriva y no entra automáticamente en proyección | ✅ |
-| Occurrence guarda snapshot de monto | ✅ |
-| Pago real puede diferir del monto comprometido | ✅ |
-| Paid occurrence requiere un gasto activo | ✅ |
-| Eliminar gasto recurrente revierte occurrence a pending | ✅ |
-| Futuro recurrente se proyecta sin persistir occurrences | ✅ |
-| `overdue` es derivado | ✅ |
-| `Expense.recurringOccurrenceId` es vínculo autoritativo | ✅ |
-| No reintroducir `transactionId` | ✅ |
-| Presupuesto no afecta saldo | ✅ |
-| Simulaciones no escriben datos reales | ✅ |
-| IA no calcula montos críticos | ✅ |
-| Offline es estado normal, no error global | ✅ |
-| Logout no elimina datos locales | ✅ |
-| Movimientos solo contiene hechos realizados | ✅ |
-| Planificación contiene expected/proyectado | ✅ |
-| Light/Dark/System forman parte del Design System | ✅ |
-| WCAG 2.2 AA es objetivo de accesibilidad | ✅ |
-| Plan inteligente queda fuera del Core 2.0 | ✅ |
-| Encrypted Local Vault queda fuera del Core 2.0 | ✅ |
-| Landing no bloquea Lunumia 2.0 | ✅ |
+| Decisión                                                            | Estado |
+| ------------------------------------------------------------------- | ------ |
+| `Period` se conserva internamente                                   | ✅     |
+| Current period se resuelve por fecha                                | ✅     |
+| `activePeriodId` no define semánticamente “hoy”                     | ✅     |
+| Movimiento debe pertenecer al periodo de su fecha                   | ✅     |
+| `Expense` representa gasto realizado                                | ✅     |
+| `Income` usa expected / received / cancelled                        | ✅     |
+| `BalanceAnchor` es fuente del saldo base                            | ✅     |
+| Balance puede ser negativo                                          | ✅     |
+| `createdAt` no es momento financiero                                | ✅     |
+| `balanceEffectiveAt` define impacto temporal en balance             | ✅     |
+| `affectsBalance` evita doble conteo                                 | ✅     |
+| Comprometido incluye vencidos anteriores                            | ✅     |
+| Expected vencido se deriva y no entra automáticamente en proyección | ✅     |
+| Occurrence guarda snapshot de monto                                 | ✅     |
+| Pago real puede diferir del monto comprometido                      | ✅     |
+| Paid occurrence requiere un gasto activo                            | ✅     |
+| Eliminar gasto recurrente revierte occurrence a pending             | ✅     |
+| Futuro recurrente se proyecta sin persistir occurrences             | ✅     |
+| `overdue` es derivado                                               | ✅     |
+| `Expense.recurringOccurrenceId` es vínculo autoritativo             | ✅     |
+| No reintroducir `transactionId`                                     | ✅     |
+| Presupuesto no afecta saldo                                         | ✅     |
+| Simulaciones no escriben datos reales                               | ✅     |
+| IA no calcula montos críticos                                       | ✅     |
+| Offline es estado normal, no error global                           | ✅     |
+| Logout no elimina datos locales                                     | ✅     |
+| Movimientos solo contiene hechos realizados                         | ✅     |
+| Planificación contiene expected/proyectado                          | ✅     |
+| Light/Dark/System forman parte del Design System                    | ✅     |
+| WCAG 2.2 AA es objetivo de accesibilidad                            | ✅     |
+| Plan inteligente queda fuera del Core 2.0                           | ✅     |
+| Encrypted Local Vault queda fuera del Core 2.0                      | ✅     |
+| Landing no bloquea Lunumia 2.0                                      | ✅     |
 
 ---
 
 # 105. Estado de cobertura
 
-| Área | Estado |
-|---|---|
-| Visión de Lunumia | ✅ Cerrada |
-| Modelo Hoy / Pasado / Futuro | ✅ Cerrado |
-| Feature Mapping | ✅ Cerrado |
-| Periodos | ✅ Cerrado |
-| Dashboard semantics | ✅ Cerrado |
-| Financial formulas | ✅ Cerradas |
-| Estados de pagos | ✅ Cerrados |
-| Estados de ingresos | ✅ Cerrados |
-| BalanceAnchor | ✅ Cerrado |
-| balanceEffectiveAt | ✅ Cerrado |
-| affectsBalance | ✅ Cerrado |
-| Snapshot recurrente | ✅ Cerrado |
-| Horizonte de compromisos | ✅ Cerrado |
-| Expected overdue | ✅ Cerrado |
-| Current period resolver | ✅ Cerrado |
-| FinancialSnapshot | ✅ Cerrado |
-| PlanningProjection | ✅ Cerrado |
-| Supabase | ✅ Planificado |
-| Dexie | ✅ Planificado |
-| Repositories | ✅ Planificados |
-| Sync | ✅ Planificado |
-| Use Cases | ✅ Planificados |
-| Property tests | ✅ Planificados |
-| Calculadores legacy | ✅ Planificados |
-| Simulador | ✅ Especificado |
-| IA actual | ✅ Especificada |
-| Backups | ✅ Planificados |
-| Seguridad/regresión | ✅ Planificada |
-| Producción/rollback | ✅ Planificado |
-| Design System | ✅ Especificado |
-| Navegación desktop/tablet/mobile | ✅ Especificada |
-| Movimientos | ✅ Especificados |
-| Presupuesto 2.0 | ✅ Especificado |
-| Próximos pagos | ✅ Especificados |
-| Historial | ✅ Especificado |
-| Planificación | ✅ Especificada |
-| Análisis | ✅ Especificado |
-| Onboarding | ✅ Especificado |
-| Empty states | ✅ Especificados |
-| Loading states | ✅ Especificados |
-| Error states | ✅ Especificados |
-| Offline states | ✅ Especificados |
-| Sync states | ✅ Especificados |
-| Auth UX | ✅ Especificado |
-| Guest → account UX | ✅ Especificado |
-| Responsive | ✅ Especificado |
-| Accessibility | ✅ Especificada |
-| PWA UX | ✅ Especificada |
-| Android UX | ✅ Especificada |
-| OCR UX | ✅ Especificada |
-| Content language | ✅ Especificado |
-| Plan inteligente de ahorro | 🟡 Lunumia 2.1 |
-| Encrypted Local Vault | 🟡 Security 2.x |
-| Landing `lunumia.com` | 🔵 Proyecto separado |
+| Área                             | Estado               |
+| -------------------------------- | -------------------- |
+| Visión de Lunumia                | ✅ Cerrada           |
+| Modelo Hoy / Pasado / Futuro     | ✅ Cerrado           |
+| Feature Mapping                  | ✅ Cerrado           |
+| Periodos                         | ✅ Cerrado           |
+| Dashboard semantics              | ✅ Cerrado           |
+| Financial formulas               | ✅ Cerradas          |
+| Estados de pagos                 | ✅ Cerrados          |
+| Estados de ingresos              | ✅ Cerrados          |
+| BalanceAnchor                    | ✅ Cerrado           |
+| balanceEffectiveAt               | ✅ Cerrado           |
+| affectsBalance                   | ✅ Cerrado           |
+| Snapshot recurrente              | ✅ Cerrado           |
+| Horizonte de compromisos         | ✅ Cerrado           |
+| Expected overdue                 | ✅ Cerrado           |
+| Current period resolver          | ✅ Cerrado           |
+| FinancialSnapshot                | ✅ Cerrado           |
+| PlanningProjection               | ✅ Cerrado           |
+| Supabase                         | ✅ Planificado       |
+| Dexie                            | ✅ Planificado       |
+| Repositories                     | ✅ Planificados      |
+| Sync                             | ✅ Planificado       |
+| Use Cases                        | ✅ Planificados      |
+| Property tests                   | ✅ Planificados      |
+| Calculadores legacy              | ✅ Planificados      |
+| Simulador                        | ✅ Especificado      |
+| IA actual                        | ✅ Especificada      |
+| Backups                          | ✅ Planificados      |
+| Seguridad/regresión              | ✅ Planificada       |
+| Producción/rollback              | ✅ Planificado       |
+| Design System                    | ✅ Especificado      |
+| Navegación desktop/tablet/mobile | ✅ Especificada      |
+| Movimientos                      | ✅ Especificados     |
+| Presupuesto 2.0                  | ✅ Especificado      |
+| Próximos pagos                   | ✅ Especificados     |
+| Historial                        | ✅ Especificado      |
+| Planificación                    | ✅ Especificada      |
+| Análisis                         | ✅ Especificado      |
+| Onboarding                       | ✅ Especificado      |
+| Empty states                     | ✅ Especificados     |
+| Loading states                   | ✅ Especificados     |
+| Error states                     | ✅ Especificados     |
+| Offline states                   | ✅ Especificados     |
+| Sync states                      | ✅ Especificados     |
+| Auth UX                          | ✅ Especificado      |
+| Guest → account UX               | ✅ Especificado      |
+| Responsive                       | ✅ Especificado      |
+| Accessibility                    | ✅ Especificada      |
+| PWA UX                           | ✅ Especificada      |
+| Android UX                       | ✅ Especificada      |
+| OCR UX                           | ✅ Especificada      |
+| Content language                 | ✅ Especificado      |
+| Plan inteligente de ahorro       | 🟡 Lunumia 2.1       |
+| Encrypted Local Vault            | 🟡 Security 2.x      |
+| Landing `lunumia.com`            | 🔵 Proyecto separado |
 
 ---
 

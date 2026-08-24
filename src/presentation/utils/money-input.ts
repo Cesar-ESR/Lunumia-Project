@@ -1,14 +1,25 @@
 export function parseMoneyInputToCents(
   value: string,
   allowZero = false,
+  allowNegative = false,
 ): number | null {
   const normalized = value.trim().replace(',', '.')
-  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null
-  const [wholePart, decimalPart = ''] = normalized.split('.')
+  const pattern = allowNegative
+    ? /^-?\d+(?:\.\d{1,2})?$/
+    : /^\d+(?:\.\d{1,2})?$/
+  if (!pattern.test(normalized)) return null
+  const negative = normalized.startsWith('-')
+  const unsigned = negative ? normalized.slice(1) : normalized
+  const [wholePart, decimalPart = ''] = unsigned.split('.')
   const whole = Number(wholePart)
   const decimal = Number(decimalPart.padEnd(2, '0'))
-  const cents = whole * 100 + decimal
-  if (!Number.isSafeInteger(cents) || cents < 0 || (!allowZero && cents === 0))
+  const absoluteCents = whole * 100 + decimal
+  const cents = negative ? -absoluteCents : absoluteCents
+  if (
+    !Number.isSafeInteger(cents) ||
+    (!allowNegative && cents < 0) ||
+    (!allowZero && cents === 0)
+  )
     return null
   return cents
 }

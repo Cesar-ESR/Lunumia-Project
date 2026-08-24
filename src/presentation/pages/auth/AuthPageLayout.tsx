@@ -18,7 +18,7 @@ export function AuthPageLayout({
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <Link className="auth-brand" to="/dashboard">
+        <Link className="auth-brand" to="/inicio">
           <span className="brand-mark" aria-hidden="true">
             {APP_MARK}
           </span>

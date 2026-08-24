@@ -33,7 +33,7 @@ export function LoginPage() {
           'from' in state &&
           typeof state.from === 'string'
             ? state.from
-            : '/dashboard'
+            : '/inicio'
         navigate(destination, { replace: true })
       }
     } catch (reason) {
@@ -113,7 +113,7 @@ export function LoginPage() {
       <div className="auth-links">
         <Link to="/forgot-password">Olvidé mi contraseña</Link>
         <Link to="/register">Crear cuenta</Link>
-        <Link to="/dashboard">Continuar como invitado</Link>
+        <Link to="/inicio">Continuar como invitado</Link>
       </div>
     </AuthPageLayout>
   )

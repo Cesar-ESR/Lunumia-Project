@@ -1,4 +1,6 @@
 import type { ReceiptFlowFailure } from './receipt-flow-errors'
+import { Button } from '../../components/Button'
+import { Surface } from '../../components/Surface'
 
 export function ReceiptErrorPanel({
   failure,
@@ -16,36 +18,29 @@ export function ReceiptErrorPanel({
   onSignIn?(): void
 }) {
   return (
-    <section
-      className="panel receipt-error"
-      aria-labelledby="receipt-error-title"
-    >
+    <Surface className="ln-receipt-error" aria-labelledby="receipt-error-title">
       <div role="alert">
         <p className="eyebrow">No se completó el análisis</p>
         <h2 id="receipt-error-title">Puedes continuar</h2>
         <p>{failure.message}</p>
       </div>
-      <div className="receipt-preview-actions">
+      <div className="ln-receipt-actions">
         {failure.canRetryRecognition && onRetry ? (
-          <button className="button" onClick={onRetry}>
-            Reintentar
-          </button>
+          <Button onClick={onRetry}>Reintentar</Button>
         ) : null}
         {failure.kind === 'unauthenticated' && onSignIn ? (
-          <button className="button" onClick={onSignIn}>
-            Iniciar sesión
-          </button>
+          <Button onClick={onSignIn}>Iniciar sesión</Button>
         ) : null}
-        <button className="button secondary" onClick={onReplace}>
+        <Button variant="secondary" onClick={onReplace}>
           Elegir otra imagen
-        </button>
-        <button className="button ghost" onClick={onManual}>
+        </Button>
+        <Button variant="ghost" onClick={onManual}>
           Registrar manualmente
-        </button>
-        <button className="button ghost" onClick={onCancel}>
+        </Button>
+        <Button variant="ghost" onClick={onCancel}>
           Cancelar
-        </button>
+        </Button>
       </div>
-    </section>
+    </Surface>
   )
 }

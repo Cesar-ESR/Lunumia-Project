@@ -34,8 +34,38 @@ function renderControls({
   return { signOut, deleteLocalData }
 }
 
+function renderGuestControls() {
+  vi.mocked(useAuth).mockReturnValue({
+    user: null,
+    status: 'guest',
+  } as never)
+  render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={<AccountControls />} />
+        <Route path="/login" element={<span>Pantalla de login</span>} />
+        <Route path="/register" element={<span>Pantalla de registro</span>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
 describe('AccountControls', () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it('mantiene las acciones de invitado como enlaces secundarios canónicos', () => {
+    renderGuestControls()
+
+    const guestContext = screen.getByText('Modo invitado').closest('div')
+    const login = screen.getByRole('link', { name: 'Iniciar sesión' })
+    const register = screen.getByRole('link', { name: 'Crear cuenta' })
+
+    expect(guestContext).toHaveClass('ln-account-controls--guest')
+    expect(login).toHaveAttribute('href', '/login')
+    expect(register).toHaveAttribute('href', '/register')
+    expect(login).toHaveClass('ln-button', 'ln-button--secondary')
+    expect(register).toHaveClass('ln-button', 'ln-button--secondary')
+  })
 
   it('cerrar sesión de todos modos conserva datos locales no resueltos', async () => {
     const user = userEvent.setup()

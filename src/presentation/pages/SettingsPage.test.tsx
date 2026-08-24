@@ -1,12 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router-dom'
-import { ApplicationServicesProvider } from '../context/ApplicationServicesContext'
-import { PeriodProvider } from '../context/PeriodContext'
+import type { ApplicationServices } from '../../app/composition-root'
+import { App } from '../App'
 import { createApplicationServicesMock } from '../test/test-factories'
 import { createBackupFile } from '../../../tests/backup-fixtures'
-import { SettingsPage } from './SettingsPage'
+
+function renderSettings(services: ApplicationServices) {
+  window.history.replaceState({}, '', '/settings')
+  return render(<App services={services} authServices={null} />)
+}
 
 describe('SettingsPage', () => {
   it('valida, resume y confirma una importación antes de escribir', async () => {
@@ -36,16 +39,8 @@ describe('SettingsPage', () => {
     })
     vi.mocked(services.backup.importBackup).mockResolvedValue(undefined)
 
-    render(
-      <MemoryRouter>
-        <ApplicationServicesProvider services={services}>
-          <PeriodProvider>
-            <SettingsPage />
-          </PeriodProvider>
-        </ApplicationServicesProvider>
-      </MemoryRouter>,
-    )
-    const input = screen.getByLabelText('Seleccionar archivo JSON')
+    renderSettings(services)
+    const input = await screen.findByLabelText('Seleccionar archivo JSON')
     await user.upload(
       input,
       new File([JSON.stringify(backup)], 'respaldo.json', {
@@ -57,15 +52,15 @@ describe('SettingsPage', () => {
         name: 'Reemplazar información local',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Versión del esquema:')).toBeInTheDocument()
+    expect(screen.getByText('Versión del respaldo:')).toBeInTheDocument()
     expect(services.backup.importBackup).not.toHaveBeenCalled()
     await user.click(
-      screen.getByRole('button', { name: 'Importar y reemplazar' }),
+      screen.getByRole('button', { name: 'Restaurar y reemplazar' }),
     )
     await waitFor(() =>
       expect(services.backup.importBackup).toHaveBeenCalledWith(backup),
     )
-    expect(await screen.findByText(/Respaldo importado/)).toBeInTheDocument()
+    expect(await screen.findByText(/Respaldo restaurado/)).toBeInTheDocument()
   })
 
   it('exporta y entrega el JSON al adaptador de descarga', async () => {
@@ -74,21 +69,54 @@ describe('SettingsPage', () => {
     const backup = createBackupFile()
     vi.mocked(services.backup.exportBackup).mockResolvedValue(backup)
     vi.mocked(services.backup.serialize).mockReturnValue('{"ok":true}')
-    render(
-      <MemoryRouter>
-        <ApplicationServicesProvider services={services}>
-          <PeriodProvider>
-            <SettingsPage />
-          </PeriodProvider>
-        </ApplicationServicesProvider>
-      </MemoryRouter>,
+    renderSettings(services)
+    await user.click(
+      await screen.findByRole('button', { name: 'Exportar respaldo' }),
     )
-    await user.click(screen.getByRole('button', { name: 'Exportar respaldo' }))
     await waitFor(() =>
       expect(services.backup.download).toHaveBeenCalledWith(
         '{"ok":true}',
         backup.exportedAt,
       ),
     )
+  })
+
+  it('muestra sólo preferencias soportadas y mantiene al invitado como estado válido', async () => {
+    const { services } = createApplicationServicesMock()
+    renderSettings(services)
+    expect(
+      await screen.findByRole('heading', { name: 'Preferencias compatibles' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Pesos mexicanos (MXN)')).toBeInTheDocument()
+    expect(screen.getByText('Modo claro')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /moneda/i })).toBeNull()
+    expect(screen.queryByRole('switch', { name: /oscuro|tema/i })).toBeNull()
+    expect(
+      screen.getByText('Guardado en este dispositivo.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('link', { name: 'Iniciar sesión' }).length,
+    ).toBeGreaterThan(0)
+    expect(
+      screen.queryByRole('button', { name: 'Eliminar mi cuenta' }),
+    ).toBeNull()
+  })
+
+  it('separa actualización de aplicación y sincronización de datos', async () => {
+    const { services } = createApplicationServicesMock()
+    renderSettings(services)
+    expect(
+      await screen.findByRole('heading', { name: 'Sincronización' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        name: 'Instalación, conexión y actualizaciones',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        /actualizaciones de la aplicación se presentan separadas/,
+      ),
+    ).toBeInTheDocument()
   })
 })

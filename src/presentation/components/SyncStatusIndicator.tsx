@@ -17,16 +17,16 @@ export function SyncStatusView({ sync }: { sync: SyncContextValue }) {
 
   return (
     <section
-      className={'sync-status sync-status--' + sync.status}
+      className={'ln-sync-status ln-sync-status--' + sync.status}
       role="status"
       aria-live="polite"
       aria-busy={sync.isSyncing}
     >
-      <span className="sync-status__mark" aria-hidden="true" />
+      <span className="ln-sync-status__mark" aria-hidden="true" />
       <span>{message}</span>
       {showAction ? (
         <button
-          className="sync-status__action"
+          className="ln-sync-status__action"
           type="button"
           onClick={() => void sync.syncNow()}
         >

@@ -16,7 +16,9 @@ import type {
 
 export interface DashboardBudgetSummary {
   totalBudget: AmountCents
+  spentCents: AmountCents
   budgetRemaining: SignedMoneyCents
+  configuredBudgetCount: number
   spendingPace: SpendingPace
 }
 
@@ -49,7 +51,9 @@ export class GetDashboardBudgetSummary {
 
     return {
       totalBudget,
+      spentCents: totalSpent,
       budgetRemaining,
+      configuredBudgetCount: budgets.length,
       spendingPace: computeSpendingPace(
         totalBudget,
         totalSpent,

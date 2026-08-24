@@ -36,15 +36,15 @@ export function buildPlanningPromptContext(input: PlanningAnalysisInput) {
   const facts = input.facts
   return {
     context: input.context,
-    currentBalance: formatNullableCurrency(facts.currentBalanceCents),
-    committed: formatCurrency(facts.committedCents),
-    expectedIncome: formatCurrency(facts.expectedIncomeCents),
-    projectedAvailable: formatNullableCurrency(facts.projectedAvailableCents),
-    projectedClosingBalance: formatNullableCurrency(
-      facts.projectedClosingBalanceCents,
-    ),
-    projectionCoverage: facts.projectionCoverage,
-    projectionHorizonEnd: facts.projectionHorizonEnd,
+    facts: {
+      currentBalanceCents: facts.currentBalanceCents,
+      committedCents: facts.committedCents,
+      expectedIncomeCents: facts.expectedIncomeCents,
+      projectedAvailableCents: facts.projectedAvailableCents,
+      projectedClosingBalanceCents: facts.projectedClosingBalanceCents,
+      projectionCoverage: facts.projectionCoverage,
+      projectionHorizonEnd: facts.projectionHorizonEnd,
+    },
   }
 }
 
@@ -66,10 +66,6 @@ export function buildExplainChangesPromptContext(input: ExplainChangesInput) {
 
 export function formatCurrency(amountCents: number): string {
   return moneyFormatter.format(amountCents / 100)
-}
-
-function formatNullableCurrency(amountCents: number | null): string | null {
-  return amountCents === null ? null : formatCurrency(amountCents)
 }
 
 function formatPercentage(value: number, showPositiveSign = false): string {

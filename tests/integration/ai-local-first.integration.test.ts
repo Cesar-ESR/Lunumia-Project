@@ -79,6 +79,11 @@ describe('IA mantiene el flujo local-first', () => {
             explanation: 'Cambio',
           })),
       ),
+      analyzePlanning: vi.fn(async () => ({
+        summary: 'Explicación',
+        observations: [],
+        considerations: [],
+      })),
     }
     await new SuggestExpenseCategory(provider).execute(
       created.description,
@@ -153,7 +158,9 @@ describe('IA mantiene el flujo local-first', () => {
     })
     expect(budget).toMatchObject({
       totalBudget: 50_000,
+      spentCents: 25_000,
       budgetRemaining: 25_000,
+      configuredBudgetCount: 1,
     })
     const changes = buildCalculatedCategoryChanges([expense], [], [category!])
     expect(changes[0]).toMatchObject({
@@ -212,6 +219,11 @@ describe('IA mantiene el flujo local-first', () => {
       explainCategoryChanges: async () => [
         { categoryId: category!.id, explanation: responseMarker },
       ],
+      analyzePlanning: async () => ({
+        summary: responseMarker,
+        observations: [responseMarker],
+        considerations: [],
+      }),
     }
     await provider.suggestCategory('Prompt privado', [category!])
     await provider.generatePeriodSummary({

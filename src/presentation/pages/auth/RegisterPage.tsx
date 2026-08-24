@@ -35,7 +35,7 @@ export function RegisterPage() {
           state: { email: email.trim().toLowerCase() },
         })
       else if (!result.requiresGuestDecision)
-        navigate('/dashboard', { replace: true })
+        navigate('/inicio', { replace: true })
     } catch (reason) {
       const fieldErrors = authFormErrors(reason)
       setErrors(fieldErrors)

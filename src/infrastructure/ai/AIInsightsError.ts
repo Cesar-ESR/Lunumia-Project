@@ -1,6 +1,7 @@
 export type AIErrorCode =
   | 'unauthenticated'
   | 'invalid_request'
+  | 'insufficient_planning_context'
   | 'description_too_long'
   | 'too_many_categories'
   | 'rate_limited'
@@ -16,6 +17,8 @@ const messages: Record<AIErrorCode, string> = {
   unauthenticated:
     'Inicia sesión para usar las funciones de inteligencia artificial.',
   invalid_request: 'Los datos para generar el contenido no son válidos.',
+  insufficient_planning_context:
+    'La proyección no tiene suficientes datos para explicarse con IA.',
   description_too_long: 'La descripción es demasiado larga.',
   too_many_categories: 'Hay demasiadas categorías para procesar.',
   rate_limited: 'Se alcanzó el límite de solicitudes. Intenta más tarde.',

@@ -3,7 +3,7 @@ import { App } from './App'
 import { createApplicationServicesMock } from './test/test-factories'
 
 describe('App', () => {
-  it('redirige al Dashboard dentro del layout principal', async () => {
+  it('redirige a Inicio y activa la navegación canónica', async () => {
     window.history.replaceState({}, '', '/')
     const { services } = createApplicationServicesMock()
     render(<App services={services} authServices={null} />)
@@ -14,6 +14,21 @@ describe('App', () => {
     expect(
       screen.getByRole('navigation', { name: 'Navegación principal' }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Ir al contenido principal' }),
+    ).toHaveAttribute('href', '#main-content')
+    expect(
+      screen
+        .getAllByRole('link', { name: 'Inicio' })
+        .some((link) => link.getAttribute('aria-current') === 'page'),
+    ).toBe(true)
+    const destinations = Array.from(document.querySelectorAll('a')).map(
+      (link) => link.getAttribute('href'),
+    )
+    expect(destinations).toContain('/movimientos')
+    expect(destinations).toContain('/plan')
+    expect(destinations).toContain('/mas')
+    expect(window.location.pathname).toBe('/inicio')
   })
 
   it('muestra una sola acción de instalación en Configuración', async () => {

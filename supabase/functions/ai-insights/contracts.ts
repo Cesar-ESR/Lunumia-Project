@@ -144,6 +144,14 @@ export const PeriodSummaryResponseSchema = z
   })
   .strict()
 
+export const PlanningAnalysisResponseSchema = z
+  .object({
+    summary: z.string().trim().min(1).max(600),
+    observations: z.array(z.string().trim().min(1).max(200)).max(4),
+    considerations: z.array(z.string().trim().min(1).max(200)).max(3),
+  })
+  .strict()
+
 export const CategoryChangeExplanationsResponseSchema = z
   .array(
     z
@@ -166,6 +174,9 @@ export type CategorySuggestionOutput = z.infer<
   typeof CategorySuggestionResponseSchema
 >
 export type PeriodSummaryOutput = z.infer<typeof PeriodSummaryResponseSchema>
+export type PlanningAnalysisOutput = z.infer<
+  typeof PlanningAnalysisResponseSchema
+>
 export type CategoryChangeExplanationsOutput = z.infer<
   typeof CategoryChangeExplanationsResponseSchema
 >
@@ -186,6 +197,21 @@ export function parsePeriodSummaryRequest(value: unknown) {
     guardCategoryLimit(value.facts, 'categoryBreakdown')
   }
   return parseRequest(PeriodSummaryRequestSchema, value)
+}
+
+export function parsePlanningAnalysisRequest(
+  value: unknown,
+): PlanningAnalysisInput {
+  const input = parseRequest(PlanningAnalysisRequestSchema, value)
+  const facts = input.facts
+  if (
+    facts.currentBalanceCents === null ||
+    facts.projectedAvailableCents === null ||
+    facts.projectedClosingBalanceCents === null ||
+    facts.projectionHorizonEnd === null
+  )
+    throw new AIInsightsFunctionError('insufficient_planning_context')
+  return input
 }
 
 export function parseAIAnalysisRequest(value: unknown): AIAnalysisInput {

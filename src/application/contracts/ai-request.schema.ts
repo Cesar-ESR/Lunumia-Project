@@ -117,6 +117,15 @@ export type PlanningAnalysisRequest = z.infer<
 >
 export type AIAnalysisRequest = z.infer<typeof AIAnalysisRequestSchema>
 
+export class InsufficientPlanningContextError extends Error {
+  readonly code = 'insufficient_planning_context' as const
+
+  constructor() {
+    super('La proyección no tiene suficientes datos para explicarse con IA.')
+    this.name = 'InsufficientPlanningContextError'
+  }
+}
+
 export function buildHistoricalAnalysisRequest(
   aggregatedData: PeriodAggregatedData,
 ): HistoricalAnalysisRequest {
@@ -157,6 +166,21 @@ export function buildPlanningAnalysisRequest(
       projectionHorizonEnd: snapshot.projectionHorizonEnd,
     },
   })
+}
+
+export function requireCompletePlanningAnalysisRequest(
+  value: unknown,
+): PlanningAnalysisRequest {
+  const request = PlanningAnalysisRequestSchema.parse(value)
+  const facts = request.facts
+  if (
+    facts.currentBalanceCents === null ||
+    facts.projectedAvailableCents === null ||
+    facts.projectedClosingBalanceCents === null ||
+    facts.projectionHorizonEnd === null
+  )
+    throw new InsufficientPlanningContextError()
+  return request
 }
 
 const CalculatedCategoryChangeSchema = z

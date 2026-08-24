@@ -3,11 +3,14 @@ import {
   CategoryChangeExplanationsResponseSchema,
   CategorySuggestionResponseSchema,
   PeriodSummaryResponseSchema,
+  PlanningAnalysisResponseSchema,
   type CategoryChangeExplanationsOutput,
   type CategorySuggestionOutput,
   type ExplainChangesInput,
   type PeriodSummaryInput,
   type PeriodSummaryOutput,
+  type PlanningAnalysisInput,
+  type PlanningAnalysisOutput,
   type SuggestCategoryInput,
 } from '../contracts.ts'
 import { AIInsightsFunctionError } from '../errors.ts'
@@ -15,6 +18,7 @@ import type { AIProvider } from './AIProvider.ts'
 import {
   buildExplainChangesPromptContext,
   buildPeriodSummaryPromptContext,
+  buildPlanningPromptContext,
 } from './prompt-context.ts'
 
 export const GROQ_CHAT_COMPLETIONS_URL =
@@ -27,7 +31,11 @@ export interface GroqAIProviderOptions {
   now?: () => number
 }
 
-type GroqOperation = 'suggest-category' | 'period-summary' | 'explain-changes'
+type GroqOperation =
+  | 'suggest-category'
+  | 'period-summary'
+  | 'explain-changes'
+  | 'planning-analysis'
 
 type GroqDiagnosticType =
   | 'upstream_bad_request'
@@ -67,8 +75,35 @@ const PERIOD_SUMMARY_RESPONSE_FORMAT = {
     },
   },
 } as const
+const PLANNING_ANALYSIS_RESPONSE_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'planning_analysis',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', minLength: 1, maxLength: 600 },
+        observations: {
+          type: 'array',
+          items: { type: 'string', minLength: 1, maxLength: 200 },
+          maxItems: 4,
+        },
+        considerations: {
+          type: 'array',
+          items: { type: 'string', minLength: 1, maxLength: 200 },
+          maxItems: 3,
+        },
+      },
+      required: ['summary', 'observations', 'considerations'],
+      additionalProperties: false,
+    },
+  },
+} as const
 type GroqResponseFormat =
-  typeof JSON_OBJECT_RESPONSE_FORMAT | typeof PERIOD_SUMMARY_RESPONSE_FORMAT
+  | typeof JSON_OBJECT_RESPONSE_FORMAT
+  | typeof PERIOD_SUMMARY_RESPONSE_FORMAT
+  | typeof PLANNING_ANALYSIS_RESPONSE_FORMAT
 const MAX_COMPLETION_TOKENS = 800
 const REASONING_EFFORT = 'default'
 const MESSAGE_COUNT = 2
@@ -196,6 +231,26 @@ export class GroqAIProvider implements AIProvider {
       throw new AIInsightsFunctionError('invalid_provider_response')
     }
     return response.data.explanations
+  }
+
+  async analyzePlanning(
+    input: PlanningAnalysisInput,
+    signal: AbortSignal,
+  ): Promise<PlanningAnalysisOutput> {
+    const operation = 'planning-analysis'
+    const output = parseProviderOutput(
+      PlanningAnalysisResponseSchema,
+      await this.complete(
+        operation,
+        'Explica brevemente en español la proyección usando exclusivamente los hechos suministrados. Los campos monetarios son enteros en centavos y ya fueron calculados por la aplicación: no los sumes, restes, conviertas, recalcules, reemplaces ni inventes. Un valor null significa desconocido y nunca significa cero. Los valores negativos son válidos. expectedIncomeCents representa dinero futuro, no saldo actual. projectedClosingBalanceCents es una estimación, no una certeza. Respeta exactamente projectionCoverage y projectionHorizonEnd; no definas otro horizonte. Si projectionCoverage es overdue_only, declara que la cobertura es limitada y no afirmes certeza del periodo completo. No apruebes gastos, no indiques montos seguros, no generes órdenes financieras y no sugieras modificar transacciones. Ninguna transacción se modifica: la respuesta es únicamente explicativa. Responde solo JSON con summary, observations y considerations.',
+        buildPlanningPromptContext(input),
+        signal,
+        PLANNING_ANALYSIS_RESPONSE_FORMAT,
+      ),
+      operation,
+    )
+    logSchemaValidationSuccess(operation)
+    return output
   }
 
   private async complete(

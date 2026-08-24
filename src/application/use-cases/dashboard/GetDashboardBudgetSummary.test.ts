@@ -59,12 +59,59 @@ describe('GetDashboardBudgetSummary', () => {
 
     await expect(getSummary.execute(period, '2026-07-15')).resolves.toEqual({
       totalBudget: 100_000,
+      spentCents: 25_000,
       budgetRemaining: 75_000,
+      configuredBudgetCount: 1,
       spendingPace: {
         spentPercentage: 25,
         timePercentage: 46.666666666666664,
         pace: 'low',
       },
+    })
+  })
+
+  it('distingue ausencia de presupuesto de una configuración explícita en cero', async () => {
+    const period: Period = {
+      ...base,
+      id: 'period',
+      type: 'monthly',
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+    }
+    const findBudgets = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          ...base,
+          id: 'zero-budget',
+          periodId: period.id,
+          categoryId: 'food',
+          amount: 0,
+        },
+      ])
+    const getSummary = new GetDashboardBudgetSummary(
+      repository<ICategoryBudgetRepository>({ findByPeriod: findBudgets }),
+      repository<IExpenseRepository>({
+        findByPeriod: vi.fn().mockResolvedValue([]),
+      }),
+    )
+
+    await expect(
+      getSummary.execute(period, '2026-07-15'),
+    ).resolves.toMatchObject({
+      totalBudget: 0,
+      spentCents: 0,
+      budgetRemaining: 0,
+      configuredBudgetCount: 0,
+    })
+    await expect(
+      getSummary.execute(period, '2026-07-15'),
+    ).resolves.toMatchObject({
+      totalBudget: 0,
+      spentCents: 0,
+      budgetRemaining: 0,
+      configuredBudgetCount: 1,
     })
   })
 })

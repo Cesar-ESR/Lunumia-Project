@@ -54,7 +54,7 @@ export function IncomesPage() {
           title="Selecciona un periodo"
           description="Necesitas un periodo activo antes de registrar ingresos."
           action={
-            <Link className="button" to="/periods">
+            <Link className="button" to="/plan/periodos">
               Administrar periodos
             </Link>
           }

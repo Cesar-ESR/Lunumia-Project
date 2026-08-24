@@ -1,17 +1,30 @@
+import type { ReactNode } from 'react'
+
 export function Notice({
   message,
+  title,
+  action,
   tone = 'success',
+  role,
 }: {
-  message: string
-  tone?: 'success' | 'error'
+  message: ReactNode
+  title?: string
+  action?: ReactNode
+  tone?: 'info' | 'success' | 'warning' | 'danger' | 'error'
+  role?: 'status' | 'alert'
 }) {
+  const semanticTone = tone === 'error' ? 'danger' : tone
   return (
     <div
-      className={`notice ${tone}`}
-      role={tone === 'error' ? 'alert' : 'status'}
-      aria-live="polite"
+      className={`ln-notice ln-notice--${semanticTone}`}
+      role={role ?? (semanticTone === 'danger' ? 'alert' : 'status')}
+      aria-live={semanticTone === 'danger' ? 'assertive' : 'polite'}
     >
-      {message}
+      <div className="ln-notice__content">
+        {title ? <strong className="ln-notice__title">{title}</strong> : null}
+        <div className="ln-notice__body">{message}</div>
+      </div>
+      {action ? <div className="ln-notice__action">{action}</div> : null}
     </div>
   )
 }

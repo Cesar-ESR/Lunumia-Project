@@ -4,6 +4,7 @@ export type AIInsightsFunctionErrorCode =
   | 'method_not_allowed'
   | 'unauthenticated'
   | 'invalid_request'
+  | 'insufficient_planning_context'
   | 'description_too_long'
   | 'too_many_categories'
   | 'rate_limited'
@@ -22,6 +23,10 @@ const details: Record<
   method_not_allowed: { status: 405, message: 'Método no permitido.' },
   unauthenticated: { status: 401, message: 'No autorizado.' },
   invalid_request: { status: 400, message: 'La solicitud no es válida.' },
+  insufficient_planning_context: {
+    status: 422,
+    message: 'La proyección no tiene suficientes datos para explicarse.',
+  },
   description_too_long: {
     status: 400,
     message: 'La descripción excede el límite permitido.',

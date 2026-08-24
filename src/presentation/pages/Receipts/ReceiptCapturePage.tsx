@@ -55,7 +55,7 @@ export function ReceiptCapturePage() {
           }
           onCancel={() => navigate('/expenses')}
           onSignIn={() => navigate('/login')}
-          onManagePeriods={() => navigate('/periods')}
+          onManagePeriods={() => navigate('/plan/periodos')}
         />
       ) : null}
     </>

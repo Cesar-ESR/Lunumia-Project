@@ -10,6 +10,8 @@ import {
   type ExpenseFormValue,
 } from '../../components/ExpenseForm'
 import { Notice } from '../../components/Notice'
+import { Button } from '../../components/Button'
+import { Surface } from '../../components/Surface'
 import { CurrencyMismatchWarning } from './CurrencyMismatchWarning'
 import { ReceiptErrorPanel } from './ReceiptErrorPanel'
 import { ReceiptPreview } from './ReceiptPreview'
@@ -138,6 +140,19 @@ export function ReceiptCaptureFlow({
       })
       return
     }
+    if (authStatus === 'offline-authenticated') {
+      setState({
+        status: 'error',
+        image,
+        failure: {
+          kind: 'network_error',
+          message:
+            'Sin conexión. El análisis del recibo necesita internet, pero puedes registrar el gasto manualmente.',
+          canRetryRecognition: false,
+        },
+      })
+      return
+    }
     recognizingRef.current = true
     const generation = ++generationRef.current
     setState({ status: 'recognizing', image })
@@ -233,14 +248,19 @@ export function ReceiptCaptureFlow({
         : null
 
   if (state.status === 'success')
-    return <Notice message="Gasto guardado en este dispositivo." />
+    return (
+      <Notice message="Gasto guardado en este dispositivo." role="status" />
+    )
 
   return (
-    <div className="receipt-flow">
-      <p className="receipt-privacy">
-        La imagen se envía temporalmente mediante Supabase Edge a Groq para
-        reconocer los datos; Lunumia no la guarda en tu cuenta.
-      </p>
+    <div className="ln-receipt-flow">
+      <Surface variant="subtle" className="ln-receipt-privacy">
+        <strong>Privacidad del recibo</strong>
+        <p>
+          Para analizarlo, la imagen se envía temporalmente a un servicio
+          remoto. Lunumia no guarda la imagen del recibo.
+        </p>
+      </Surface>
 
       {state.status === 'idle' ||
       (state.status === 'selecting' && !state.image) ? (
@@ -267,7 +287,7 @@ export function ReceiptCaptureFlow({
       ) : null}
 
       {state.status === 'error' ? (
-        <div className={state.image ? 'receipt-workspace' : undefined}>
+        <div className={state.image ? 'ln-receipt-workspace' : undefined}>
           {state.image ? <ReceiptPreview image={state.image} readonly /> : null}
           <ReceiptErrorPanel
             failure={state.failure}
@@ -282,12 +302,14 @@ export function ReceiptCaptureFlow({
 
       {formContext ? (
         periods.length && fallbackPeriod ? (
-          <div className={formContext.image ? 'receipt-workspace' : undefined}>
+          <div
+            className={formContext.image ? 'ln-receipt-workspace' : undefined}
+          >
             {formContext.image ? (
               <ReceiptPreview image={formContext.image} readonly />
             ) : null}
-            <section
-              className="panel receipt-expense-form"
+            <Surface
+              className="ln-receipt-expense-form"
               aria-labelledby="receipt-form-title"
             >
               <p className="eyebrow">Revisa antes de guardar</p>
@@ -296,6 +318,11 @@ export function ReceiptCaptureFlow({
                 El reconocimiento solo propone valores. Corrige cualquier dato
                 antes de confirmar.
               </p>
+              {formContext.image ? (
+                <p className="sr-only" role="status" aria-live="polite">
+                  Recibo analizado. Revisa los datos antes de crear el gasto.
+                </p>
+              ) : null}
               <ExpenseForm
                 ownerId={ownerId}
                 period={fallbackPeriod}
@@ -326,7 +353,7 @@ export function ReceiptCaptureFlow({
                         onReviewedChange={setCurrencyReviewed}
                       />
                     ) : null}
-                    <div className="receipt-currency-field">
+                    <div className="ln-receipt-currency-field">
                       <span>Moneda del gasto</span>
                       <strong>{currency}</strong>
                     </div>
@@ -335,24 +362,22 @@ export function ReceiptCaptureFlow({
                 onSubmit={(value) => submitExpense(value, formContext)}
                 onCancel={cancelFlow}
               />
-            </section>
+            </Surface>
           </div>
         ) : (
-          <section className="panel receipt-error" role="alert">
+          <Surface className="ln-receipt-error" role="alert">
             <h2>No hay un periodo disponible</h2>
             <p>
               Crea un periodo que incluya la fecha del gasto y vuelve a
               intentarlo.
             </p>
-            <div className="receipt-preview-actions">
-              <button className="button" onClick={onManagePeriods}>
-                Administrar periodos
-              </button>
-              <button className="button ghost" onClick={cancelFlow}>
+            <div className="ln-receipt-actions">
+              <Button onClick={onManagePeriods}>Administrar periodos</Button>
+              <Button variant="ghost" onClick={cancelFlow}>
                 Cancelar
-              </button>
+              </Button>
             </div>
-          </section>
+          </Surface>
         )
       ) : null}
     </div>

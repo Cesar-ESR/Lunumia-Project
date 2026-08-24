@@ -3,6 +3,7 @@ import { createCategorySchema } from '@application/contracts'
 import type { Category } from '@domain/entities'
 import { useApplicationServices } from '../context/ApplicationServicesContext'
 import { useAsyncData } from '../hooks/useAsyncData'
+import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
@@ -10,6 +11,7 @@ import { FormField } from '../components/FormField'
 import { LoadingState } from '../components/LoadingState'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
+import { Surface } from '../components/Surface'
 import { friendlyError, zodFieldErrors, type FieldErrors } from '../utils/forms'
 
 const emptyForm = { name: '', color: '#2f6fed', icon: '' }
@@ -110,11 +112,11 @@ export function CategoriesPage() {
       <PageHeader
         eyebrow="Organización"
         title="Categorías"
-        description="Agrupa tus gastos de una forma que tenga sentido para ti."
+        description="Organiza tus gastos por nombre. El color y el icono son apoyos visuales; el nombre siempre identifica la categoría."
       />
       {notice ? <Notice tone="error" message={notice} /> : null}
-      <div className="split-layout">
-        <section className="panel">
+      <div className="ln-management-layout">
+        <Surface className="ln-management-form">
           <h2>{editing ? 'Editar categoría' : 'Nueva categoría'}</h2>
           <form className="stack-form" onSubmit={submit} noValidate>
             <FormField id="category-name" label="Nombre" error={errors.name}>
@@ -130,13 +132,20 @@ export function CategoriesPage() {
                 }
               />
             </FormField>
-            <FormField id="category-color" label="Color" error={errors.color}>
+            <FormField
+              id="category-color"
+              label="Color decorativo"
+              error={errors.color}
+              hint="La categoría seguirá identificándose por su nombre."
+            >
               <input
                 id="category-color"
                 type="color"
                 value={form.color}
                 aria-describedby={
-                  errors.color ? 'category-color-error' : undefined
+                  errors.color
+                    ? 'category-color-hint category-color-error'
+                    : 'category-color-hint'
                 }
                 onChange={(event) =>
                   setForm({ ...form, color: event.target.value })
@@ -163,26 +172,25 @@ export function CategoriesPage() {
             </FormField>
             <div className="form-actions">
               {editing ? (
-                <button
-                  type="button"
-                  className="button ghost"
+                <Button
+                  variant="secondary"
                   disabled={isPending}
                   onClick={resetForm}
                 >
                   Cancelar
-                </button>
+                </Button>
               ) : null}
-              <button className="button primary" disabled={isPending}>
+              <Button type="submit" disabled={isPending}>
                 {isPending
                   ? 'Guardando…'
                   : editing
                     ? 'Guardar cambios'
                     : 'Crear categoría'}
-              </button>
+              </Button>
             </div>
           </form>
-        </section>
-        <section className="panel" aria-labelledby="category-list-title">
+        </Surface>
+        <section aria-labelledby="category-list-title">
           <h2 id="category-list-title">Tus categorías</h2>
           {categories.status === 'loading' && !categories.data ? (
             <LoadingState message="Cargando categorías" />
@@ -200,9 +208,14 @@ export function CategoriesPage() {
             />
           ) : null}
           {categories.data?.length ? (
-            <div className="record-list">
+            <div className="ln-management-list">
               {categories.data.map((category) => (
-                <article className="record-card" key={category.id}>
+                <Surface
+                  as="article"
+                  className="ln-management-row"
+                  key={category.id}
+                  aria-label={`Categoría ${category.name}`}
+                >
                   <div className="record-main">
                     <span
                       className="category-swatch"
@@ -216,32 +229,30 @@ export function CategoriesPage() {
                       </h3>
                       <p>
                         {category.isSystem
-                          ? 'Categoría del sistema'
-                          : 'Categoría personal'}
+                          ? 'Lunumia protege esta categoría para conservar movimientos sin clasificar.'
+                          : 'Categoría personal editable.'}
                       </p>
                     </div>
                   </div>
                   {category.isSystem ? (
-                    <span className="badge">Protegida</span>
+                    <span className="ln-status-label">Protegida</span>
                   ) : (
-                    <div className="record-actions">
-                      <button
-                        type="button"
-                        className="button ghost"
+                    <div className="ln-management-actions">
+                      <Button
+                        variant="ghost"
                         onClick={() => beginEdit(category)}
                       >
                         Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="button ghost danger-text"
+                      </Button>
+                      <Button
+                        variant="danger"
                         onClick={() => void requestDelete(category)}
                       >
                         Eliminar
-                      </button>
+                      </Button>
                     </div>
                   )}
-                </article>
+                </Surface>
               ))}
             </div>
           ) : null}
@@ -252,7 +263,9 @@ export function CategoriesPage() {
         title="Eliminar categoría"
         description={
           deletion
-            ? `${deletion.expenseCount} gasto(s) usan “${deletion.category.name}”. Se reasignarán a “Sin categoría” antes de eliminarla.`
+            ? deletion.expenseCount === 1
+              ? `1 gasto usa “${deletion.category.name}”. Se reasignará a “Sin categoría” antes de eliminarla.`
+              : `${deletion.expenseCount} gastos usan “${deletion.category.name}”. Se reasignarán a “Sin categoría” antes de eliminarla.`
             : ''
         }
         confirmLabel="Eliminar categoría"

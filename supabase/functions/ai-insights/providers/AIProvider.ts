@@ -4,6 +4,8 @@ import type {
   ExplainChangesInput,
   PeriodSummaryInput,
   PeriodSummaryOutput,
+  PlanningAnalysisInput,
+  PlanningAnalysisOutput,
   SuggestCategoryInput,
 } from '../contracts.ts'
 
@@ -20,4 +22,8 @@ export interface AIProvider {
     input: ExplainChangesInput,
     signal: AbortSignal,
   ): Promise<CategoryChangeExplanationsOutput>
+  analyzePlanning(
+    input: PlanningAnalysisInput,
+    signal: AbortSignal,
+  ): Promise<PlanningAnalysisOutput>
 }

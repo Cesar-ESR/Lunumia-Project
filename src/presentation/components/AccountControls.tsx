@@ -15,10 +15,14 @@ export function AccountControls() {
 
   if (!auth.user)
     return (
-      <div className="account-controls guest-controls">
+      <div className="ln-account-controls ln-account-controls--guest">
         <span>Modo invitado</span>
-        <Link to="/login">Iniciar sesión</Link>
-        <Link to="/register">Crear cuenta</Link>
+        <Link className="ln-button ln-button--secondary" to="/login">
+          Iniciar sesión
+        </Link>
+        <Link className="ln-button ln-button--secondary" to="/register">
+          Crear cuenta
+        </Link>
       </div>
     )
 
@@ -62,7 +66,7 @@ export function AccountControls() {
 
   return (
     <>
-      <div className="account-controls">
+      <div className="ln-account-controls">
         <span>
           {auth.status === 'offline-authenticated'
             ? 'Cuenta · offline'
@@ -71,7 +75,7 @@ export function AccountControls() {
         <strong>{auth.user.email}</strong>
         <button
           type="button"
-          className="account-link"
+          className="ln-account-controls__action"
           disabled={isPending}
           onClick={() => void requestSignOut()}
         >
@@ -79,7 +83,7 @@ export function AccountControls() {
         </button>
         <button
           type="button"
-          className="account-link"
+          className="ln-account-controls__action"
           disabled={isPending}
           onClick={() => {
             setDeleteBlockedCount(null)

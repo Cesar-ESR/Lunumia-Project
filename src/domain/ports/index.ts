@@ -78,6 +78,25 @@ export interface CategoryChangeExplanation {
   explanation: string
 }
 
+export interface PlanningAnalysisInput {
+  context: 'planning'
+  facts: {
+    currentBalanceCents: number | null
+    committedCents: number
+    expectedIncomeCents: number
+    projectedAvailableCents: number | null
+    projectedClosingBalanceCents: number | null
+    projectionCoverage: 'full_period' | 'overdue_only'
+    projectionHorizonEnd: DateOnly | null
+  }
+}
+
+export interface PlanningAnalysisResponse {
+  summary: string
+  observations: ReadonlyArray<string>
+  considerations: ReadonlyArray<string>
+}
+
 export interface AIInsightsProvider {
   suggestCategory(
     description: string,
@@ -89,4 +108,7 @@ export interface AIInsightsProvider {
   explainCategoryChanges(
     changes: ReadonlyArray<CalculatedCategoryChange>,
   ): Promise<ReadonlyArray<CategoryChangeExplanation>>
+  analyzePlanning(
+    input: PlanningAnalysisInput,
+  ): Promise<PlanningAnalysisResponse>
 }

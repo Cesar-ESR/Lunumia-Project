@@ -7,7 +7,7 @@ export function NotFoundPage() {
       title="Página no encontrada"
       description="La dirección que buscas no existe en Lunumia."
       action={
-        <Link className="button" to="/dashboard">
+        <Link className="button" to="/inicio">
           Volver al Dashboard
         </Link>
       }

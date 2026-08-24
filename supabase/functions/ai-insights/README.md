@@ -1,19 +1,22 @@
 # ai-insights
 
-Función autenticada con rutas `suggest-category`, `period-summary` y
-`explain-changes`. No persiste solicitudes ni respuestas y no modifica datos.
+Función autenticada con rutas `suggest-category`, `period-summary`,
+`explain-changes` y `planning-analysis`. No persiste solicitudes ni respuestas
+y no modifica datos.
 
 El payload canónico de `period-summary` usa `context: "historical"` y sólo
 transporta ingresos recibidos, gastos, totales por categoría y gastos
 destacados ya calculados. `expected` y `cancelled` no se comunican como ingreso
-realizado. El contrato Domain 2.0 también valida un contexto `planning` mínimo
-con `expectedIncomeCents`, `committedCents`, proyecciones, cobertura y horizonte
-ya calculados, pero no expone una ruta de planificación mientras el producto no
-tenga esa funcionalidad.
+realizado. `planning-analysis` acepta exclusivamente el contexto `planning` con
+`expectedIncomeCents`, `committedCents`, balance, proyecciones, cobertura y
+horizonte ya calculados. La respuesta estructurada contiene sólo `summary`,
+`observations` y `considerations`; no contiene nuevas cifras financieras.
 
 Los importes estructurados se conservan como integer cents. Los saldos y
 proyecciones admiten negativos y `null`; los agregados admiten sólo valores no
-negativos. No se envían entidades `Income`, occurrences, reglas recurrentes,
+negativos. La ruta de planificación rechaza con
+`insufficient_planning_context` los hechos críticos desconocidos antes de
+invocar al proveedor. No se envían entidades `Income`, occurrences, reglas recurrentes,
 metadatos de sync, IDs de operaciones, JWT ni claves internas. Después de
 validar con Zod, el proveedor construye de forma determinista un contexto
 monetario de presentación en MXN. Groq sólo explica ese contexto ya formateado:
@@ -43,7 +46,7 @@ imports compatibles con Node.
 
 `PostgresRateLimiter` consume el RPC atómico `consume_rate_limit`. La identidad
 se deriva del JWT mediante `auth.uid()` y la política privada de `ai-insights`
-limita a 10 solicitudes por 60 segundos y usuario, compartidas entre las tres
+limita a 10 solicitudes por 60 segundos y usuario, compartidas entre las cuatro
 rutas. El cliente solo puede indicar el alcance allowlisted: no puede elegir el
 owner, el máximo ni la ventana. Los contadores no guardan JWT, prompts, payloads
 financieros ni respuestas. `InMemoryRateLimiter` permanece únicamente como

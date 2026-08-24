@@ -7,8 +7,11 @@ import {
   ExplainChangesRequestSchema,
   parseCategoryChangeExplanations,
   parseCategorySuggestion,
+  parsePlanningAnalysisResponse,
   PeriodSummaryRequestSchema,
   PeriodSummarySchema,
+  PlanningAnalysisResponseSchema,
+  requireCompletePlanningAnalysisRequest,
   SuggestCategoryRequestSchema,
 } from './index'
 import type { FinancialSnapshot } from '@domain/calculations'
@@ -327,5 +330,65 @@ describe('contratos de IA', () => {
     expect(EdgeAIAnalysisRequestSchema.parse(planningRequest)).toEqual(
       planningRequest,
     )
+  })
+
+  it('27. valida una respuesta de planificación pequeña y explicativa', () => {
+    const response = {
+      summary: 'La proyección termina por debajo de cero.',
+      observations: ['El saldo proyectado es una estimación.'],
+      considerations: ['La decisión final corresponde a la persona usuaria.'],
+    }
+
+    expect(parsePlanningAnalysisResponse(response)).toEqual(response)
+  })
+
+  it.each([
+    {
+      summary: 'Resumen',
+      observations: [],
+      considerations: [],
+      safeToSpendCents: 1,
+    },
+    { summary: '', observations: [], considerations: [] },
+    {
+      summary: 'Resumen',
+      observations: Array(5).fill('Observación'),
+      considerations: [],
+    },
+    {
+      summary: 'Resumen',
+      observations: [],
+      considerations: Array(4).fill('Consideración'),
+    },
+  ])('28. rechaza respuesta de planificación fuera del contrato', (value) => {
+    expect(PlanningAnalysisResponseSchema.safeParse(value).success).toBe(false)
+  })
+
+  it('29. exige hechos críticos conocidos sin convertir null en cero', () => {
+    const incomplete = buildPlanningAnalysisRequest({
+      ...planningSnapshot,
+      currentBalanceCents: null,
+    })
+
+    expect(() =>
+      requireCompletePlanningAnalysisRequest(incomplete),
+    ).toThrowError(
+      expect.objectContaining({ code: 'insufficient_planning_context' }),
+    )
+    expect(incomplete.facts.currentBalanceCents).toBeNull()
+  })
+
+  it.each([
+    { field: 'currentBalanceCents', value: 1.5 },
+    { field: 'projectionCoverage', value: 'partial' },
+    { field: 'projectionHorizonEnd', value: '2026-02-30' },
+  ])('30. rechaza planificación inválida: $field', ({ field, value }) => {
+    const request = buildPlanningAnalysisRequest(planningSnapshot)
+    expect(
+      AIAnalysisRequestSchema.safeParse({
+        ...request,
+        facts: { ...request.facts, [field]: value },
+      }).success,
+    ).toBe(false)
   })
 })

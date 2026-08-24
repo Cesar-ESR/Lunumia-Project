@@ -1,4 +1,6 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
+import { Button } from './Button'
+import { Dialog } from './Dialog'
 
 export function ConfirmDialog({
   open,
@@ -6,6 +8,7 @@ export function ConfirmDialog({
   description,
   confirmLabel = 'Confirmar',
   isPending = false,
+  destructive = true,
   children,
   onConfirm,
   onCancel,
@@ -15,55 +18,42 @@ export function ConfirmDialog({
   description: string
   confirmLabel?: string
   isPending?: boolean
+  destructive?: boolean
   children?: ReactNode
   onConfirm(): void
   onCancel(): void
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    if (open) cancelRef.current?.focus()
-  }, [open])
-  useEffect(() => {
-    if (!open) return
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isPending) onCancel()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isPending, onCancel, open])
-  if (!open) return null
   return (
-    <div className="dialog-backdrop">
-      <section
-        className="dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-title"
-        aria-describedby="confirm-description"
-      >
-        <h2 id="confirm-title">{title}</h2>
-        <p id="confirm-description">{description}</p>
-        {children}
-        <div className="dialog-actions">
-          <button
+    <Dialog
+      open={open}
+      title={title}
+      description={description}
+      onClose={onCancel}
+      initialFocusRef={cancelRef}
+      pending={isPending}
+      actions={
+        <>
+          <Button
             ref={cancelRef}
-            type="button"
-            className="button ghost"
+            variant="ghost"
             disabled={isPending}
             onClick={onCancel}
           >
             Cancelar
-          </button>
-          <button
-            type="button"
-            className="button danger"
-            disabled={isPending}
+          </Button>
+          <Button
+            variant={destructive ? 'danger' : 'primary'}
+            loading={isPending}
+            loadingLabel="Procesando…"
             onClick={onConfirm}
           >
-            {isPending ? 'Procesando…' : confirmLabel}
-          </button>
-        </div>
-      </section>
-    </div>
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      {children}
+    </Dialog>
   )
 }

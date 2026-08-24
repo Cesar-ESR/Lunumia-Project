@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { GuestDataDecision } from '../context/AuthContext'
 import { useAuth } from '../context/AuthContext'
+import { Button } from './Button'
+import { Dialog } from './Dialog'
 
 export function GuestDataDecisionDialog() {
   const { pendingGuestData, resolveGuestData } = useAuth()
@@ -21,58 +23,50 @@ export function GuestDataDecisionDialog() {
     .reduce((total, [, value]) => total + Number(value), 0)
 
   return (
-    <div className="dialog-backdrop">
-      <section
-        className="dialog guest-data-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="guest-data-title"
-        aria-describedby="guest-data-description"
-      >
-        <h2 id="guest-data-title">Datos guardados en este dispositivo</h2>
-        <p id="guest-data-description">
-          Encontramos {count} registros del modo invitado. Elige explícitamente
-          cómo manejarlos antes de continuar.
-        </p>
+    <Dialog
+      open
+      title="Datos guardados en este dispositivo"
+      description={`Encontramos ${count} registros del modo invitado. Elige explícitamente cómo manejarlos antes de continuar.`}
+      className="guest-data-dialog"
+      pending={isPending}
+      closeOnEscape={!isPending}
+      onClose={() => void decide('cancel')}
+      actions={
         <div className="decision-actions">
-          <button
-            className="button"
-            type="button"
+          <Button
             disabled={isPending}
             onClick={() => void decide('migrate-local')}
           >
             Migrar datos de este dispositivo
-          </button>
-          <button
-            className="button secondary"
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
             disabled={isPending}
             onClick={() => void decide('keep-account')}
           >
             Conservar datos de la cuenta
-          </button>
-          <button
-            className="button danger"
-            type="button"
+          </Button>
+          <Button
+            variant="danger"
             disabled={isPending}
             onClick={() => void decide('discard-local')}
           >
             Descartar datos locales
-          </button>
-          <button
-            className="button ghost"
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             disabled={isPending}
             onClick={() => void decide('cancel')}
           >
             Cancelar
-          </button>
+          </Button>
         </div>
-        <p className="field-hint">
-          La migración solo cambia el propietario local. Los datos todavía no se
-          han sincronizado con la nube.
-        </p>
-      </section>
-    </div>
+      }
+    >
+      <p className="field-hint">
+        La migración solo cambia el propietario local. Los datos todavía no se
+        han sincronizado con la nube.
+      </p>
+    </Dialog>
   )
 }

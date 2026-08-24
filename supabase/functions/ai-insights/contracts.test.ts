@@ -1,6 +1,8 @@
 import {
   parseAIAnalysisRequest,
   parsePeriodSummaryRequest,
+  parsePlanningAnalysisRequest,
+  PlanningAnalysisResponseSchema,
 } from './contracts.ts'
 
 const categoryId = '11111111-1111-4111-8111-111111111111'
@@ -69,5 +71,41 @@ describe('contrato Edge de análisis Domain 2.0', () => {
         facts: { ...planningRequest.facts, committedCents: -1 },
       }),
     ).toThrowError(expect.objectContaining({ code: 'invalid_request' }))
+  })
+
+  it('valida planificación completa y conserva cada hecho exactamente', () => {
+    const complete = {
+      ...planningRequest,
+      facts: {
+        ...planningRequest.facts,
+        currentBalanceCents: 100_000,
+        projectedAvailableCents: 77_777,
+        projectedClosingBalanceCents: -12_345,
+        projectionHorizonEnd: '2026-08-31',
+      },
+    }
+
+    expect(parsePlanningAnalysisRequest(complete)).toEqual(complete)
+  })
+
+  it('rechaza contexto crítico insuficiente sin convertir null en cero', () => {
+    expect(() => parsePlanningAnalysisRequest(planningRequest)).toThrowError(
+      expect.objectContaining({ code: 'insufficient_planning_context' }),
+    )
+    expect(planningRequest.facts.currentBalanceCents).toBeNull()
+  })
+
+  it.each([
+    { summary: 'Resumen', observations: [], considerations: [] },
+    { summary: 'Resumen', observations: [], considerations: [], riskScore: 1 },
+    {
+      summary: 'Resumen',
+      observations: Array(5).fill('Dato'),
+      considerations: [],
+    },
+  ])('valida estrictamente la respuesta explicativa', (value) => {
+    expect(PlanningAnalysisResponseSchema.safeParse(value).success).toBe(
+      !('riskScore' in value) && value.observations.length <= 4,
+    )
   })
 })

@@ -10,7 +10,7 @@ import {
 function renderSimulator(
   services: ReturnType<typeof createApplicationServicesMock>['services'],
 ) {
-  window.history.replaceState({}, '', '/simulator')
+  window.history.replaceState({}, '', '/simulador')
   return render(<App services={services} />)
 }
 
@@ -19,8 +19,9 @@ async function simulate(
   amount = '100.00',
 ) {
   await screen.findByRole('option', { name: 'Comida' })
-  await user.type(screen.getByLabelText('Monto de la compra'), amount)
-  await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
+  await user.type(screen.getByLabelText(/Monto de la compra/), amount)
+  await user.selectOptions(screen.getByLabelText(/Categoría/), CATEGORY_ID)
+  await user.click(screen.getByRole('button', { name: 'Simular compra' }))
 }
 
 describe('PurchaseSimulatorPage', () => {
@@ -30,9 +31,7 @@ describe('PurchaseSimulatorPage', () => {
     renderSimulator(services)
     await simulate(user)
     expect(
-      await screen.findByText(
-        'Esta compra se mantiene dentro de tu dinero disponible actual.',
-      ),
+      await screen.findByText('Dentro de tu disponible.'),
     ).toBeInTheDocument()
     expect(mocks.createExpense).not.toHaveBeenCalled()
   })
@@ -55,9 +54,7 @@ describe('PurchaseSimulatorPage', () => {
     renderSimulator(services)
     await simulate(user)
     expect(
-      await screen.findByText(
-        'Esta compra dejaría tu dinero disponible en negativo.',
-      ),
+      await screen.findByText('Dejaría tu disponible en negativo.'),
     ).toBeInTheDocument()
   })
 
@@ -79,15 +76,14 @@ describe('PurchaseSimulatorPage', () => {
     renderSimulator(services)
     await simulate(user)
 
-    expect(await screen.findByText('No configurado')).toBeInTheDocument()
-    expect(screen.getByText('No evaluable')).toBeInTheDocument()
+    expect(await screen.findAllByText('No calculable')).toHaveLength(2)
     expect(
-      screen.getByText(
-        'Configura tu saldo para evaluar si esta compra cabe en tu dinero disponible.',
-      ),
+      screen.getByText('No podemos evaluarla hasta conocer tu saldo.'),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('La proyección sólo considera compromisos vencidos.'),
+      screen.getByText(
+        'La proyección disponible sólo cubre compromisos vencidos.',
+      ),
     ).toBeInTheDocument()
     expect(screen.getByLabelText('$50.00')).toBeInTheDocument()
     expect(screen.getByLabelText('$40.00')).toBeInTheDocument()
@@ -102,9 +98,7 @@ describe('PurchaseSimulatorPage', () => {
       screen.getByText('Escribe un monto positivo con máximo dos decimales.'),
     ).toBeInTheDocument()
     expect(
-      screen.queryByText(
-        'Esta compra se mantiene dentro de tu dinero disponible actual.',
-      ),
+      screen.queryByText('Dentro de tu disponible.'),
     ).not.toBeInTheDocument()
   })
 
@@ -116,10 +110,12 @@ describe('PurchaseSimulatorPage', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Convertir en gasto' }),
     )
-    await user.type(screen.getByLabelText('Descripción'), 'Compra simulada')
-    await user.clear(screen.getByLabelText('Fecha'))
-    await user.type(screen.getByLabelText('Fecha'), '2026-07-20')
-    await user.click(screen.getByRole('button', { name: 'Revisar gasto' }))
+    await user.type(screen.getByLabelText(/Descripción/), 'Compra simulada')
+    await user.clear(screen.getByLabelText(/Fecha/))
+    await user.type(screen.getByLabelText(/Fecha/), '2026-07-20')
+    await user.click(
+      screen.getByRole('button', { name: 'Revisar y confirmar' }),
+    )
     expect(mocks.createExpense).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
     expect(mocks.createExpense).toHaveBeenCalledTimes(1)
@@ -140,20 +136,82 @@ describe('PurchaseSimulatorPage', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Convertir en gasto' }),
     )
-    await user.clear(screen.getByLabelText('Fecha'))
+    await user.clear(screen.getByLabelText(/Fecha/))
 
-    await user.click(screen.getByRole('button', { name: 'Revisar gasto' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Revisar y confirmar' }),
+    )
 
-    expect(screen.getByLabelText('Descripción')).toHaveAttribute(
+    expect(screen.getByLabelText(/Descripción/)).toHaveAttribute(
       'aria-describedby',
       'conversion-description-error',
     )
-    expect(screen.getByLabelText('Fecha')).toHaveAttribute(
+    expect(screen.getByLabelText(/Fecha/)).toHaveAttribute(
       'aria-describedby',
       'conversion-date-error',
     )
     expect(
       screen.queryByText(/Too small|Invalid string/i),
     ).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['within', 'Dentro del presupuesto disponible de la categoría.'],
+    ['exceeds', 'Supera el presupuesto disponible de la categoría.'],
+    [
+      'not_configured',
+      'No hay un presupuesto configurado para esta categoría.',
+    ],
+  ] as const)(
+    'presenta el resultado de presupuesto %s',
+    async (budgetFit, copy) => {
+      const user = userEvent.setup()
+      const { services } = createApplicationServicesMock()
+      services.simulator.simulatePurchase.execute = vi
+        .fn<typeof services.simulator.simulatePurchase.execute>()
+        .mockResolvedValue({
+          projectedAvailableBeforePurchase: 5000,
+          projectedAvailableAfterPurchase: 4000,
+          financialAffordability: 'within',
+          categoryBudgetBefore: budgetFit === 'not_configured' ? null : 1000,
+          categoryBudgetAfter:
+            budgetFit === 'not_configured'
+              ? null
+              : budgetFit === 'exceeds'
+                ? -9999
+                : 1,
+          budgetFit,
+          projectionCoverage: 'full_period',
+          projectionHorizonEnd: '2026-07-31',
+        })
+      renderSimulator(services)
+      await simulate(user)
+      expect(await screen.findByText(copy)).toBeInTheDocument()
+    },
+  )
+
+  it('presenta la clasificación autoritativa aunque los montos parezcan contradecirla', async () => {
+    const user = userEvent.setup()
+    const { services } = createApplicationServicesMock()
+    services.simulator.simulatePurchase.execute = vi
+      .fn<typeof services.simulator.simulatePurchase.execute>()
+      .mockResolvedValue({
+        projectedAvailableBeforePurchase: 1,
+        projectedAvailableAfterPurchase: -999999,
+        financialAffordability: 'within',
+        categoryBudgetBefore: 1,
+        categoryBudgetAfter: -999999,
+        budgetFit: 'within',
+        projectionCoverage: 'full_period',
+        projectionHorizonEnd: '2026-07-31',
+      })
+    renderSimulator(services)
+    await simulate(user)
+    expect(
+      await screen.findByText('Dentro de tu disponible.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Dentro del presupuesto disponible de la categoría.'),
+    ).toBeInTheDocument()
   })
 })

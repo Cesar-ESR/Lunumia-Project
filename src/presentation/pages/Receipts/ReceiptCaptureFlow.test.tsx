@@ -152,6 +152,15 @@ async function openEditing(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ReceiptCaptureFlow - selección y vista previa', () => {
+  it('explica el procesamiento remoto sin exponer proveedores', () => {
+    setup()
+    expect(screen.getByText('Privacidad del recibo')).toBeVisible()
+    expect(
+      screen.getByText(/imagen se envía temporalmente a un servicio remoto/i),
+    ).toBeVisible()
+    expect(screen.queryByText(/Supabase|Groq|Edge Function/i)).toBeNull()
+  })
+
   it('llama cámara y galería exactamente una vez desde sus acciones', async () => {
     const user = userEvent.setup()
     const { prepareImage } = setup()
@@ -251,6 +260,39 @@ describe('ReceiptCaptureFlow - selección y vista previa', () => {
 })
 
 describe('ReceiptCaptureFlow - OCR y resultados tardíos', () => {
+  it('sin conexión conserva la imagen y ofrece captura manual sin llamar OCR', async () => {
+    const user = userEvent.setup()
+    const { recognizeReceipt } = setup({
+      authStatus: 'offline-authenticated',
+    })
+    await openPreview(user)
+    await user.click(screen.getByRole('button', { name: 'Analizar recibo' }))
+    expect(recognizeReceipt).not.toHaveBeenCalled()
+    expect(
+      screen.getByText(/análisis del recibo necesita internet/i),
+    ).toBeVisible()
+    expect(
+      screen.getByAltText('Vista previa del recibo seleccionado'),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Registrar manualmente' }),
+    ).toBeEnabled()
+  })
+
+  it('anuncia que el recibo está listo para revisión sin mover el foco', async () => {
+    const user = userEvent.setup()
+    setup()
+    await openEditing(user)
+    expect(
+      screen.getByText(
+        'Recibo analizado. Revisa los datos antes de crear el gasto.',
+      ),
+    ).toHaveAttribute('role', 'status')
+    expect(
+      screen.getByRole('heading', { name: 'Datos del gasto' }),
+    ).not.toHaveFocus()
+  })
+
   it('llama OCR una vez y muestra estado aria-live durante el análisis', async () => {
     const user = userEvent.setup()
     const pending = deferred<ReceiptRecognitionProposal>()
@@ -629,6 +671,7 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
       amount: 12345,
       description: 'Mercado local',
       date: '2026-07-10',
+      affectsBalance: true,
     })
     expect(JSON.stringify(payload)).not.toMatch(
       /base64|preview|confidence|rawText/,

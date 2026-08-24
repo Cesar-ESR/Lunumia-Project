@@ -15,7 +15,9 @@ import type {
   UserSettings,
 } from '@domain/entities'
 import type { DashboardBudgetSummary } from '@application/use-cases/dashboard/GetDashboardBudgetSummary'
-import type { FinancialSnapshot } from '@domain/calculations'
+import type { FinancialSnapshotReadModel } from '@application/use-cases/dashboard/GetFinancialSnapshot'
+import type { ResourceUsageSummary } from '@application/use-cases/dashboard/GetResourceUsageSummary'
+import type { CategoryBudgetSummary } from '@application/use-cases/budgets/GetCategoryBudgetSummaries'
 
 export const OWNER_ID = 'guest:test-owner'
 export const PERIOD_ID = '11111111-1111-4111-8111-111111111111'
@@ -120,14 +122,27 @@ export const createDashboardBudgetSummaryMock = (
   overrides: Partial<DashboardBudgetSummary> = {},
 ): DashboardBudgetSummary => ({
   totalBudget: 100000,
+  spentCents: 35000,
   budgetRemaining: 65000,
+  configuredBudgetCount: 1,
   spendingPace: { spentPercentage: 35, timePercentage: 50, pace: 'low' },
   ...overrides,
 })
 
+export const createCategoryBudgetSummaryMock = (
+  overrides: Partial<CategoryBudgetSummary> = {},
+): CategoryBudgetSummary => ({
+  categoryId: CATEGORY_ID,
+  budgetCents: 60000,
+  spentCents: 12500,
+  remainingCents: 47500,
+  status: 'within',
+  ...overrides,
+})
+
 export const createFinancialSnapshotMock = (
-  overrides: Partial<FinancialSnapshot> = {},
-): FinancialSnapshot => ({
+  overrides: Partial<FinancialSnapshotReadModel> = {},
+): FinancialSnapshotReadModel => ({
   currentBalanceCents: 125000,
   spentCents: 25000,
   committedCents: 10000,
@@ -139,17 +154,32 @@ export const createFinancialSnapshotMock = (
   projectedClosingBalanceCents: 115000,
   projectionHorizonEnd: '2026-07-31',
   projectionCoverage: 'full_period',
+  resourceUsage: createResourceUsageSummaryMock(),
+  ...overrides,
+})
+
+export const createResourceUsageSummaryMock = (
+  overrides: Partial<ResourceUsageSummary> = {},
+): ResourceUsageSummary => ({
+  referenceAt: '2026-07-01T00:00:00.000Z',
+  resourceBaseCents: 150000,
+  spentCents: 25000,
+  currentAvailableCents: 125000,
+  canCalculatePercentage: true,
+  status: 'available',
   ...overrides,
 })
 
 export function createApplicationServicesMock({
   activePeriod = createPeriodMock(),
   budgetSummary = createDashboardBudgetSummaryMock(),
+  categoryBudgetSummaries = [createCategoryBudgetSummaryMock()],
   financialSnapshot = createFinancialSnapshotMock(),
 }: {
   activePeriod?: Period | null
   budgetSummary?: DashboardBudgetSummary
-  financialSnapshot?: FinancialSnapshot
+  categoryBudgetSummaries?: CategoryBudgetSummary[]
+  financialSnapshot?: FinancialSnapshotReadModel
 } = {}) {
   const category = createCategoryMock()
   const expense = createExpenseMock()
@@ -157,6 +187,12 @@ export function createApplicationServicesMock({
   const budget = createBudgetMock()
   const payment = createRecurringPaymentMock()
   const occurrence = createOccurrenceMock()
+  const recurringExpense = createExpenseMock({
+    description: payment.name,
+    amount: occurrence.amount,
+    date: occurrence.dueDate,
+    recurringOccurrenceId: occurrence.id,
+  })
   const anchor: BalanceAnchor = {
     id: '99999999-9999-4999-8999-999999999999',
     amount: 150000,
@@ -176,6 +212,11 @@ export function createApplicationServicesMock({
   const getBudgetSummary = vi
     .fn<ApplicationServices['dashboard']['getBudgetSummary']['execute']>()
     .mockResolvedValue(budgetSummary)
+  const getCategoryBudgetSummaries = vi
+    .fn<
+      ApplicationServices['budgets']['getCategoryBudgetSummaries']['execute']
+    >()
+    .mockResolvedValue(categoryBudgetSummaries)
   const getFinancialSnapshot = vi
     .fn<ApplicationServices['dashboard']['getFinancialSnapshot']['execute']>()
     .mockResolvedValue(financialSnapshot)
@@ -198,7 +239,7 @@ export function createApplicationServicesMock({
     >()
     .mockResolvedValue({
       occurrence: createOccurrenceMock({ status: 'paid' }),
-      expense,
+      expense: recurringExpense,
     })
   const services: ApplicationServices = {
     ownerId: OWNER_ID,
@@ -379,6 +420,9 @@ export function createApplicationServicesMock({
           >()
           .mockResolvedValue([budget]),
       },
+      getCategoryBudgetSummaries: {
+        execute: getCategoryBudgetSummaries,
+      },
     },
     recurringPayments: {
       createRecurringPayment: { execute: createRecurringPayment },
@@ -497,11 +541,16 @@ export function createApplicationServicesMock({
     externalUrls: {
       openExternalUrl: vi.fn(async () => undefined),
     },
+    backButton: {
+      subscribe: vi.fn(async () => async () => undefined),
+      exitApp: vi.fn(async () => undefined),
+    },
   }
   return {
     services,
     mocks: {
       getBudgetSummary,
+      getCategoryBudgetSummaries,
       getFinancialSnapshot,
       createExpense,
       prepareReceiptImage,

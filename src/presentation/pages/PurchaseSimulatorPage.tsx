@@ -1,26 +1,51 @@
 import { useCallback, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { Calculator, CircleAlert, WalletCards } from 'lucide-react'
+import type { ApplicationServices } from '../../app/composition-root'
 import { createExpenseSchema } from '@application/contracts'
 import { getLocalDateOnly } from '@shared/utils/date'
+import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { FormField } from '../components/FormField'
 import { LoadingState } from '../components/LoadingState'
+import { MetricBlock } from '../components/MetricBlock'
 import { MoneyDisplay } from '../components/MoneyDisplay'
+import { MoneyField } from '../components/MoneyField'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
+import { Surface } from '../components/Surface'
 import { useApplicationServices } from '../context/ApplicationServicesContext'
 import { usePeriod } from '../context/PeriodContext'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { friendlyError, zodFieldErrors, type FieldErrors } from '../utils/forms'
 import { parseMoneyInputToCents } from '../utils/money-input'
+import { projectionMetricState } from '../utils/projection-view-model'
+
+type PurchaseSimulation = Awaited<
+  ReturnType<ApplicationServices['simulator']['simulatePurchase']['execute']>
+>
+
+type ResultState =
+  | { status: 'idle'; data: null; error: null }
+  | { status: 'loading'; data: null; error: null }
+  | { status: 'success'; data: PurchaseSimulation; error: null }
+  | { status: 'error'; data: null; error: Error }
+
+const idleResult: ResultState = { status: 'idle', data: null, error: null }
 
 export function PurchaseSimulatorPage() {
   const services = useApplicationServices()
   const { activePeriod } = usePeriod()
+  const loadCategories = useCallback(
+    () => services.categories.listCategories.execute(),
+    [services],
+  )
+  const categories = useAsyncData(loadCategories)
   const [amountText, setAmountText] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [result, setResult] = useState<ResultState>(idleResult)
   const [showConversion, setShowConversion] = useState(false)
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(getLocalDateOnly())
@@ -32,32 +57,20 @@ export function PurchaseSimulatorPage() {
     message: string
   } | null>(null)
   const amount = parseMoneyInputToCents(amountText)
-  const load = useCallback(async () => {
-    const categories = await services.categories.listCategories.execute()
-    if (!activePeriod || amount === null || !categoryId)
-      return { categories, result: null }
-    const result = await services.simulator.simulatePurchase.execute({
-      period: activePeriod,
-      categoryId,
-      amount,
-    })
-    return { categories, result }
-  }, [activePeriod, amount, categoryId, services])
-  const simulation = useAsyncData(load)
 
   if (!activePeriod)
     return (
       <>
         <PageHeader
-          eyebrow="Decisión"
+          eyebrow="Herramientas"
           title="Simulador de compra"
-          description="Prueba el impacto de una compra sin guardar nada."
+          description="Evalúa una compra hipotética sin guardar nada."
         />
         <EmptyState
           title="Selecciona un periodo"
-          description="Necesitas un periodo activo para calcular tu dinero disponible."
+          description="Necesitas un periodo seleccionado para ejecutar la simulación."
           action={
-            <Link className="button" to="/periods">
+            <Link className="ln-button ln-button--primary" to="/plan/periodos">
               Administrar periodos
             </Link>
           }
@@ -69,13 +82,46 @@ export function PurchaseSimulatorPage() {
     amountText && amount === null
       ? 'Escribe un monto positivo con máximo dos decimales.'
       : undefined
-  const prepareConversion = () => {
+
+  const clearResult = () => {
+    setResult(idleResult)
+    setShowConversion(false)
+  }
+
+  const simulate = async (event: FormEvent) => {
+    event.preventDefault()
     const next: FieldErrors = {}
     if (amount === null) next.amount = 'Escribe un monto válido.'
     if (!categoryId) next.categoryId = 'Selecciona una categoría.'
     setErrors(next)
-    if (!Object.keys(next).length) setShowConversion(true)
+    setShowConversion(false)
+    if (Object.keys(next).length || amount === null) return
+    setResult({ status: 'loading', data: null, error: null })
+    try {
+      const data = await services.simulator.simulatePurchase.execute({
+        period: activePeriod,
+        categoryId,
+        amount,
+      })
+      setResult({ status: 'success', data, error: null })
+    } catch (reason) {
+      setResult({
+        status: 'error',
+        data: null,
+        error:
+          reason instanceof Error
+            ? reason
+            : new Error('No fue posible ejecutar la simulación.'),
+      })
+    }
   }
+
+  const prepareConversion = () => {
+    if (result.status !== 'success') return
+    setErrors({})
+    setShowConversion(true)
+  }
+
   const requestConversion = (event: FormEvent) => {
     event.preventDefault()
     const input = {
@@ -89,7 +135,7 @@ export function PurchaseSimulatorPage() {
     const parsed = createExpenseSchema.safeParse(input)
     const next = parsed.success ? {} : zodFieldErrors(parsed.error)
     if (date && (date < activePeriod.startDate || date > activePeriod.endDate))
-      next.date = 'La fecha debe estar dentro del periodo activo.'
+      next.date = 'La fecha debe estar dentro del periodo seleccionado.'
     if (Object.keys(next).length || !parsed.success) {
       setErrors(next)
       return
@@ -97,6 +143,7 @@ export function PurchaseSimulatorPage() {
     setErrors({})
     setConfirming(true)
   }
+
   const confirmConversion = async () => {
     const input = {
       ownerId: services.ownerId,
@@ -120,9 +167,10 @@ export function PurchaseSimulatorPage() {
       setAmountText('')
       setCategoryId('')
       setDescription('')
+      setResult(idleResult)
       setNotice({
         tone: 'success',
-        message: 'La simulación se convirtió en gasto.',
+        message: 'La compra revisada se guardó como gasto.',
       })
     } catch (reason) {
       setConfirming(false)
@@ -131,204 +179,281 @@ export function PurchaseSimulatorPage() {
       setIsPending(false)
     }
   }
-  const result = amount !== null && categoryId ? simulation.data?.result : null
+
   return (
     <>
       <PageHeader
-        eyebrow="Decisión"
+        eyebrow="Herramientas"
         title="Simulador de compra"
-        description="Explora el impacto antes de comprometer tu dinero."
+        description="Evalúa una compra hipotética con el resultado autoritativo de Lunumia. La simulación no guarda datos."
       />
       {notice ? <Notice {...notice} /> : null}
-      <div className="split-layout simulator-layout">
-        <section className="panel">
-          <h2>¿Qué quieres comprar?</h2>
-          <div className="stack-form">
-            <FormField
+      <div className="ln-simulator-layout">
+        <Surface
+          className="ln-simulator-form"
+          aria-labelledby="simulator-form-title"
+        >
+          <div className="ln-simulator-heading">
+            <Calculator aria-hidden="true" />
+            <div>
+              <p className="eyebrow">Compra hipotética</p>
+              <h2 id="simulator-form-title">Datos de la simulación</h2>
+            </div>
+          </div>
+          {Object.keys(errors).length && !showConversion ? (
+            <Notice
+              tone="error"
+              title="Revisa la simulación"
+              message="Corrige los campos indicados antes de continuar."
+            />
+          ) : null}
+          <form
+            className="stack-form"
+            onSubmit={(event) => void simulate(event)}
+            noValidate
+          >
+            <MoneyField
               id="simulation-amount"
               label="Monto de la compra"
-              error={errors.amount || amountError}
-            >
-              <input
-                id="simulation-amount"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={amountText}
-                aria-describedby={
-                  errors.amount || amountError
-                    ? 'simulation-amount-error'
-                    : undefined
-                }
-                onChange={(event) => {
-                  setAmountText(event.target.value)
-                  setErrors({ ...errors, amount: '' })
-                  setShowConversion(false)
-                }}
-              />
-            </FormField>
+              value={amountText}
+              error={amountError || errors.amount}
+              required
+              onChange={(event) => {
+                setAmountText(event.target.value)
+                setErrors({ ...errors, amount: '' })
+                clearResult()
+              }}
+            />
             <FormField
               id="simulation-category"
               label="Categoría"
               error={errors.categoryId}
+              required
             >
               <select
                 id="simulation-category"
                 value={categoryId}
-                aria-describedby={
-                  errors.categoryId ? 'simulation-category-error' : undefined
-                }
                 onChange={(event) => {
                   setCategoryId(event.target.value)
                   setErrors({ ...errors, categoryId: '' })
-                  setShowConversion(false)
+                  clearResult()
                 }}
               >
                 <option value="">Selecciona una categoría</option>
-                {simulation.data?.categories.map((category) => (
+                {categories.data?.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>
                 ))}
               </select>
             </FormField>
-          </div>
-        </section>
-        <section
-          className={`panel simulation-result ${result?.financialAffordability === 'exceeds' ? 'negative-result' : ''}`}
+            {categories.status === 'loading' && !categories.data ? (
+              <LoadingState message="Cargando categorías…" />
+            ) : null}
+            {categories.status === 'error' ? (
+              <ErrorState
+                title="No pudimos cargar las categorías"
+                message={categories.error.message}
+                onRetry={categories.refresh}
+              />
+            ) : null}
+            <Button
+              type="submit"
+              loading={result.status === 'loading'}
+              loadingLabel="Simulando…"
+              disabled={categories.status === 'error'}
+            >
+              Simular compra
+            </Button>
+          </form>
+        </Surface>
+
+        <Surface
+          className={`ln-simulator-result ${result.status === 'success' ? `ln-simulator-result--${result.data.financialAffordability}` : ''}`}
+          aria-labelledby="simulation-result-title"
           aria-live="polite"
+          aria-busy={result.status === 'loading'}
+          role="status"
         >
-          <h2>Resultado</h2>
-          {simulation.status === 'loading' && amount !== null && categoryId ? (
-            <LoadingState message="Calculando impacto…" />
-          ) : null}
-          {simulation.status === 'error' ? (
-            <ErrorState
-              message={simulation.error.message}
-              onRetry={simulation.refresh}
-            />
-          ) : null}
-          {!result ? (
+          <h2 id="simulation-result-title">Resultado</h2>
+          {result.status === 'idle' ? (
             <EmptyState
-              title="Completa la simulación"
-              description="Escribe un monto válido y elige una categoría para ver el resultado."
+              title="Aún no hay una simulación"
+              description="Completa los datos y elige “Simular compra”."
             />
-          ) : (
-            <>
-              <div className="simulation-grid">
-                <div>
-                  <span>Disponible proyectado actual</span>
-                  {result.projectedAvailableBeforePurchase === null ? (
-                    <strong>No configurado</strong>
-                  ) : (
-                    <MoneyDisplay
-                      amount={result.projectedAvailableBeforePurchase}
-                    />
-                  )}
-                </div>
-                <div>
-                  <span>Disponible después</span>
-                  {result.projectedAvailableAfterPurchase === null ? (
-                    <strong>No evaluable</strong>
-                  ) : (
-                    <MoneyDisplay
-                      amount={result.projectedAvailableAfterPurchase}
-                    />
-                  )}
-                </div>
-                <div>
-                  <span>Presupuesto antes</span>
-                  {result.categoryBudgetBefore === null ? (
-                    <strong>Sin presupuesto</strong>
-                  ) : (
-                    <MoneyDisplay amount={result.categoryBudgetBefore} />
-                  )}
-                </div>
-                <div>
-                  <span>Presupuesto después</span>
-                  {result.categoryBudgetAfter === null ? (
-                    <strong>No aplica</strong>
-                  ) : (
-                    <MoneyDisplay amount={result.categoryBudgetAfter} />
-                  )}
-                </div>
-              </div>
-              <p className="simulation-message">
-                {result.financialAffordability === 'unknown'
-                  ? 'Configura tu saldo para evaluar si esta compra cabe en tu dinero disponible.'
-                  : result.financialAffordability === 'exceeds'
-                    ? 'Esta compra dejaría tu dinero disponible en negativo.'
-                    : 'Esta compra se mantiene dentro de tu dinero disponible actual.'}
-              </p>
-              {result.projectionCoverage === 'overdue_only' ? (
-                <p>La proyección sólo considera compromisos vencidos.</p>
-              ) : null}
-              <button
-                type="button"
-                className="button"
-                onClick={prepareConversion}
-              >
-                Convertir en gasto
-              </button>
-            </>
-          )}
-        </section>
+          ) : null}
+          {result.status === 'loading' ? (
+            <LoadingState message="Evaluando la compra hipotética…" />
+          ) : null}
+          {result.status === 'error' ? (
+            <ErrorState
+              title="No pudimos ejecutar la simulación"
+              message={result.error.message}
+            />
+          ) : null}
+          {result.status === 'success' ? (
+            <SimulationResult
+              result={result.data}
+              onConvert={prepareConversion}
+            />
+          ) : null}
+        </Surface>
       </div>
+
       {showConversion ? (
-        <section className="panel conversion-panel">
-          <h2>Datos del gasto</h2>
+        <Surface
+          className="ln-simulator-conversion"
+          aria-labelledby="conversion-title"
+        >
+          <h2 id="conversion-title">Revisar datos del gasto</h2>
+          <p>
+            Esta etapa prepara un gasto, pero todavía no modifica tus datos.
+          </p>
+          {Object.keys(errors).length ? (
+            <Notice
+              tone="error"
+              title="Revisa el gasto"
+              message="Corrige los campos indicados antes de abrir la confirmación."
+            />
+          ) : null}
           <form className="form-grid" onSubmit={requestConversion} noValidate>
             <FormField
               id="conversion-description"
               label="Descripción"
               error={errors.description}
+              required
             >
               <input
                 id="conversion-description"
                 maxLength={200}
                 value={description}
-                aria-describedby={
-                  errors.description
-                    ? 'conversion-description-error'
-                    : undefined
-                }
                 onChange={(event) => setDescription(event.target.value)}
               />
             </FormField>
-            <FormField id="conversion-date" label="Fecha" error={errors.date}>
+            <FormField
+              id="conversion-date"
+              label="Fecha"
+              error={errors.date}
+              required
+            >
               <input
                 id="conversion-date"
                 type="date"
                 min={activePeriod.startDate}
                 max={activePeriod.endDate}
                 value={date}
-                aria-describedby={
-                  errors.date ? 'conversion-date-error' : undefined
-                }
                 onChange={(event) => setDate(event.target.value)}
               />
             </FormField>
-            <div className="form-actions full-row">
-              <button
-                type="button"
-                className="button ghost"
+            <div className="ln-form-actions full-row">
+              <Button
+                variant="secondary"
                 onClick={() => setShowConversion(false)}
               >
                 Cancelar
-              </button>
-              <button className="button">Revisar gasto</button>
+              </Button>
+              <Button type="submit">Revisar y confirmar</Button>
             </div>
           </form>
-        </section>
+        </Surface>
       ) : null}
+
       <ConfirmDialog
         open={confirming}
-        title="Convertir simulación en gasto"
-        description="Esta acción guardará un gasto real en el periodo activo. La simulación por sí sola no guarda datos."
+        title="Guardar compra como gasto"
+        description="Esta confirmación sí guardará un gasto real en el periodo seleccionado. La simulación por sí sola no modifica datos."
         confirmLabel="Guardar gasto"
         isPending={isPending}
         onCancel={() => setConfirming(false)}
         onConfirm={() => void confirmConversion()}
       />
     </>
+  )
+}
+
+function SimulationResult({
+  result,
+  onConvert,
+}: {
+  result: PurchaseSimulation
+  onConvert(): void
+}) {
+  const financialCopy = {
+    within: 'Dentro de tu disponible.',
+    exceeds: 'Dejaría tu disponible en negativo.',
+    unknown: 'No podemos evaluarla hasta conocer tu saldo.',
+  }[result.financialAffordability]
+  const budgetCopy = {
+    within: 'Dentro del presupuesto disponible de la categoría.',
+    exceeds: 'Supera el presupuesto disponible de la categoría.',
+    not_configured: 'No hay un presupuesto configurado para esta categoría.',
+  }[result.budgetFit]
+
+  return (
+    <div className="ln-simulator-result-content">
+      <div className="ln-simulator-verdict">
+        <CircleAlert aria-hidden="true" />
+        <strong>{financialCopy}</strong>
+      </div>
+      <div className="ln-simulator-metrics">
+        <MetricBlock
+          label="Disponible proyectado actual"
+          value={
+            result.projectedAvailableBeforePurchase === null ? (
+              'No calculable'
+            ) : (
+              <MoneyDisplay amount={result.projectedAvailableBeforePurchase} />
+            )
+          }
+          state={projectionMetricState(result.projectedAvailableBeforePurchase)}
+        />
+        <MetricBlock
+          variant="primary"
+          label="Disponible después de la compra"
+          value={
+            result.projectedAvailableAfterPurchase === null ? (
+              'No calculable'
+            ) : (
+              <MoneyDisplay amount={result.projectedAvailableAfterPurchase} />
+            )
+          }
+          state={projectionMetricState(result.projectedAvailableAfterPurchase)}
+        />
+        <MetricBlock
+          label="Presupuesto antes"
+          value={
+            result.categoryBudgetBefore === null ? (
+              'Sin presupuesto'
+            ) : (
+              <MoneyDisplay amount={result.categoryBudgetBefore} />
+            )
+          }
+          state={projectionMetricState(result.categoryBudgetBefore)}
+        />
+        <MetricBlock
+          label="Presupuesto después"
+          value={
+            result.categoryBudgetAfter === null ? (
+              'No aplica'
+            ) : (
+              <MoneyDisplay amount={result.categoryBudgetAfter} />
+            )
+          }
+          state={projectionMetricState(result.categoryBudgetAfter)}
+        />
+      </div>
+      <p className="ln-simulator-budget-copy">
+        <WalletCards aria-hidden="true" /> {budgetCopy}
+      </p>
+      {result.projectionCoverage === 'overdue_only' ? (
+        <p>La proyección disponible sólo cubre compromisos vencidos.</p>
+      ) : null}
+      {result.financialAffordability === 'unknown' ? (
+        <Link className="ln-button ln-button--secondary" to="/saldo/inicial">
+          Indicar saldo actual
+        </Link>
+      ) : null}
+      <Button onClick={onConvert}>Convertir en gasto</Button>
+    </div>
   )
 }

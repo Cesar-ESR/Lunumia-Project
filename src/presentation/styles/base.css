@@ -1,0 +1,110 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 100%;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-line);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.18em;
+}
+
+a:not([class]) {
+  color: var(--text-link);
+}
+
+a:not([class]):hover {
+  color: var(--brand-primary-hover);
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+img,
+video {
+  height: auto;
+}
+
+[hidden] {
+  display: none;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+h1 {
+  font-size: var(--text-h1-size);
+  font-weight: 650;
+  line-height: var(--text-h1-line);
+}
+
+h2 {
+  font-size: var(--text-h2-size);
+  font-weight: 650;
+  line-height: var(--text-h2-line);
+}
+
+h3 {
+  font-size: var(--text-h3-size);
+  font-weight: 650;
+  line-height: var(--text-h3-line);
+}
+
+:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 calc(var(--focus-width) * 2) var(--focus-ring);
+}
+
+::selection {
+  color: var(--color-text-primary);
+  background: var(--color-brand-subtle);
+}
+
+@media (max-width: 599px) {
+  :root {
+    --text-h1-size: 1.75rem;
+    --text-h1-line: 2.125rem;
+    --text-money-primary-size: 2rem;
+    --text-money-primary-line: 2.25rem;
+  }
+}

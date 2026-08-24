@@ -9,17 +9,24 @@ import {
   CategorySuggestionResponseSchema,
   parseExplainChangesRequest,
   parsePeriodSummaryRequest,
+  parsePlanningAnalysisRequest,
   parseSuggestCategoryRequest,
   PeriodSummaryResponseSchema,
+  PlanningAnalysisResponseSchema,
 } from './contracts.ts'
 import { AIInsightsFunctionError } from './errors.ts'
 import type { AIProvider } from './providers/AIProvider.ts'
 
-type AIRoute = 'suggest-category' | 'period-summary' | 'explain-changes'
+type AIRoute =
+  | 'suggest-category'
+  | 'period-summary'
+  | 'explain-changes'
+  | 'planning-analysis'
 const routes = new Set<AIRoute>([
   'suggest-category',
   'period-summary',
   'explain-changes',
+  'planning-analysis',
 ])
 
 export interface AIInsightsDependencies {
@@ -137,6 +144,17 @@ async function executeRoute(
       provider.generatePeriodSummary(input, signal),
     )
     const parsed = PeriodSummaryResponseSchema.safeParse(result)
+    if (!parsed.success)
+      throw new AIInsightsFunctionError('invalid_provider_response')
+    return parsed.data
+  }
+
+  if (route === 'planning-analysis') {
+    const input = parsePlanningAnalysisRequest(body)
+    const result = await withProviderTimeout(timeoutMs, (signal) =>
+      provider.analyzePlanning(input, signal),
+    )
+    const parsed = PlanningAnalysisResponseSchema.safeParse(result)
     if (!parsed.success)
       throw new AIInsightsFunctionError('invalid_provider_response')
     return parsed.data

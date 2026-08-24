@@ -1,15 +1,20 @@
 import { useCallback, useMemo, useState } from 'react'
+import { Sparkles } from 'lucide-react'
+import { Button } from '../components/Button'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { LoadingState } from '../components/LoadingState'
 import { MoneyDisplay } from '../components/MoneyDisplay'
+import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
+import { Surface } from '../components/Surface'
 import { useApplicationServices } from '../context/ApplicationServicesContext'
 import { useAuth } from '../context/AuthContext'
 import { usePeriod } from '../context/PeriodContext'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { useAIAvailability } from '../hooks/useAIAvailability'
 import { useCategoryChangeExplanations } from '../hooks/useCategoryChangeExplanations'
+import { formatCompactDate } from '../utils/movement-view-model'
 
 export function InsightsPage() {
   const services = useApplicationServices()
@@ -32,6 +37,9 @@ export function InsightsPage() {
     return previous?.id ?? comparisonPeriods[0]?.id ?? ''
   }, [activePeriod?.startDate, comparisonPeriods, selectedComparisonPeriodId])
 
+  const comparisonPeriod = comparisonPeriods.find(
+    ({ id }) => id === comparisonPeriodId,
+  )
   const load = useCallback(async () => {
     if (!activePeriod || !comparisonPeriodId) return []
     return services.aiData.prepareCategoryChanges.execute(
@@ -54,26 +62,28 @@ export function InsightsPage() {
     return (
       <>
         <PageHeader
-          eyebrow="Comparación"
-          title="Insights por categoría"
-          description="Compara cifras calculadas localmente entre periodos."
+          eyebrow="Herramientas"
+          title="Análisis"
+          description="Compara actividad histórica calculada por Lunumia."
         />
         <EmptyState
           title="Selecciona un periodo"
-          description="Necesitas un periodo activo para comparar tus gastos."
+          description="Necesitas un periodo seleccionado para analizar su actividad."
         />
       </>
     )
 
+  const periodDescription = `${formatCompactDate(activePeriod.startDate)} — ${formatCompactDate(activePeriod.endDate)}`
+
   return (
     <>
       <PageHeader
-        eyebrow="Comparación"
-        title="Insights por categoría"
-        description="Las cifras se calculan localmente; el texto inteligente es opcional."
+        eyebrow="Herramientas"
+        title="Análisis"
+        description={`Periodo analizado: ${periodDescription}`}
         actions={
           comparisonPeriods.length ? (
-            <label className="compact-field">
+            <label className="compact-field ln-analysis-period-selector">
               <span>Comparar con</span>
               <select
                 value={comparisonPeriodId}
@@ -81,7 +91,8 @@ export function InsightsPage() {
               >
                 {comparisonPeriods.map((period) => (
                   <option key={period.id} value={period.id}>
-                    {period.startDate} — {period.endDate}
+                    {formatCompactDate(period.startDate)} —{' '}
+                    {formatCompactDate(period.endDate)}
                   </option>
                 ))}
               </select>
@@ -89,6 +100,7 @@ export function InsightsPage() {
           ) : null
         }
       />
+
       {!comparisonPeriods.length ? (
         <EmptyState
           title="Falta otro periodo"
@@ -96,88 +108,57 @@ export function InsightsPage() {
         />
       ) : null}
       {changesState.status === 'loading' && !changesState.data ? (
-        <LoadingState message="Calculando cambios localmente…" />
+        <LoadingState variant="skeleton" message="Calculando la comparación…" />
       ) : null}
       {changesState.status === 'error' ? (
         <ErrorState
+          title="No pudimos calcular la comparación"
           message={changesState.error.message}
           onRetry={changesState.refresh}
         />
       ) : null}
-      {changesState.status === 'success' && changes.length === 0 ? (
+      {comparisonPeriods.length > 0 &&
+      changesState.status === 'success' &&
+      changes.length === 0 ? (
         <EmptyState
-          title="Sin movimientos para comparar"
-          description="Registra gastos en alguno de los periodos para ver cambios."
+          title="Aún no hay suficiente actividad para analizar este periodo"
+          description="Registra gastos en alguno de los periodos para ver cambios. No solicitaremos una explicación con un conjunto vacío."
         />
       ) : null}
+
       {changes.length ? (
-        <section
-          className="ai-insights-section"
-          aria-labelledby="changes-title"
-        >
-          <div className="ai-section-header">
-            <div>
-              <p className="eyebrow">Cifras locales</p>
-              <h2 id="changes-title">Cambios por categoría</h2>
+        <div className="ln-analysis-flow">
+          <section aria-labelledby="analysis-facts-title">
+            <div className="ln-section-heading">
+              <div>
+                <p className="eyebrow">Datos de Lunumia</p>
+                <h2 id="analysis-facts-title">Cambios calculados</h2>
+                <p>
+                  Comparación con{' '}
+                  {comparisonPeriod
+                    ? `${formatCompactDate(comparisonPeriod.startDate)} — ${formatCompactDate(comparisonPeriod.endDate)}`
+                    : 'el periodo de referencia'}
+                  .
+                </p>
+              </div>
             </div>
-            {canUseAI ? (
-              <button
-                type="button"
-                className="button secondary"
-                disabled={ai.status === 'loading'}
-                onClick={() => void ai.generate()}
-              >
-                {ai.status === 'loading'
-                  ? 'Generando…'
-                  : 'Generar explicaciones'}
-              </button>
-            ) : null}
-          </div>
-          {!canUseAI ? (
-            <p className="ai-disclaimer">
-              Las explicaciones inteligentes están disponibles al iniciar sesión
-              y tener conexión. La comparación local sigue funcionando.
-            </p>
-          ) : (
-            <p className="ai-disclaimer">
-              Las explicaciones son texto generado y no constituyen asesoría
-              financiera.
-            </p>
-          )}
-          {ai.status === 'loading' ? (
-            <p className="ai-loading" role="status">
-              Generando únicamente el texto explicativo…
-            </p>
-          ) : null}
-          {ai.message ? (
-            <div className="ai-error" role="alert">
-              <p>{ai.message}</p>
-              {ai.status !== 'rate_limited' ? (
-                <button
-                  type="button"
-                  className="button ghost"
-                  onClick={() => void ai.generate()}
+            <div className="ln-analysis-facts-grid">
+              {changes.map((change) => (
+                <Surface
+                  as="article"
+                  className="ln-analysis-fact"
+                  key={change.categoryId}
                 >
-                  Reintentar
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="insights-grid">
-            {changes.map((change) => {
-              const explanation = ai.explanations.get(change.categoryId)
-              return (
-                <article className="insight-card" key={change.categoryId}>
                   <h3>{change.categoryName}</h3>
                   <dl>
                     <div>
-                      <dt>Periodo actual</dt>
+                      <dt>Periodo analizado</dt>
                       <dd>
                         <MoneyDisplay amount={change.currentAmount} />
                       </dd>
                     </div>
                     <div>
-                      <dt>Periodo anterior</dt>
+                      <dt>Periodo comparado</dt>
                       <dd>
                         <MoneyDisplay amount={change.previousAmount} />
                       </dd>
@@ -197,20 +178,86 @@ export function InsightsPage() {
                       </dd>
                     </div>
                   </dl>
-                  <div className="ai-explanation">
-                    <span className="ai-label">Explicación inteligente</span>
+                </Surface>
+              ))}
+            </div>
+          </section>
+
+          <Surface
+            className="ln-analysis-ai"
+            aria-labelledby="analysis-ai-title"
+            aria-busy={ai.status === 'loading'}
+          >
+            <div className="ln-analysis-ai__heading">
+              <Sparkles aria-hidden="true" />
+              <div>
+                <p className="eyebrow">Contenido opcional</p>
+                <h2 id="analysis-ai-title">Explicación con IA</h2>
+              </div>
+            </div>
+            <p>
+              Esta explicación no modifica tus datos ni sustituye tus
+              decisiones.
+            </p>
+            <p className="ln-analysis-ai__privacy">
+              Para generarla se envía un resumen de los datos necesarios a un
+              servicio remoto.
+            </p>
+            {canUseAI ? (
+              <Button
+                variant="secondary"
+                loading={ai.status === 'loading'}
+                loadingLabel="Generando explicación…"
+                onClick={() => void ai.generate()}
+              >
+                {ai.status === 'success'
+                  ? 'Generar de nuevo'
+                  : 'Solicitar explicación'}
+              </Button>
+            ) : (
+              <Notice
+                tone="info"
+                message="La explicación con IA requiere una cuenta con sesión y conexión. Los datos calculados permanecen disponibles."
+              />
+            )}
+            {ai.status === 'loading' ? (
+              <LoadingState message="Generando únicamente la explicación…" />
+            ) : null}
+            {ai.message ? (
+              <Notice
+                tone="warning"
+                title="No pudimos generar la explicación"
+                message={ai.message}
+                action={
+                  ai.status !== 'rate_limited' ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => void ai.generate()}
+                    >
+                      Reintentar explicación
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : null}
+            {ai.status === 'success' ? (
+              <div
+                className="ln-analysis-ai-results"
+                aria-label="Contenido generado por IA"
+              >
+                {changes.map((change) => (
+                  <article key={change.categoryId}>
+                    <h3>{change.categoryName}</h3>
                     <p>
-                      {explanation ??
-                        (ai.status === 'success'
-                          ? 'No se recibió una explicación para esta categoría.'
-                          : 'Genera explicaciones si deseas contexto textual adicional.')}
+                      {ai.explanations.get(change.categoryId) ??
+                        'No se recibió una explicación para esta categoría.'}
                     </p>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </section>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </Surface>
+        </div>
       ) : null}
     </>
   )

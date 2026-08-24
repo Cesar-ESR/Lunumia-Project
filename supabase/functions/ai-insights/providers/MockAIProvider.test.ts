@@ -46,6 +46,18 @@ const changesInput = {
     },
   ],
 }
+const planningInput = {
+  context: 'planning' as const,
+  facts: {
+    currentBalanceCents: 100_000,
+    committedCents: 22_222,
+    expectedIncomeCents: 33_333,
+    projectedAvailableCents: 77_777,
+    projectedClosingBalanceCents: -12_345,
+    projectionCoverage: 'overdue_only' as const,
+    projectionHorizonEnd: '2026-08-31',
+  },
+}
 
 describe('MockAIProvider configurable', () => {
   it('es determinista, permite extremos de confianza y null', async () => {
@@ -129,11 +141,13 @@ describe('MockAIProvider configurable', () => {
     await provider.suggestCategory(suggestionInput, signal)
     await provider.generatePeriodSummary(summaryInput, signal)
     await provider.explainCategoryChanges(changesInput, signal)
+    await provider.analyzePlanning(planningInput, signal)
 
     expect(provider.calls.map(({ method }) => method)).toEqual([
       'suggestCategory',
       'generatePeriodSummary',
       'explainCategoryChanges',
+      'analyzePlanning',
     ])
     expect(provider.callCount('suggestCategory')).toBe(1)
     expect(provider.calls[0]?.payload).toEqual({
@@ -143,6 +157,11 @@ describe('MockAIProvider configurable', () => {
     expect(provider.calls[1]?.payload).toMatchObject({
       context: 'historical',
       periodType: 'monthly',
+    })
+    expect(provider.calls[3]?.payload).toEqual({
+      context: 'planning',
+      projectionCoverage: 'overdue_only',
+      hasHorizon: 1,
     })
     const audit = JSON.stringify(provider.calls)
     expect(audit).not.toContain(suggestionInput.description)

@@ -171,6 +171,11 @@ function providerReturning(text: string): AIInsightsProvider {
     suggestCategory: async () => null,
     generatePeriodSummary: async () => ({ text, highlights: [] }),
     explainCategoryChanges: async () => [],
+    analyzePlanning: async () => ({
+      summary: text,
+      observations: [],
+      considerations: [],
+    }),
   }
 }
 
@@ -182,5 +187,6 @@ function providerFailing(): AIInsightsProvider {
     suggestCategory: unavailable,
     generatePeriodSummary: unavailable,
     explainCategoryChanges: unavailable,
+    analyzePlanning: unavailable,
   }
 }

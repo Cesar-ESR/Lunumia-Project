@@ -45,6 +45,11 @@ describe('InMemoryRateLimiter', () => {
       suggestCategory: async () => null,
       generatePeriodSummary: async () => ({ text: 'Resumen', highlights: [] }),
       explainCategoryChanges: async () => [],
+      analyzePlanning: async () => ({
+        summary: 'Explicación',
+        observations: [],
+        considerations: [],
+      }),
     }
     const handler = createAIInsightsHandler({
       allowedOrigins: ['http://localhost:5173'],

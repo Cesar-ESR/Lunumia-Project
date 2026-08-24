@@ -7,6 +7,8 @@ export type AIErrorPresentation = {
 const messages: Record<string, string> = {
   unauthenticated: 'Necesitas iniciar sesión para utilizar esta función.',
   invalid_request: 'No pudimos preparar los datos para esta función.',
+  insufficient_planning_context:
+    'La proyección todavía no tiene todos los datos necesarios para explicarse.',
   description_too_long: 'La descripción es demasiado larga para esta función.',
   too_many_categories: 'Hay demasiadas categorías para procesar.',
   rate_limited: 'Alcanzaste temporalmente el límite de funciones inteligentes.',

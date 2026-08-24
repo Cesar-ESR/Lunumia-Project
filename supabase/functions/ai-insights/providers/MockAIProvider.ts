@@ -5,6 +5,8 @@ import type {
   ExplainChangesInput,
   PeriodSummaryInput,
   PeriodSummaryOutput,
+  PlanningAnalysisInput,
+  PlanningAnalysisOutput,
   SuggestCategoryInput,
 } from '../contracts.ts'
 import type { AIProvider } from './AIProvider.ts'
@@ -15,6 +17,7 @@ export interface MockAIProviderOptions {
   categorySuggestion?: CategorySuggestionOutput
   periodSummary?: PeriodSummaryOutput
   categoryExplanations?: CategoryChangeExplanationsOutput
+  planningAnalysis?: PlanningAnalysisOutput
 }
 
 export type MockAIProviderFailure =
@@ -26,7 +29,10 @@ export type MockAIProviderFailure =
   | 'unknown'
 
 export type MockAIProviderMethod =
-  'suggestCategory' | 'generatePeriodSummary' | 'explainCategoryChanges'
+  | 'suggestCategory'
+  | 'generatePeriodSummary'
+  | 'explainCategoryChanges'
+  | 'analyzePlanning'
 
 export interface MockAIProviderCall {
   method: MockAIProviderMethod
@@ -100,6 +106,27 @@ export class MockAIProvider implements AIProvider {
       categoryId,
       explanation: `El cambio de ${categoryName} refleja los datos comparados.`,
     }))
+  }
+
+  async analyzePlanning(
+    input: PlanningAnalysisInput,
+    signal: AbortSignal,
+  ): Promise<PlanningAnalysisOutput> {
+    this.record('analyzePlanning', {
+      context: input.context,
+      projectionCoverage: input.facts.projectionCoverage,
+      hasHorizon: input.facts.projectionHorizonEnd === null ? 0 : 1,
+    })
+    await this.beforeResponse(signal)
+    if (this.options.planningAnalysis) return this.options.planningAnalysis
+    return {
+      summary: 'La explicación usa únicamente la proyección proporcionada.',
+      observations: ['Los importes corresponden a hechos ya calculados.'],
+      considerations:
+        input.facts.projectionCoverage === 'overdue_only'
+          ? ['La cobertura se limita a compromisos vencidos.']
+          : [],
+    }
   }
 
   private async beforeResponse(signal: AbortSignal): Promise<void> {

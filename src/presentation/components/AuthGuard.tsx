@@ -14,5 +14,11 @@ export function AuthGuard({ allowGuest = false }: { allowGuest?: boolean }) {
     (auth.status === 'revalidating' && auth.user !== null)
   )
     return <Outlet />
-  return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  return (
+    <Navigate
+      to="/login"
+      replace
+      state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+    />
+  )
 }
