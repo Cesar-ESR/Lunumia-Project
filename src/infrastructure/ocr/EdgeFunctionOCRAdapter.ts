@@ -56,6 +56,7 @@ export class EdgeFunctionOCRAdapter implements ReceiptRecognitionProvider {
           body: {
             imageBase64: input.imageBase64,
             mimeType: input.mimeType,
+            responseVersion: 2,
           },
         },
       )

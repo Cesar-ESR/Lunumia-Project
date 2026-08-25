@@ -61,6 +61,45 @@ const topExpenseSchema = z
   })
   .strict()
 
+const legacyCategoryBreakdownSchema = z
+  .object({
+    categoryId: z.string().uuid(),
+    categoryName: z.string().trim().min(1).max(AI_LIMITS.categoryName),
+    total: amountCentsSchema,
+    percentage: z.number().finite(),
+  })
+  .strict()
+
+const legacyTopExpenseSchema = z
+  .object({
+    description: z.string().trim().min(1).max(AI_LIMITS.topExpenseDescription),
+    amount: amountCentsSchema,
+  })
+  .strict()
+
+export const LegacyPeriodSummaryRequestSchema = z
+  .object({
+    aggregatedData: z
+      .object({
+        totalIncome: amountCentsSchema,
+        totalExpenses: amountCentsSchema,
+        categoryBreakdown: z
+          .array(legacyCategoryBreakdownSchema)
+          .max(AI_LIMITS.categories)
+          .refine(uniqueCategoryIds),
+        topExpenses: z
+          .array(legacyTopExpenseSchema)
+          .max(AI_LIMITS.topExpenses)
+          .optional(),
+        periodType: z.enum(['monthly', 'biweekly']),
+        startDate: dateOnlySchema,
+        endDate: dateOnlySchema,
+      })
+      .strict()
+      .refine(({ startDate, endDate }) => startDate <= endDate),
+  })
+  .strict()
+
 export const HistoricalAnalysisRequestSchema = z
   .object({
     context: z.literal('historical'),
@@ -165,6 +204,9 @@ export const CategoryChangeExplanationsResponseSchema = z
 
 export type SuggestCategoryInput = z.infer<typeof SuggestCategoryRequestSchema>
 export type PeriodSummaryInput = z.infer<typeof PeriodSummaryRequestSchema>
+export type LegacyPeriodSummaryInput = z.infer<
+  typeof LegacyPeriodSummaryRequestSchema
+>
 export type PlanningAnalysisInput = z.infer<
   typeof PlanningAnalysisRequestSchema
 >
@@ -193,10 +235,43 @@ export function parseSuggestCategoryRequest(value: unknown) {
 }
 
 export function parsePeriodSummaryRequest(value: unknown) {
-  if (isRecord(value) && isRecord(value.facts)) {
+  if (isRecord(value) && isRecord(value.facts))
     guardCategoryLimit(value.facts, 'categoryBreakdown')
-  }
-  return parseRequest(PeriodSummaryRequestSchema, value)
+  if (isRecord(value) && isRecord(value.aggregatedData))
+    guardCategoryLimit(value.aggregatedData, 'categoryBreakdown')
+
+  const canonical = HistoricalAnalysisRequestSchema.safeParse(value)
+  if (canonical.success) return canonical.data
+
+  const legacy = LegacyPeriodSummaryRequestSchema.safeParse(value)
+  if (!legacy.success) throw new AIInsightsFunctionError('invalid_request')
+  return normalizeLegacyPeriodSummaryRequest(legacy.data)
+}
+
+export function normalizeLegacyPeriodSummaryRequest(
+  legacy: LegacyPeriodSummaryInput,
+): PeriodSummaryInput {
+  const data = legacy.aggregatedData
+  return HistoricalAnalysisRequestSchema.parse({
+    context: 'historical',
+    facts: {
+      receivedIncomeCents: data.totalIncome,
+      expenseCents: data.totalExpenses,
+      categoryBreakdown: data.categoryBreakdown.map((category) => ({
+        categoryId: category.categoryId,
+        categoryName: category.categoryName,
+        totalCents: category.total,
+        percentage: category.percentage,
+      })),
+      topExpenses: data.topExpenses?.map((expense) => ({
+        description: expense.description,
+        amountCents: expense.amount,
+      })),
+      periodType: data.periodType,
+      startDate: data.startDate,
+      endDate: data.endDate,
+    },
+  })
 }
 
 export function parsePlanningAnalysisRequest(

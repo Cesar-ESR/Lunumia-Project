@@ -1,8 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import {
-  readAllowedOrigins,
-  readProviderTimeout,
-} from '../_shared/environment.ts'
+import { readProviderTimeout } from '../_shared/environment.ts'
+import { readConfiguredAllowedOrigins } from '../_shared/cors-environment.ts'
 import { PostgresRateLimiter } from '../_shared/distributed-rate-limiter.ts'
 import { createAIProvider } from './providers/ProviderFactory.ts'
 import { createAIInsightsHandler } from './router.ts'
@@ -17,10 +15,10 @@ const groqApiKey = Deno.env.get('GROQ_API_KEY') ?? ''
 const groqModel = Deno.env.get('GROQ_MODEL') ?? ''
 const runtimeEnvironment = Deno.env.get('AI_ENVIRONMENT') ?? 'production'
 const timeoutMs = readProviderTimeout(Deno.env.get('AI_TIMEOUT_MS'))
-const allowedOrigins = readAllowedOrigins([
-  Deno.env.get('ALLOWED_ORIGIN'),
+const allowedOrigins = readConfiguredAllowedOrigins(
   Deno.env.get('ALLOWED_ORIGINS'),
-])
+  Deno.env.get('ALLOWED_ORIGIN'),
+)
 
 if (!supabaseUrl || !publishableKey)
   throw new Error(

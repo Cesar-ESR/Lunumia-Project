@@ -2,6 +2,7 @@
 node_modules/
 .pnpm-store/
 dist/
+dist-landing/
 android/.gradle/
 android/**/build/
 
@@ -21,4 +22,3 @@ supabase/.temp/
 .vscode/
 .DS_Store
 Thumbs.db
-

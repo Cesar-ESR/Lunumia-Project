@@ -10,6 +10,10 @@ import {
   type DistributedRateLimiter,
 } from '../_shared/distributed-rate-limiter.ts'
 import { createAIInsightsHandler } from './router.ts'
+import {
+  parseProductionV1PeriodSummaryResponse,
+  ProductionV1PeriodSummaryRequestSchema,
+} from '../compatibility/production-v1-contracts.ts'
 
 const categoryId = '11111111-1111-4111-8111-111111111111'
 const token = 'secret-jwt-that-must-not-be-logged'
@@ -34,6 +38,24 @@ const summaryBody = {
     ],
     topExpenses: [{ description: 'Hamburguesa', amountCents: 12_000 }],
     periodType: 'monthly',
+    startDate: '2026-08-01',
+    endDate: '2026-08-31',
+  },
+}
+const legacySummaryBody = {
+  aggregatedData: {
+    totalIncome: 700_000,
+    totalExpenses: 21_300,
+    categoryBreakdown: [
+      {
+        categoryId,
+        categoryName: 'Comida',
+        total: 14_000,
+        percentage: 65.73,
+      },
+    ],
+    topExpenses: [{ description: 'Hamburguesa', amount: 12_000 }],
+    periodType: 'monthly' as const,
     startDate: '2026-08-01',
     endDate: '2026-08-31',
   },
@@ -92,6 +114,7 @@ function createHandler(options?: {
   timeoutMs?: number
   rateLimiter?: InMemoryRateLimiter | DistributedRateLimiter
   now?: () => number
+  allowedOrigins?: readonly string[]
 }) {
   const provider = options?.provider ?? createProvider()
   const createProviderDependency = vi.fn(() => provider)
@@ -108,7 +131,7 @@ function createHandler(options?: {
     createProviderDependency,
     rateLimiter: configuredLimiter,
     handler: createAIInsightsHandler({
-      allowedOrigins: readAllowedOrigins([]),
+      allowedOrigins: options?.allowedOrigins ?? readAllowedOrigins([]),
       timeoutMs: options?.timeoutMs ?? 1_000,
       rateLimiter,
       now,
@@ -170,6 +193,39 @@ describe('ai-insights router', () => {
     )
     expect(response.status).toBe(204)
     expectCors(response, capacitorOrigin)
+  })
+
+  it.each([
+    'https://lunumia.com',
+    'https://www.lunumia.com',
+    'https://app.lunumia.com',
+  ])('33.prod OPTIONS permite %s cuando está configurado', async (origin) => {
+    const { handler } = createHandler({
+      allowedOrigins: [origin],
+    })
+    const response = await handler(
+      request('suggest-category', null, { method: 'OPTIONS', origin }),
+    )
+    expect(response.status).toBe(204)
+    expectCors(response, origin)
+  })
+
+  it('33.prod rechaza un origen malicioso no configurado', async () => {
+    const { handler } = createHandler({
+      allowedOrigins: [
+        'https://lunumia.com',
+        'https://www.lunumia.com',
+        'https://app.lunumia.com',
+      ],
+    })
+    const response = await handler(
+      request('suggest-category', null, {
+        method: 'OPTIONS',
+        origin: 'https://evil.example',
+      }),
+    )
+    expect(response.status).toBe(403)
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull()
   })
 
   it('33.b OPTIONS declara headers y métodos requeridos por supabase-js', async () => {
@@ -367,6 +423,25 @@ describe('ai-insights router', () => {
     expect(provider.generatePeriodSummary).toHaveBeenCalledOnce()
     expect(provider.suggestCategory).not.toHaveBeenCalled()
     expect(provider.explainCategoryChanges).not.toHaveBeenCalled()
+  })
+
+  it('41.legacy golden: frontend de producción pasa por Edge y su parser exacto', async () => {
+    const { handler, provider } = createHandler()
+    const productionRequest =
+      ProductionV1PeriodSummaryRequestSchema.parse(legacySummaryBody)
+
+    const response = await handler(request('period-summary', productionRequest))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(parseProductionV1PeriodSummaryResponse(body)).toEqual({
+      text: 'Resumen',
+      highlights: [],
+    })
+    expect(provider.generatePeriodSummary).toHaveBeenCalledWith(
+      summaryBody,
+      expect.any(AbortSignal),
+    )
   })
 
   it('41.a acepta AmountCents y entrega a Groq solo importes display', async () => {

@@ -1,6 +1,7 @@
 export type OCRFunctionErrorCode =
   | 'unauthenticated'
   | 'invalid_image'
+  | 'unsupported_response_version'
   | 'payload_too_large'
   | 'provider_timeout'
   | 'provider_unavailable'
@@ -15,6 +16,10 @@ const errorDetails: Record<
 > = {
   unauthenticated: { status: 401, message: 'No autorizado.' },
   invalid_image: { status: 400, message: 'La imagen no es válida.' },
+  unsupported_response_version: {
+    status: 400,
+    message: 'La versión de respuesta solicitada no es compatible.',
+  },
   payload_too_large: { status: 413, message: 'La imagen es demasiado grande.' },
   provider_timeout: {
     status: 504,

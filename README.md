@@ -93,6 +93,17 @@ variables públicas requeridas. Después inicia Vite:
 pnpm dev
 ```
 
+La landing pública es un proyecto independiente en `landing/`. Se inicia y
+compila por separado, sin Supabase, Service Worker ni runtime de la aplicación:
+
+```bash
+pnpm dev:landing
+pnpm build:landing
+```
+
+El build de la aplicación permanece en `dist/`; la landing genera
+`dist-landing/`.
+
 ## Variables públicas del frontend
 
 ```dotenv
@@ -112,18 +123,21 @@ sincronización y Edge Functions quedan deshabilitados.
 
 Los siguientes scripts existen en `package.json`:
 
-| Comando             | Propósito                                     |
-| ------------------- | --------------------------------------------- |
-| `pnpm dev`          | Servidor Vite de desarrollo                   |
-| `pnpm build`        | Typecheck por proyectos y build de producción |
-| `pnpm preview`      | Preview local del build                       |
-| `pnpm typecheck`    | Validación TypeScript                         |
-| `pnpm test`         | Vitest en modo interactivo                    |
-| `pnpm test:run`     | Suite Vitest de una sola ejecución            |
-| `pnpm lint`         | ESLint                                        |
-| `pnpm lint:fix`     | ESLint con correcciones automáticas           |
-| `pnpm format`       | Formatea con Prettier                         |
-| `pnpm format:check` | Comprueba formato sin escribir                |
+| Comando                | Propósito                                     |
+| ---------------------- | --------------------------------------------- |
+| `pnpm dev`             | Servidor Vite de desarrollo                   |
+| `pnpm dev:landing`     | Servidor local aislado de la landing          |
+| `pnpm build`           | Typecheck por proyectos y build de producción |
+| `pnpm build:landing`   | Build independiente en `dist-landing/`        |
+| `pnpm preview`         | Preview local del build                       |
+| `pnpm preview:landing` | Preview local de la landing compilada         |
+| `pnpm typecheck`       | Validación TypeScript                         |
+| `pnpm test`            | Vitest en modo interactivo                    |
+| `pnpm test:run`        | Suite Vitest de una sola ejecución            |
+| `pnpm lint`            | ESLint                                        |
+| `pnpm lint:fix`        | ESLint con correcciones automáticas           |
+| `pnpm format`          | Formatea con Prettier                         |
+| `pnpm format:check`    | Comprueba formato sin escribir                |
 
 ## Configuración de Supabase
 
@@ -169,6 +183,12 @@ Otras variables backend reconocidas por el código son:
 - `SUPABASE_SERVICE_ROLE_KEY` únicamente en `delete-account`; jamás debe llegar
   al frontend.
 
+`ALLOWED_ORIGINS` es el contrato canónico y acepta una lista separada por
+comas. Durante la migración de origen, producción debe incluir
+`https://lunumia.com`, `https://www.lunumia.com` y
+`https://app.lunumia.com`. `ALLOWED_ORIGIN` se conserva temporalmente sólo como
+fallback cuando la variable canónica no está configurada; nunca se usa `*`.
+
 ### Edge Functions
 
 Solo existen estas funciones:
@@ -211,6 +231,12 @@ correo, recuperación y cambio de contraseña. En Android controla la renovació
 de sesión al pasar entre foreground y background, y procesa tanto cold starts
 como eventos `appUrlOpen`.
 
+El origen Web/PWA canónico es `https://app.lunumia.com`. Los callbacks web que
+genera la aplicación conservan las rutas existentes
+`https://app.lunumia.com/verify-email` y
+`https://app.lunumia.com/reset-password`; no se sustituyen por el callback
+nativo ni por la página de marketing.
+
 El callback nativo actual es:
 
 ```text
@@ -221,6 +247,14 @@ Debe estar incluido en la allow list de Redirect URLs del Dashboard de
 Supabase. El identificador es histórico y se conserva para mantener
 compatibilidad con instalaciones, sesiones y enlaces existentes. No lo cambies
 aisladamente a un identificador nuevo.
+
+La migración del origen Web a `app.lunumia.com` no conserva automáticamente el
+almacenamiento del navegador. Como la aplicación anterior no fue liberada al
+público, el estado local existente en `lunumia.com` corresponde a pruebas
+controladas y su descarte durante el cutover está aceptado. No se implementa un
+bridge ni exportación/importación para ese estado. Esta decisión no autoriza
+eliminar usuarios, identidades Auth, filas financieras sincronizadas ni ningún
+otro dato remoto de Supabase.
 
 Sin cuenta, los datos pertenecen a un owner invitado local. Al autenticar una
 cuenta, la UI permite decidir si se migran, conservan o descartan los datos del
@@ -311,6 +345,12 @@ Object Mode, valida localmente la respuesta con un esquema estricto y convierte
 decimales normalizados a centavos mediante aritmética entera exacta.
 La salida comprimida se limita a 3,000,000 bytes para mantener el request con
 imagen base64 por debajo del límite de 4 MiB de Groq.
+
+El transporte OCR mantiene compatibilidad de despliegue Edge-first: una
+solicitud sin discriminador recibe exactamente la respuesta legacy de
+producción. El frontend Lunumia 2.0 solicita explícitamente
+`responseVersion: 2` para recibir evidencia, desglose del monto y señales de
+ambigüedad. Versiones explícitas desconocidas se rechazan.
 
 Qwen solo propone comercio, fecha, moneda y componentes visibles del monto. El
 validador puro clasifica la propuesta como `valid`, `needs_review` o `invalid`,

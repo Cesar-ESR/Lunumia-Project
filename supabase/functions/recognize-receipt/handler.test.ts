@@ -7,6 +7,7 @@ import type { OCRProvider } from './providers/OCRProvider'
 import { OCRFunctionError } from './errors/OCRFunctionError'
 import { MAX_BASE64_LENGTH } from './schemas/contracts'
 import { RateLimitStorageError } from '../_shared/distributed-rate-limiter'
+import { parseProductionV1ReceiptResponse } from '../compatibility/production-v1-contracts'
 
 const origin = 'https://lunumia.example'
 const jpegBase64 = btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xd9))
@@ -25,6 +26,14 @@ const validResult = {
   amountPaid: 12_345,
   amountEvidence: 'TOTAL 123.45',
   amountAmbiguous: false,
+  currency: 'MXN',
+  confidence: 0.99,
+  rawText: 'MOCK RECEIPT',
+}
+const legacyResult = {
+  merchant: 'Comercio de prueba',
+  date: '2026-01-15',
+  total: 12_345,
   currency: 'MXN',
   confidence: 0.99,
   rawText: 'MOCK RECEIPT',
@@ -84,11 +93,45 @@ describe('recognize-receipt Edge Function', () => {
     expect(deps.createProvider).not.toHaveBeenCalled()
   })
 
-  it('valida JPEG real, ejecuta OCR y devuelve resultado estructurado', async () => {
+  it('golden legacy: petición de producción devuelve exactamente el contrato v1', async () => {
     const response =
       await createRecognizeReceiptHandler(dependencies())(request())
     expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body).toEqual(legacyResult)
+    expect(parseProductionV1ReceiptResponse(body)).toEqual(legacyResult)
+  })
+
+  it('golden V2: el discriminador explícito conserva evidencia y validación', async () => {
+    const response = await createRecognizeReceiptHandler(dependencies())(
+      request({
+        imageBase64: jpegBase64,
+        mimeType: 'image/jpeg',
+        responseVersion: 2,
+      }),
+    )
+    expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual(validResult)
+  })
+
+  it('legacy omite evidencia y degrada sugerencias incompatibles de forma segura', async () => {
+    const result = {
+      ...validResult,
+      total: -100,
+      confidence: null,
+    }
+    const response = await createRecognizeReceiptHandler(
+      dependencies({
+        createProvider: () => ({ recognize: vi.fn(async () => result) }),
+      }),
+    )(request())
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      ...legacyResult,
+      total: null,
+      confidence: 0,
+    })
   })
 
   it('limita OCR antes de leer la imagen o ejecutar el proveedor', async () => {
@@ -170,6 +213,27 @@ describe('recognize-receipt Edge Function', () => {
     expect(response.status).toBe(204)
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe(origin)
   })
+
+  it.each([
+    'https://lunumia.com',
+    'https://www.lunumia.com',
+    'https://app.lunumia.com',
+  ])(
+    'permite el origen de producción %s cuando está configurado',
+    async (productionOrigin) => {
+      const preflight = new Request(
+        'https://functions.example/recognize-receipt',
+        { method: 'OPTIONS', headers: { Origin: productionOrigin } },
+      )
+      const response = await createRecognizeReceiptHandler(
+        dependencies({ allowedOrigins: [productionOrigin] }),
+      )(preflight)
+      expect(response.status).toBe(204)
+      expect(response.headers.get('Access-Control-Allow-Origin')).toBe(
+        productionOrigin,
+      )
+    },
+  )
 
   it('no registra JWT, base64 ni texto OCR', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
@@ -255,6 +319,12 @@ describe('recognize-receipt Edge Function', () => {
       400,
       'invalid_image',
     ],
+    [
+      'versión desconocida',
+      { imageBase64: jpegBase64, mimeType: 'image/jpeg', responseVersion: 3 },
+      400,
+      'unsupported_response_version',
+    ],
   ] as const)('rechaza payload: %s', async (_label, body, status, code) => {
     const deps = dependencies()
     const response = await createRecognizeReceiptHandler(deps)(request(body))
@@ -287,6 +357,7 @@ describe('recognize-receipt Edge Function', () => {
       request({
         imageBase64: 'A'.repeat(MAX_BASE64_LENGTH + 1),
         mimeType: 'image/jpeg',
+        responseVersion: 2,
       }),
     )
     expect(response.status).toBe(413)
@@ -331,7 +402,13 @@ describe('recognize-receipt Edge Function', () => {
       const fake: OCRProvider = { recognize: vi.fn(async () => result) }
       const response = await createRecognizeReceiptHandler(
         dependencies({ createProvider: () => fake }),
-      )(request())
+      )(
+        request({
+          imageBase64: jpegBase64,
+          mimeType: 'image/jpeg',
+          responseVersion: 2,
+        }),
+      )
       expect(response.status).toBe(status)
       const body = await response.json()
       if (code) expect(body).toMatchObject({ code })

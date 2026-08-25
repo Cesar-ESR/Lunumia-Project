@@ -9,8 +9,11 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:landing": "vite --config landing/vite.config.ts",
     "build": "tsc -b && vite build",
+    "build:landing": "tsc -b tsconfig.landing.json && vite build --config landing/vite.config.ts",
     "preview": "vite preview",
+    "preview:landing": "vite preview --config landing/vite.config.ts",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest",
     "test:run": "vitest run",

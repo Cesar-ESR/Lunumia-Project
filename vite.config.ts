@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { PWA_SCOPE, PWA_START_URL } from './src/shared/constants/web-origins'
 
 export default defineConfig({
   build: {
@@ -52,16 +53,26 @@ export default defineConfig({
         short_name: 'Lunumia',
         description: 'Presupuestos personales local-first',
         lang: 'es',
-        start_url: '/',
-        scope: '/',
+        start_url: PWA_START_URL,
+        scope: PWA_SCOPE,
         display: 'standalone',
-        background_color: '#f4f6f3',
-        theme_color: '#0f766e',
+        background_color: '#f6f8fc',
+        theme_color: '#1267d6',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           {
-            src: '/icons/icon-maskable-512.png',
+            src: '/icons/pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icons/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: '/icons/pwa-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',

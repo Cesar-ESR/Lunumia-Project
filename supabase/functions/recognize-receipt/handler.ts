@@ -2,6 +2,7 @@ import { decodeReceiptImage } from './decode-image.ts'
 import { OCRFunctionError } from './errors/OCRFunctionError.ts'
 import type { OCRProvider } from './providers/OCRProvider.ts'
 import {
+  formatRecognitionResponse,
   parseRecognitionRequest,
   ReceiptRecognitionResponseSchema,
 } from './schemas/contracts.ts'
@@ -80,7 +81,11 @@ export function createRecognizeReceiptHandler(
       const validated = ReceiptRecognitionResponseSchema.safeParse(result)
       if (!validated.success)
         throw new OCRFunctionError('invalid_provider_response')
-      return jsonResponse(200, validated.data, origin)
+      return jsonResponse(
+        200,
+        formatRecognitionResponse(validated.data, input.responseVersion),
+        origin,
+      )
     } catch (reason) {
       return errorResponse(
         reason instanceof OCRFunctionError

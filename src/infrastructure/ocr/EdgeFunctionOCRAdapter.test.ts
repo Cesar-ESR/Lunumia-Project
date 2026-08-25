@@ -52,7 +52,7 @@ describe('EdgeFunctionOCRAdapter', () => {
       'recognize-receipt',
       {
         method: 'POST',
-        body: input,
+        body: { ...input, responseVersion: 2 },
       },
     )
   })
@@ -99,13 +99,13 @@ describe('EdgeFunctionOCRAdapter', () => {
     expect(error).not.toHaveBeenCalled()
   })
 
-  it('envía únicamente imagen y MIME mediante el cliente inyectado', async () => {
+  it('envía imagen, MIME y la versión V2 explícita mediante el cliente inyectado', async () => {
     const injected = client(valid)
     await new EdgeFunctionOCRAdapter(injected).recognize(input)
     const invoke = vi.mocked(injected.functions.invoke)
     expect(invoke).toHaveBeenCalledOnce()
     const body = invoke.mock.calls[0]?.[1].body
-    expect(body).toEqual(input)
+    expect(body).toEqual({ ...input, responseVersion: 2 })
     expect(body).not.toHaveProperty('userId')
     expect(body).not.toHaveProperty('service_role')
     expect(body).not.toHaveProperty('apiKey')

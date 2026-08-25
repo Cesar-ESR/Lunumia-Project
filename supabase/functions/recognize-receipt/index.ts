@@ -1,10 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.111.0'
 import { createRecognizeReceiptHandler } from './handler.ts'
 import { createOCRProvider } from './providers/ProviderFactory.ts'
-import {
-  readAllowedOrigins,
-  readProviderTimeout,
-} from '../_shared/environment.ts'
+import { readProviderTimeout } from '../_shared/environment.ts'
+import { readConfiguredAllowedOrigins } from '../_shared/cors-environment.ts'
 import { PostgresRateLimiter } from '../_shared/distributed-rate-limiter.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
@@ -17,10 +15,10 @@ const runtimeEnvironment = Deno.env.get('OCR_ENVIRONMENT') ?? 'production'
 const timeoutMs = readProviderTimeout(Deno.env.get('OCR_TIMEOUT_MS'))
 const groqApiKey = Deno.env.get('GROQ_API_KEY') ?? ''
 const ocrModel = Deno.env.get('OCR_MODEL') ?? ''
-const allowedOrigins = readAllowedOrigins([
-  Deno.env.get('ALLOWED_ORIGIN') ?? '',
-  Deno.env.get('ALLOWED_ORIGINS') ?? '',
-])
+const allowedOrigins = readConfiguredAllowedOrigins(
+  Deno.env.get('ALLOWED_ORIGINS'),
+  Deno.env.get('ALLOWED_ORIGIN'),
+)
 
 if (!supabaseUrl || !publishableKey)
   throw new Error(
