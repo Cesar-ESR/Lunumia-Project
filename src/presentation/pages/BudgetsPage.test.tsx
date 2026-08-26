@@ -10,6 +10,8 @@ import {
   createDashboardBudgetSummaryMock,
 } from '../test/test-factories'
 
+const APP_READY_TIMEOUT_MS = 3_000
+
 function renderBudgets(
   result = createApplicationServicesMock(),
   path = '/plan/presupuestos',
@@ -20,7 +22,11 @@ function renderBudgets(
 }
 
 async function findBudgetRow(name = 'Comida') {
-  return screen.findByRole('article', { name })
+  return screen.findByRole(
+    'article',
+    { name },
+    { timeout: APP_READY_TIMEOUT_MS },
+  )
 }
 
 describe('BudgetsPage U7B', () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from './Button'
@@ -27,6 +27,42 @@ function DialogHarness() {
         }
       />
     </>
+  )
+}
+
+function PostCloseFocusHarness() {
+  const [open, setOpen] = useState(false)
+  const [completed, setCompleted] = useState(false)
+  const statusRef = useRef<HTMLHeadingElement>(null)
+  const getPostCloseFocusTarget = useCallback(() => statusRef.current, [])
+  return (
+    <main data-focus-fallback tabIndex={-1}>
+      {completed ? null : (
+        <button type="button" onClick={() => setOpen(true)}>
+          Abrir transición
+        </button>
+      )}
+      <h2 ref={statusRef} tabIndex={-1}>
+        {completed ? 'Pagado' : 'Pendiente'}
+      </h2>
+      <Dialog
+        open={open}
+        title="Completar transición"
+        onClose={() => setOpen(false)}
+        getPostCloseFocusTarget={getPostCloseFocusTarget}
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              setCompleted(true)
+              setOpen(false)
+            }}
+          >
+            Completar
+          </button>
+        }
+      />
+    </main>
   )
 }
 
@@ -77,6 +113,18 @@ describe('Dialog', () => {
     expect(document.body.style.overflow).toBe('')
     expect(container).not.toHaveAttribute('inert')
     expect(container).not.toHaveAttribute('aria-hidden')
+  })
+
+  it('respeta el destino explícito cuando el trigger desaparece al cerrar', async () => {
+    const user = userEvent.setup()
+    render(<PostCloseFocusHarness />)
+    await user.click(screen.getByRole('button', { name: 'Abrir transición' }))
+
+    await user.click(screen.getByRole('button', { name: 'Completar' }))
+
+    const status = screen.getByRole('heading', { name: 'Pagado' })
+    expect(screen.queryByRole('button', { name: 'Abrir transición' })).toBeNull()
+    expect(status).toHaveFocus()
   })
 
   it('cierra con Android Back antes de permitir navegación de ruta', async () => {

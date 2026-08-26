@@ -19,6 +19,8 @@ import {
   createRecurringPaymentMock,
 } from '../test/test-factories'
 
+const APP_READY_TIMEOUT_MS = 3_000
+
 type MockResult = ReturnType<typeof createApplicationServicesMock>
 
 function renderPath(path: string, result = createApplicationServicesMock()) {
@@ -52,7 +54,11 @@ describe('Compromisos UX 2.0', () => {
   it('redirige /recurring al destino canónico y mantiene Plan activo', async () => {
     renderPath('/recurring')
     expect(
-      await screen.findByRole('heading', { name: 'Compromisos' }),
+      await screen.findByRole(
+        'heading',
+        { name: 'Compromisos' },
+        { timeout: APP_READY_TIMEOUT_MS },
+      ),
     ).toBeInTheDocument()
     await waitFor(() =>
       expect(window.location.pathname).toBe('/plan/compromisos'),

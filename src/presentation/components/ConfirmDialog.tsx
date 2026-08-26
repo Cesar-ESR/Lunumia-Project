@@ -12,6 +12,7 @@ export function ConfirmDialog({
   children,
   onConfirm,
   onCancel,
+  getPostCloseFocusTarget,
 }: {
   open: boolean
   title: string
@@ -22,6 +23,7 @@ export function ConfirmDialog({
   children?: ReactNode
   onConfirm(): void
   onCancel(): void
+  getPostCloseFocusTarget?: () => HTMLElement | null
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null)
   return (
@@ -31,6 +33,7 @@ export function ConfirmDialog({
       description={description}
       onClose={onCancel}
       initialFocusRef={cancelRef}
+      getPostCloseFocusTarget={getPostCloseFocusTarget}
       pending={isPending}
       actions={
         <>

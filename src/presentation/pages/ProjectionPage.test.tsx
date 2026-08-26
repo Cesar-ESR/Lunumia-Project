@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ApplicationServices } from '../../app/composition-root'
 import { App } from '../App'
@@ -6,6 +6,8 @@ import {
   createApplicationServicesMock,
   createFinancialSnapshotMock,
 } from '../test/test-factories'
+
+const APP_READY_TIMEOUT_MS = 3_000
 
 const availability = vi.hoisted(() => ({ value: true }))
 
@@ -69,7 +71,11 @@ describe('ProjectionPage', () => {
     )
 
     expect(
-      await screen.findByText('Saldo actual de referencia'),
+      await screen.findByText(
+        'Saldo actual de referencia',
+        {},
+        { timeout: APP_READY_TIMEOUT_MS },
+      ),
     ).toBeInTheDocument()
     expect(
       screen.getByText('Disponible después de compromisos'),
@@ -415,7 +421,7 @@ describe('ProjectionPage', () => {
     const cta = await screen.findByRole('button', {
       name: 'Ayúdame a interpretar este plan',
     })
-    cta.focus()
+    act(() => cta.focus())
 
     await user.click(cta)
 

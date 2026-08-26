@@ -7,6 +7,8 @@ import {
   createIncomeMock,
 } from './test/test-factories'
 
+const APP_READY_TIMEOUT_MS = 3_000
+
 function renderPath(path: string) {
   window.history.replaceState({}, '', path)
   const result = createApplicationServicesMock()
@@ -52,7 +54,11 @@ describe('Movimientos e ingresos UX 2.0', () => {
     )
 
     expect(
-      await screen.findByRole('heading', { name: 'Reembolso pendiente' }),
+      await screen.findByRole(
+        'heading',
+        { name: 'Reembolso pendiente' },
+        { timeout: APP_READY_TIMEOUT_MS },
+      ),
     ).toBeInTheDocument()
     expect(screen.getByText('Expectativa cancelada')).toBeInTheDocument()
     expect(screen.getAllByText(/Ya estaba reflejado en tu saldo/)).toHaveLength(

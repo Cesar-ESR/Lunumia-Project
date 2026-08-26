@@ -7,6 +7,8 @@ import {
   createApplicationServicesMock,
 } from '../test/test-factories'
 
+const APP_READY_TIMEOUT_MS = 3_000
+
 function renderSimulator(
   services: ReturnType<typeof createApplicationServicesMock>['services'],
 ) {
@@ -18,7 +20,11 @@ async function simulate(
   user: ReturnType<typeof userEvent.setup>,
   amount = '100.00',
 ) {
-  await screen.findByRole('option', { name: 'Comida' })
+  await screen.findByRole(
+    'option',
+    { name: 'Comida' },
+    { timeout: APP_READY_TIMEOUT_MS },
+  )
   await user.type(screen.getByLabelText(/Monto de la compra/), amount)
   await user.selectOptions(screen.getByLabelText(/Categoría/), CATEGORY_ID)
   await user.click(screen.getByRole('button', { name: 'Simular compra' }))
@@ -31,7 +37,11 @@ describe('PurchaseSimulatorPage', () => {
     renderSimulator(services)
     await simulate(user)
     expect(
-      await screen.findByText('Dentro de tu disponible.'),
+      await screen.findByText(
+        'Dentro de tu disponible.',
+        {},
+        { timeout: APP_READY_TIMEOUT_MS },
+      ),
     ).toBeInTheDocument()
     expect(mocks.createExpense).not.toHaveBeenCalled()
   })

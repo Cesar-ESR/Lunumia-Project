@@ -32,6 +32,7 @@ export function Dialog({
   actions,
   onClose,
   initialFocusRef,
+  getPostCloseFocusTarget,
   closeOnEscape = true,
   pending = false,
   className = '',
@@ -43,6 +44,7 @@ export function Dialog({
   actions?: ReactNode
   onClose(): void
   initialFocusRef?: RefObject<HTMLElement | null>
+  getPostCloseFocusTarget?: () => HTMLElement | null
   closeOnEscape?: boolean
   pending?: boolean
   className?: string
@@ -97,8 +99,10 @@ export function Dialog({
         if (ariaHidden === null) element.removeAttribute('aria-hidden')
         else element.setAttribute('aria-hidden', ariaHidden)
       })
+      const postCloseTarget = getPostCloseFocusTarget?.()
       const restoreTarget = restoreFocusRef.current
-      if (restoreTarget?.isConnected) restoreTarget.focus()
+      if (postCloseTarget?.isConnected) postCloseTarget.focus()
+      else if (restoreTarget?.isConnected) restoreTarget.focus()
       else {
         const fallback = document.querySelector<HTMLElement>(
           '[data-focus-fallback], main',
@@ -106,7 +110,7 @@ export function Dialog({
         fallback?.focus()
       }
     }
-  }, [open])
+  }, [getPostCloseFocusTarget, open])
 
   useEffect(() => {
     if (!open) return

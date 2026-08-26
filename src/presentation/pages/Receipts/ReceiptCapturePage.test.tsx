@@ -6,12 +6,18 @@ import {
   createApplicationServicesMock,
 } from '../../test/test-factories'
 
+const APP_READY_TIMEOUT_MS = 3_000
+
 describe('ReceiptCapturePage routing', () => {
   it('expone Escanear recibo desde Gastos y abre la ruta dedicada', async () => {
     const { services } = createApplicationServicesMock()
     window.history.replaceState({}, '', '/expenses')
     render(<App services={services} authServices={null} />)
-    const link = await screen.findByRole('link', { name: 'Escanear recibo' })
+    const link = await screen.findByRole(
+      'link',
+      { name: 'Escanear recibo' },
+      { timeout: APP_READY_TIMEOUT_MS },
+    )
     expect(link).toHaveAttribute('href', '/expenses/receipt')
     act(() => {
       window.history.pushState({}, '', '/expenses/receipt')

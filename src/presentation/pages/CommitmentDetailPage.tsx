@@ -117,6 +117,7 @@ function CommitmentDetail({
   )
   const [fieldError, setFieldError] = useState<string | null>(null)
   const statusHeadingRef = useRef<HTMLHeadingElement>(null)
+  const shouldFocusStatusOnCloseRef = useRef(false)
   const viewModel = occurrenceToViewModel({
     occurrence,
     payment,
@@ -125,8 +126,21 @@ function CommitmentDetail({
     today,
   })
 
-  const focusStatus = () =>
-    window.requestAnimationFrame(() => statusHeadingRef.current?.focus())
+  const getPostCloseFocusTarget = useCallback(() => {
+    if (!shouldFocusStatusOnCloseRef.current) return null
+    shouldFocusStatusOnCloseRef.current = false
+    return statusHeadingRef.current
+  }, [])
+
+  const openAction = (nextAction: Exclude<DetailAction, null>) => {
+    shouldFocusStatusOnCloseRef.current = false
+    setAction(nextAction)
+  }
+
+  const closeAction = () => {
+    shouldFocusStatusOnCloseRef.current = false
+    setAction(null)
+  }
 
   const confirm = async () => {
     if (!action) return
@@ -187,10 +201,10 @@ function CommitmentDetail({
           message: 'Pago deshecho. El compromiso volvió a pendiente.',
         })
       }
+      shouldFocusStatusOnCloseRef.current = true
       setAction(null)
-      focusStatus()
     } catch (reason) {
-      setAction(null)
+      closeAction()
       setNotice({ tone: 'error', message: friendlyError(reason) })
     } finally {
       setIsPending(false)
@@ -283,7 +297,7 @@ function CommitmentDetail({
             <button
               type="button"
               className="ln-button ln-button--primary"
-              onClick={() => setAction('pay')}
+              onClick={() => openAction('pay')}
             >
               Registrar pago
             </button>
@@ -292,7 +306,7 @@ function CommitmentDetail({
             <button
               type="button"
               className="ln-button ln-button--secondary"
-              onClick={() => setAction('skip')}
+              onClick={() => openAction('skip')}
             >
               Omitir esta ocurrencia
             </button>
@@ -301,7 +315,7 @@ function CommitmentDetail({
             <button
               type="button"
               className="ln-button ln-button--danger"
-              onClick={() => setAction('reverse')}
+              onClick={() => openAction('reverse')}
             >
               Deshacer pago
             </button>
@@ -316,8 +330,9 @@ function CommitmentDetail({
         confirmLabel="Registrar pago"
         destructive={false}
         isPending={isPending}
+        getPostCloseFocusTarget={getPostCloseFocusTarget}
         onCancel={() => {
-          setAction(null)
+          closeAction()
           setFieldError(null)
         }}
         onConfirm={() => void confirm()}
@@ -374,7 +389,8 @@ function CommitmentDetail({
         description="El plan continuará. Sólo se omitirá este pago. Esta decisión no se puede deshacer desde aquí."
         confirmLabel="Omitir ocurrencia"
         isPending={isPending}
-        onCancel={() => setAction(null)}
+        getPostCloseFocusTarget={getPostCloseFocusTarget}
+        onCancel={closeAction}
         onConfirm={() => void confirm()}
       />
       <ConfirmDialog
@@ -383,7 +399,8 @@ function CommitmentDetail({
         description="Se eliminará el gasto vinculado y este compromiso volverá a pendiente. El plan recurrente no cambiará."
         confirmLabel="Deshacer pago"
         isPending={isPending}
-        onCancel={() => setAction(null)}
+        getPostCloseFocusTarget={getPostCloseFocusTarget}
+        onCancel={closeAction}
         onConfirm={() => void confirm()}
       >
         <div className="ln-payment-dialog-fields">
