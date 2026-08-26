@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { APP_MARK, APP_NAME } from '@shared/constants'
+import { APP_NAME } from '@shared/constants'
+import { LunumiaBrandSymbol } from '../../components/LunumiaBrandSymbol'
 import { RouteFocus } from '../../components/RouteFocus'
 import { useApplicationServices } from '../../context/ApplicationServicesContext'
 import { requestDirtyNavigation } from '../../utils/dirty-navigation'
@@ -50,9 +51,7 @@ export function SetupPageLayout({
   return (
     <div className={`ln-setup-shell${wide ? ' ln-setup-shell--wide' : ''}`}>
       <header className="ln-setup-brand">
-        <span className="ln-brand-mark" aria-hidden="true">
-          {APP_MARK}
-        </span>
+        <LunumiaBrandSymbol />
         <div>
           <strong>{APP_NAME}</strong>
           <span>{step}</span>

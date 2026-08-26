@@ -62,16 +62,11 @@
 }
 
 .ln-brand-mark {
-  display: inline-grid;
+  display: block;
   width: 2.25rem;
   height: 2.25rem;
   flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--radius-md);
-  color: var(--text-on-brand);
-  background: var(--brand-gradient);
-  box-shadow: 0 4px 12px rgba(18, 103, 214, 0.18);
-  font-weight: 800;
+  object-fit: contain;
 }
 
 .ln-period-context {

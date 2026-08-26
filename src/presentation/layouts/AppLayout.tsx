@@ -17,8 +17,9 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { APP_MARK, APP_NAME } from '@shared/constants'
+import { APP_NAME } from '@shared/constants'
 import { AccountControls } from '../components/AccountControls'
+import { LunumiaBrandSymbol } from '../components/LunumiaBrandSymbol'
 import { RegistrationQuickAction } from '../components/RegistrationQuickAction'
 import { RouteFocus } from '../components/RouteFocus'
 import { SkipLink } from '../components/SkipLink'
@@ -293,9 +294,7 @@ export function AppLayout() {
       <SkipLink />
       <aside className="ln-sidebar" aria-label="Navegación lateral">
         <div className="ln-sidebar-brand">
-          <span className="ln-brand-mark" aria-hidden="true">
-            {APP_MARK}
-          </span>
+          <LunumiaBrandSymbol />
           <div className="ln-sidebar-brand__copy">
             <strong>{APP_NAME}</strong>
             <small>Finanzas sin ruido</small>
@@ -337,9 +336,7 @@ export function AppLayout() {
         <header className="ln-context-bar">
           <div className="ln-context-bar__identity">
             <div className="ln-mobile-brand">
-              <span className="ln-brand-mark" aria-hidden="true">
-                {APP_MARK}
-              </span>
+              <LunumiaBrandSymbol />
               <strong>{APP_NAME}</strong>
             </div>
             <span className="ln-context-bar__screen">{screenName}</span>

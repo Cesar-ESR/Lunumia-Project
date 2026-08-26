@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { APP_MARK, APP_NAME } from '@shared/constants'
+import { APP_NAME } from '@shared/constants'
+import { LunumiaBrandSymbol } from '../../components/LunumiaBrandSymbol'
 
 export function AuthPageLayout({
   eyebrow,
@@ -19,9 +20,7 @@ export function AuthPageLayout({
     <main className="auth-shell">
       <section className="auth-card">
         <Link className="auth-brand" to="/inicio">
-          <span className="brand-mark" aria-hidden="true">
-            {APP_MARK}
-          </span>
+          <LunumiaBrandSymbol />
           <strong>{APP_NAME}</strong>
         </Link>
         <header>
