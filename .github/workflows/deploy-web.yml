@@ -1,0 +1,303 @@
+name: Deploy production web
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Production surface to deploy
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - app
+          - landing
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lunumia-production-web
+  cancel-in-progress: false
+
+env:
+  AWS_ACCOUNT_ID: '953483531248'
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::953483531248:role/lunumia-github-web-deploy
+  APP_S3_BUCKET: lunumia-prod-app-us-east-1-953483531248
+  APP_CLOUDFRONT_DISTRIBUTION_ID: E2UXB5FEASW4B1
+  LANDING_S3_BUCKET: lunumia-prod-landing-us-east-1-953483531248
+  LANDING_CLOUDFRONT_DISTRIBUTION_ID: EFZ0L1GNARUJ0
+
+jobs:
+  changes:
+    name: Select production surfaces
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      app: ${{ steps.scope.outputs.app }}
+      landing: ${{ steps.scope.outputs.landing }}
+    steps:
+      - name: Check out source with deployment history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine deployment scope
+        id: scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          MANUAL_TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          app=false
+          landing=false
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            case "$MANUAL_TARGET" in
+              both) app=true; landing=true ;;
+              app) app=true ;;
+              landing) landing=true ;;
+              *) echo "Unsupported deployment target: $MANUAL_TARGET" >&2; exit 1 ;;
+            esac
+          else
+            if [[ "$BEFORE_SHA" =~ ^0+$ ]] || ! git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+              diff_command=(git diff-tree --root --no-commit-id --name-only -r -z "$AFTER_SHA")
+            else
+              diff_command=(git diff --name-only -z "$BEFORE_SHA" "$AFTER_SHA")
+            fi
+
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                landing/*|tsconfig.landing.json)
+                  landing=true
+                  ;;
+                src/*|public/*|index.html|vite.config.ts|tsconfig.app.json|tsconfig.node.json)
+                  app=true
+                  ;;
+                package.json|pnpm-lock.yaml|pnpm-workspace.yaml|.nvmrc|.node-version|tsconfig.json)
+                  app=true
+                  landing=true
+                  ;;
+                .github/*|docs/*|infra/*|scripts/*|supabase/*|android/*|brand/*|tests/*|.kiro/*|README.md|.gitignore|.prettierignore|.prettierrc.json|.env.example|capacitor.config.ts|eslint.config.js)
+                  ;;
+                *)
+                  # Unknown tracked paths are treated as shared to avoid a missed release.
+                  app=true
+                  landing=true
+                  ;;
+              esac
+            done < <("${diff_command[@]}")
+          fi
+
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "landing=$landing" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Deployment scope::App=$app Landing=$landing"
+
+  validate:
+    name: Required CI gate
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  deploy:
+    name: Deploy approved production surfaces
+    needs: [changes, validate]
+    if: ${{ github.ref == 'refs/heads/dev' && (needs.changes.outputs.app == 'true' || needs.changes.outputs.landing == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://app.lunumia.com
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out validated source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
+        with:
+          version: 11.9.0
+          runtime: node@22
+          install: false
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Require production App configuration
+        if: ${{ needs.changes.outputs.app == 'true' }}
+        shell: bash
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          [[ -n "$VITE_SUPABASE_URL" ]] || { echo "VITE_SUPABASE_URL is not configured for production." >&2; exit 1; }
+          [[ -n "$VITE_SUPABASE_PUBLISHABLE_KEY" ]] || { echo "VITE_SUPABASE_PUBLISHABLE_KEY is not configured for production." >&2; exit 1; }
+
+      - name: Build App production artifact
+        if: ${{ needs.changes.outputs.app == 'true' }}
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: pnpm build
+
+      - name: Build Landing production artifact
+        if: ${{ needs.changes.outputs.landing == 'true' }}
+        run: pnpm build:landing
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: lunumia-${{ github.run_id }}-${{ github.run_attempt }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+          unset-current-credentials: true
+
+      - name: Verify AWS account
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_account="$(aws sts get-caller-identity --query Account --output text)"
+          [[ "$actual_account" == "$AWS_ACCOUNT_ID" ]] || { echo "AWS account mismatch." >&2; exit 1; }
+
+      - name: Deploy App to private S3 bucket
+        if: ${{ needs.changes.outputs.app == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          test -f dist/sw.js
+          test -f dist/manifest.webmanifest
+
+          aws s3 sync dist/assets/ "s3://$APP_S3_BUCKET/assets/" \
+            --delete \
+            --cache-control 'public,max-age=31536000,immutable' \
+            --only-show-errors
+
+          aws s3 sync dist/ "s3://$APP_S3_BUCKET/" \
+            --delete \
+            --exclude '*' \
+            --include 'workbox-*.js' \
+            --cache-control 'public,max-age=31536000,immutable' \
+            --only-show-errors
+
+          aws s3 sync dist/ "s3://$APP_S3_BUCKET/" \
+            --delete \
+            --exclude 'assets/*' \
+            --exclude 'workbox-*.js' \
+            --cache-control 'no-cache,max-age=0,must-revalidate' \
+            --only-show-errors
+
+      - name: Invalidate App SPA and PWA cache
+        id: app-invalidation
+        if: ${{ needs.changes.outputs.app == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          invalidation_id="$(aws cloudfront create-invalidation \
+            --distribution-id "$APP_CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths '/*' \
+            --query 'Invalidation.Id' \
+            --output text)"
+          echo "id=$invalidation_id" >> "$GITHUB_OUTPUT"
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$APP_CLOUDFRONT_DISTRIBUTION_ID" \
+            --id "$invalidation_id"
+          echo "::notice title=App invalidation::$invalidation_id"
+
+      - name: Smoke App production
+        if: ${{ needs.changes.outputs.app == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /login /verify-email /reset-password /manifest.webmanifest; do
+            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "https://app.lunumia.com$path")"
+            [[ "$status" == "200" ]] || { echo "App smoke failed for $path: HTTP $status" >&2; exit 1; }
+          done
+          curl --silent --show-error --dump-header - --output /dev/null https://app.lunumia.com/ \
+            | tr -d '\r' \
+            | grep -Eiq '^strict-transport-security:[[:space:]]*max-age=86400([;[:space:]]|$)'
+
+      - name: Deploy Landing to private S3 bucket
+        if: ${{ needs.changes.outputs.landing == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist-landing/index.html
+
+          aws s3 sync dist-landing/assets/ "s3://$LANDING_S3_BUCKET/assets/" \
+            --delete \
+            --cache-control 'public,max-age=31536000,immutable' \
+            --only-show-errors
+
+          aws s3 sync dist-landing/ "s3://$LANDING_S3_BUCKET/" \
+            --delete \
+            --exclude 'assets/*' \
+            --cache-control 'no-cache,max-age=0,must-revalidate' \
+            --only-show-errors
+
+      - name: Invalidate Landing mutable entry points
+        id: landing-invalidation
+        if: ${{ needs.changes.outputs.landing == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          invalidation_id="$(aws cloudfront create-invalidation \
+            --distribution-id "$LANDING_CLOUDFRONT_DISTRIBUTION_ID" \
+            --paths '/' '/index.html' '/apple-touch-icon.png' '/favicon-16x16.png' '/favicon-32x32.png' '/lunumia-logo-horizontal.png' \
+            --query 'Invalidation.Id' \
+            --output text)"
+          echo "id=$invalidation_id" >> "$GITHUB_OUTPUT"
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$LANDING_CLOUDFRONT_DISTRIBUTION_ID" \
+            --id "$invalidation_id"
+          echo "::notice title=Landing invalidation::$invalidation_id"
+
+      - name: Smoke Landing production
+        if: ${{ needs.changes.outputs.landing == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          landing_body="$(curl --fail --silent --show-error https://lunumia.com/)"
+          grep -Fq 'Entiende tu dinero con más claridad.' <<< "$landing_body"
+
+          apex_headers="$(curl --silent --show-error --dump-header - --output /dev/null https://lunumia.com/ | tr -d '\r')"
+          grep -Eiq '^strict-transport-security:[[:space:]]*max-age=86400([;[:space:]]|$)' <<< "$apex_headers"
+
+          www_headers="$(curl --silent --show-error --dump-header - --output /dev/null --max-redirs 0 'https://www.lunumia.com/path-check?source=github-actions' | tr -d '\r')"
+          grep -Eq '^HTTP/[^ ]+ 301([[:space:]]|$)' <<< "$www_headers"
+          grep -Eiq '^location:[[:space:]]*https://lunumia\.com/path-check\?source=github-actions[[:space:]]*$' <<< "$www_headers"
+          grep -Eiq '^strict-transport-security:[[:space:]]*max-age=86400([;[:space:]]|$)' <<< "$www_headers"
+
+      - name: Publish deployment summary
+        if: ${{ always() }}
+        shell: bash
+        env:
+          APP_SELECTED: ${{ needs.changes.outputs.app }}
+          LANDING_SELECTED: ${{ needs.changes.outputs.landing }}
+          APP_INVALIDATION_ID: ${{ steps.app-invalidation.outputs.id }}
+          LANDING_INVALIDATION_ID: ${{ steps.landing-invalidation.outputs.id }}
+        run: |
+          {
+            echo '## Lunumia production web deployment'
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- App selected: \`$APP_SELECTED\`"
+            echo "- Landing selected: \`$LANDING_SELECTED\`"
+            echo "- App invalidation: \`${APP_INVALIDATION_ID:-not-created}\`"
+            echo "- Landing invalidation: \`${LANDING_INVALIDATION_ID:-not-created}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

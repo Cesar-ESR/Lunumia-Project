@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "GitHubProductionEnvironmentOnly",
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::953483531248:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:Cesar-ESR@177269805/Lunumia-Project@1329425457:environment:production",
+          "token.actions.githubusercontent.com:ref": "refs/heads/dev",
+          "token.actions.githubusercontent.com:environment": "production",
+          "token.actions.githubusercontent.com:repository_id": "1329425457",
+          "token.actions.githubusercontent.com:repository_owner_id": "177269805"
+        }
+      }
+    }
+  ]
+}

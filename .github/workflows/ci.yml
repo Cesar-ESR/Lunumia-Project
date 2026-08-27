@@ -1,24 +1,68 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   verify:
+    name: Validate application and landing
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@v2
         with:
           version: 11.9.0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
-      - run: pnpm run typecheck
-      - run: pnpm run test:run
-      - run: pnpm run build
+          runtime: node@22
+          install: false
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate migration file set
+        shell: bash
+        run: |
+          set -euo pipefail
+          declare -A versions=()
+          while IFS= read -r migration; do
+            filename="${migration##*/}"
+            if [[ ! "$filename" =~ ^([0-9]{12,14})_[a-z0-9_]+\.sql$ ]]; then
+              echo "Invalid migration filename: $migration" >&2
+              exit 1
+            fi
+            version="${BASH_REMATCH[1]}"
+            if [[ -n "${versions[$version]:-}" ]]; then
+              echo "Duplicate migration version: $version" >&2
+              exit 1
+            fi
+            versions[$version]=1
+            if grep -nE '^(<<<<<<<|=======|>>>>>>>)' "$migration"; then
+              echo "Merge-conflict marker found in $migration" >&2
+              exit 1
+            fi
+          done < <(git ls-files 'supabase/migrations/*.sql')
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test:run
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Build landing
+        run: pnpm build:landing

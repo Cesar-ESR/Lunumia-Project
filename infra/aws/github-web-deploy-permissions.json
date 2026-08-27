@@ -1,0 +1,32 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListDeploymentBuckets",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": [
+        "arn:aws:s3:::lunumia-prod-app-us-east-1-953483531248",
+        "arn:aws:s3:::lunumia-prod-landing-us-east-1-953483531248"
+      ]
+    },
+    {
+      "Sid": "DeployGeneratedWebObjects",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": [
+        "arn:aws:s3:::lunumia-prod-app-us-east-1-953483531248/*",
+        "arn:aws:s3:::lunumia-prod-landing-us-east-1-953483531248/*"
+      ]
+    },
+    {
+      "Sid": "InvalidateWebDistributions",
+      "Effect": "Allow",
+      "Action": ["cloudfront:CreateInvalidation", "cloudfront:GetInvalidation"],
+      "Resource": [
+        "arn:aws:cloudfront::953483531248:distribution/E2UXB5FEASW4B1",
+        "arn:aws:cloudfront::953483531248:distribution/EFZ0L1GNARUJ0"
+      ]
+    }
+  ]
+}
