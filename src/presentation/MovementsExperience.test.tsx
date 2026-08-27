@@ -17,6 +17,62 @@ function renderPath(path: string) {
 }
 
 describe('Movimientos e ingresos UX 2.0', () => {
+  it('expone las acciones de gasto, recibo e ingreso para un periodo activo', async () => {
+    renderPath('/movimientos')
+
+    expect(
+      await screen.findByRole(
+        'link',
+        { name: 'Registrar gasto' },
+        { timeout: APP_READY_TIMEOUT_MS },
+      ),
+    ).toHaveAttribute('href', '/expenses')
+    expect(
+      screen.getByRole('link', { name: 'Escanear recibo' }),
+    ).toHaveAttribute('href', '/expenses/receipt')
+    expect(
+      screen.getByRole('link', { name: 'Registrar ingreso' }),
+    ).toHaveAttribute('href', '/movimientos/ingresos/nuevo')
+  })
+
+  it('navega desde Movimientos al formulario de gasto existente', async () => {
+    const user = userEvent.setup()
+    renderPath('/movimientos')
+
+    await user.click(
+      await screen.findByRole(
+        'link',
+        { name: 'Registrar gasto' },
+        { timeout: APP_READY_TIMEOUT_MS },
+      ),
+    )
+
+    await waitFor(() => expect(window.location.pathname).toBe('/expenses'))
+    expect(
+      await screen.findByRole('heading', { name: 'Nuevo gasto' }),
+    ).toBeInTheDocument()
+  })
+
+  it('navega desde Movimientos al flujo de recibos existente', async () => {
+    const user = userEvent.setup()
+    renderPath('/movimientos')
+
+    await user.click(
+      await screen.findByRole(
+        'link',
+        { name: 'Escanear recibo' },
+        { timeout: APP_READY_TIMEOUT_MS },
+      ),
+    )
+
+    await waitFor(() =>
+      expect(window.location.pathname).toBe('/expenses/receipt'),
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Escanear recibo' }),
+    ).toBeInTheDocument()
+  })
+
   it('unifica movimientos, conserva estados y sincroniza filtros con la URL', async () => {
     const user = userEvent.setup()
     const { services } = renderPath('/movimientos')

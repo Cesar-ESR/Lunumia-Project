@@ -178,12 +178,23 @@ export function MovementsPage() {
         title="Movimientos"
         description={`${formatCompactDate(activePeriod.startDate)} — ${formatCompactDate(activePeriod.endDate)}`}
         actions={
-          <Link
-            className="ln-button ln-button--primary"
-            to="/movimientos/ingresos/nuevo"
-          >
-            Registrar ingreso
-          </Link>
+          <>
+            <Link className="ln-button ln-button--secondary" to="/expenses">
+              Registrar gasto
+            </Link>
+            <Link
+              className="ln-button ln-button--secondary"
+              to="/expenses/receipt"
+            >
+              Escanear recibo
+            </Link>
+            <Link
+              className="ln-button ln-button--primary"
+              to="/movimientos/ingresos/nuevo"
+            >
+              Registrar ingreso
+            </Link>
+          </>
         }
       />
       {isMovementNoticeState(location.state) ? (
