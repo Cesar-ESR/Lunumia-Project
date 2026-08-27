@@ -59,7 +59,6 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
           .from('categories')
           .select('*')
           .eq('user_id', ownerId)
-          .eq('is_system', true)
           .is('deleted_at', null),
         this.client
           .from('user_settings')
@@ -85,7 +84,7 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
         'No se pudo consultar la configuraciÃ³n remota.',
       )
 
-    const systemCategories = (categoriesResponse.data ?? []).map((row) => {
+    const categories = (categoriesResponse.data ?? []).map((row) => {
       const change = deserializeRemoteChange('category', row)
       if (change.entityType !== 'category')
         throw new Error('La categorÃ­a remota no pudo validarse.')
@@ -98,7 +97,7 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
       throw new Error('La configuraciÃ³n remota no pudo validarse.')
 
     return {
-      systemCategories,
+      categories,
       userSettings: settingsChange?.record ?? null,
     }
   }

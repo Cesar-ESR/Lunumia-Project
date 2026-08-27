@@ -20,19 +20,24 @@ describe('Movimientos e ingresos UX 2.0', () => {
   it('expone las acciones de gasto, recibo e ingreso para un periodo activo', async () => {
     renderPath('/movimientos')
 
-    expect(
-      await screen.findByRole(
+    const registerExpense = await screen.findByRole(
         'link',
         { name: 'Registrar gasto' },
         { timeout: APP_READY_TIMEOUT_MS },
-      ),
-    ).toHaveAttribute('href', '/expenses')
-    expect(
-      screen.getByRole('link', { name: 'Escanear recibo' }),
-    ).toHaveAttribute('href', '/expenses/receipt')
-    expect(
-      screen.getByRole('link', { name: 'Registrar ingreso' }),
-    ).toHaveAttribute('href', '/movimientos/ingresos/nuevo')
+      )
+    const scanReceipt = screen.getByRole('link', { name: 'Escanear recibo' })
+    const registerIncome = screen.getByRole('link', {
+      name: 'Registrar ingreso',
+    })
+    expect(registerExpense).toHaveAttribute('href', '/expenses')
+    expect(registerExpense).toHaveClass('ln-button--primary')
+    expect(scanReceipt).toHaveAttribute('href', '/expenses/receipt')
+    expect(scanReceipt).toHaveClass('ln-button--secondary')
+    expect(registerIncome).toHaveAttribute(
+      'href',
+      '/movimientos/ingresos/nuevo',
+    )
+    expect(registerIncome).toHaveClass('ln-button--primary')
   })
 
   it('navega desde Movimientos al formulario de gasto existente', async () => {

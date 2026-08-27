@@ -81,11 +81,13 @@ export class DexieCategoryRepository implements ICategoryRepository {
       : null
   }
   async findAll(): Promise<Category[]> {
+    return (await this.findAllIncludingDeleted())
+      .filter((value) => value.deletedAt === null)
+  }
+  async findAllIncludingDeleted(): Promise<Category[]> {
     return (
       await this.db.categories.where('ownerId').equals(this.ownerId).toArray()
-    )
-      .filter((value) => value.deletedAt === null)
-      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    ).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   }
   async findByNormalizedName(name: string): Promise<Category | null> {
     return (

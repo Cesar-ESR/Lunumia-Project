@@ -103,7 +103,7 @@ export interface RemoteApplySummary {
 }
 
 export interface RemoteDefaultSnapshot {
-  systemCategories: Category[]
+  categories: Category[]
   userSettings: UserSettings | null
 }
 

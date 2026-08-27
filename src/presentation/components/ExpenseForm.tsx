@@ -321,7 +321,6 @@ export function ExpenseForm({
           <option value="">Selecciona una categoría</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
-              {category.icon ? `${category.icon} ` : ''}
               {category.name}
             </option>
           ))}

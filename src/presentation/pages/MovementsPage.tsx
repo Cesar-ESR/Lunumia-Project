@@ -179,7 +179,7 @@ export function MovementsPage() {
         description={`${formatCompactDate(activePeriod.startDate)} — ${formatCompactDate(activePeriod.endDate)}`}
         actions={
           <>
-            <Link className="ln-button ln-button--secondary" to="/expenses">
+            <Link className="ln-button ln-button--primary" to="/expenses">
               Registrar gasto
             </Link>
             <Link

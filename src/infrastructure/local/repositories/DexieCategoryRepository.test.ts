@@ -58,4 +58,17 @@ describe('DexieCategoryRepository', () => {
     })
     expect(await repository.countExpensesByCategory('food')).toBe(1)
   })
+  it('expone el historial borrado solo mediante la consulta explícita', async () => {
+    database = new GastoClaroDB('categories-history-test')
+    const repository = new DexieCategoryRepository(database, 'owner', {
+      clock: { now: () => '2026-01-02T00:00:00.000Z' },
+    })
+    await repository.create(category('food', 'Comida'))
+    await repository.delete('food')
+
+    expect(await repository.findAll()).toEqual([])
+    expect(await repository.findAllIncludingDeleted()).toEqual([
+      expect.objectContaining({ id: 'food', deletedAt: '2026-01-02T00:00:00.000Z' }),
+    ])
+  })
 })

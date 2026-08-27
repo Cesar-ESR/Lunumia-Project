@@ -139,7 +139,7 @@ export class DexieSyncStore implements LocalSyncStore {
         this.db.expenses.where('ownerId').equals(ownerId).count(),
       ])
 
-      for (const remoteCategory of [...snapshot.systemCategories].sort(
+      for (const remoteCategory of [...snapshot.categories].sort(
         compareRecords,
       )) {
         if (remoteCategory.ownerId !== ownerId)
@@ -154,17 +154,62 @@ export class DexieSyncStore implements LocalSyncStore {
         )
           .filter(
             (category) =>
-              category.isSystem && category.id !== remoteCategory.id,
+              category.id !== remoteCategory.id,
           )
           .sort(compareRecords)
 
+        let canonicalCategory: Category = {
+          ...remoteCategory,
+          syncStatus: 'synced',
+        }
+        let categoryOperationType: 'update' | 'delete' | null = null
         for (const duplicate of duplicates) {
-          await this.reconcileSystemCategory(
+          await this.reconcileCategoryReferences(
             ownerId,
             duplicate,
             remoteCategory,
             reconciledAt,
           )
+        }
+        const localSource = duplicates.at(-1)
+        if (localSource && !remoteCategory.isSystem) {
+          const reconciledUpdatedAt = strictlyAfterRemote(
+            reconciledAt,
+            remoteCategory.updatedAt,
+          )
+          if (localSource.deletedAt !== null) {
+            canonicalCategory = {
+              ...remoteCategory,
+              name: localSource.name,
+              normalizedName: localSource.normalizedName,
+              color: localSource.color,
+              icon: localSource.icon,
+              isSystem: false,
+              updatedAt: reconciledUpdatedAt,
+              deletedAt: reconciledUpdatedAt,
+              syncStatus: 'pending',
+            }
+            categoryOperationType = 'delete'
+          } else {
+            const differsRemotely =
+              localSource.name !== remoteCategory.name ||
+              localSource.normalizedName !== remoteCategory.normalizedName ||
+              localSource.color !== remoteCategory.color ||
+              localSource.icon !== remoteCategory.icon
+            if (differsRemotely) {
+              canonicalCategory = {
+                ...remoteCategory,
+                name: localSource.name,
+                normalizedName: localSource.normalizedName,
+                color: localSource.color,
+                icon: localSource.icon,
+                isSystem: false,
+                updatedAt: reconciledUpdatedAt,
+                syncStatus: 'pending',
+              }
+              categoryOperationType = 'update'
+            }
+          }
         }
         if (duplicates.length > 0) {
           await this.removeQueuedEntityOperations(
@@ -172,10 +217,20 @@ export class DexieSyncStore implements LocalSyncStore {
             'category',
             remoteCategory.id,
           )
-          await this.db.categories.put({
-            ...remoteCategory,
-            syncStatus: 'synced',
-          })
+          await this.db.categories.put(canonicalCategory)
+          if (categoryOperationType) {
+            await this.db.syncOperations.add(
+              createSyncOperation(
+                this.sync,
+                ownerId,
+                'category',
+                canonicalCategory.id,
+                categoryOperationType,
+                canonicalCategory,
+                reconciledAt,
+              ),
+            )
+          }
         }
       }
 
@@ -286,7 +341,7 @@ export class DexieSyncStore implements LocalSyncStore {
     })
   }
 
-  private async reconcileSystemCategory(
+  private async reconcileCategoryReferences(
     ownerId: string,
     localCategory: Category,
     remoteCategory: Category,

@@ -33,6 +33,24 @@ async function completeValidForm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ExpenseForm', () => {
+  it('muestra solo el nombre humano de la categoría en el selector nativo', () => {
+    render(
+      <ExpenseForm
+        ownerId="guest:test-owner"
+        period={createPeriodMock()}
+        categories={[
+          createCategoryMock({ name: 'Sin categoría', icon: 'inbox' }),
+        ]}
+        onSubmit={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('option', { name: 'Sin categoría' })).toHaveTextContent(
+      'Sin categoría',
+    )
+    expect(screen.queryByText(/inbox/)).toBeNull()
+  })
+
   it('valida campos vacíos y exige categoría', async () => {
     const user = userEvent.setup()
     const { onSubmit } = renderForm()

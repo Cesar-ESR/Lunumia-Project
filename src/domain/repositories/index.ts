@@ -47,6 +47,7 @@ export interface ICategoryRepository {
   delete(id: string): Promise<void>
   findById(id: string): Promise<Category | null>
   findAll(): Promise<Category[]>
+  findAllIncludingDeleted(): Promise<Category[]>
   findByNormalizedName(name: string): Promise<Category | null>
   countExpensesByCategory(categoryId: string): Promise<number>
   findSystemCategory(): Promise<Category>

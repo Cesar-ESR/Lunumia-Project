@@ -1,5 +1,6 @@
 import type { Clock, IdGenerator } from '@application/services/IdGenerator'
 import type { UserSettingsStore } from '@application/use-cases/periods/SetActivePeriod'
+import { STARTER_CATEGORY_TEMPLATES } from '@application/use-cases/categories/starter-category-templates'
 import { normalizeCategoryName } from '@domain/rules'
 import type { ICategoryRepository } from '@domain/repositories'
 
@@ -28,8 +29,11 @@ export class InitializeLocalOwner {
       })
     }
 
+    const categoryHistory = await this.categories.findAllIncludingDeleted()
     if (
-      !(await this.categories.findAll()).some((category) => category.isSystem)
+      !categoryHistory.some(
+        (category) => category.isSystem && category.deletedAt === null,
+      )
     ) {
       await this.categories.create({
         id: this.ids.generate(),
@@ -44,6 +48,27 @@ export class InitializeLocalOwner {
         deletedAt: null,
         syncStatus: 'pending',
       })
+    }
+
+    const ordinaryHistory = categoryHistory.filter(
+      (category) => !category.isSystem,
+    )
+    if (this.ownerId.startsWith('guest:') && ordinaryHistory.length === 0) {
+      for (const template of STARTER_CATEGORY_TEMPLATES) {
+        await this.categories.create({
+          id: this.ids.generate(),
+          ownerId: this.ownerId,
+          name: template.name,
+          normalizedName: normalizeCategoryName(template.name),
+          color: template.color,
+          icon: template.icon,
+          isSystem: false,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+          syncStatus: 'pending',
+        })
+      }
     }
   }
 }

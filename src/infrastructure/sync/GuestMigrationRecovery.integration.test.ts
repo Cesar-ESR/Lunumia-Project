@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type {
   BalanceAnchor,
   Category,
+  CategoryBudget,
   Expense,
   Period,
+  RecurringPayment,
   SyncCursor,
   SyncEntityType,
   SyncOperation,
@@ -34,6 +36,11 @@ const secondExpenseId = '60000000-0000-4000-8000-000000000006'
 const localSettingsId = '70000000-0000-4000-8000-000000000007'
 const remoteSettingsId = '80000000-0000-4000-8000-000000000008'
 const balanceAnchorId = '90000000-0000-4000-8000-000000000009'
+const localStarterCategoryId = 'a0000000-0000-4000-8000-000000000010'
+const remoteStarterCategoryId = 'a0000000-0000-4000-8000-000000000011'
+const categoryBudgetId = 'a0000000-0000-4000-8000-000000000012'
+const recurringPaymentId = 'a0000000-0000-4000-8000-000000000013'
+const compoundOperationId = 'a0000000-0000-4000-8000-000000000014'
 const entityInstant = '2026-08-09T05:30:00.000Z'
 const migrationInstant = '2026-08-09T06:17:39.705Z'
 const reconciliationInstant = '2026-08-09T07:00:00.000Z'
@@ -58,7 +65,7 @@ class ForeignKeyRemote implements RemoteSyncGateway {
   userSettings: UserSettings | null
 
   constructor(defaults = remoteDefaults()) {
-    defaults.systemCategories.forEach((category) =>
+    defaults.categories.forEach((category) =>
       this.categories.set(category.id, category),
     )
     this.userSettings = defaults.userSettings
@@ -70,8 +77,8 @@ class ForeignKeyRemote implements RemoteSyncGateway {
 
   async fetchCanonicalDefaults(): Promise<RemoteDefaultSnapshot> {
     return {
-      systemCategories: [...this.categories.values()].filter(
-        (category) => category.isSystem && category.deletedAt === null,
+      categories: [...this.categories.values()].filter(
+        (category) => category.deletedAt === null,
       ),
       userSettings: this.userSettings,
     }
@@ -321,6 +328,7 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
 
   it('revierte referencias, IDs y cola si falla la reconciliaciÃ³n', async () => {
     await seedGuest(database)
+    await seedGuestStarterRelationships(database)
     await migrateGuest(database)
     const beforeQueue = await database.syncOperations.toArray()
     const store = new DexieSyncStore(
@@ -335,16 +343,24 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
     await expect(
       store.reconcileRemoteDefaults(
         ownerId,
-        remoteDefaults(),
+        remoteDefaults([remoteStarterCategory()]),
         reconciliationInstant,
       ),
     ).rejects.toThrow('fallo de reconciliaciÃ³n forzado')
 
     expect(await database.categories.get(localCategoryId)).toBeDefined()
     expect(await database.categories.get(remoteCategoryId)).toBeUndefined()
+    expect(await database.categories.get(localStarterCategoryId)).toBeDefined()
+    expect(await database.categories.get(remoteStarterCategoryId)).toBeUndefined()
     expect((await database.expenses.get(firstExpenseId))?.categoryId).toBe(
-      localCategoryId,
+      localStarterCategoryId,
     )
+    expect((await database.categoryBudgets.get(categoryBudgetId))?.categoryId).toBe(
+      localStarterCategoryId,
+    )
+    expect(
+      (await database.recurringPayments.get(recurringPaymentId))?.categoryId,
+    ).toBe(localStarterCategoryId)
     expect(await database.userSettings.get(localSettingsId)).toBeDefined()
     expect(await database.syncOperations.toArray()).toEqual(beforeQueue)
   })
@@ -381,6 +397,162 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
         expect.objectContaining({ categoryId: remoteCategoryId }),
       ]),
     )
+  })
+
+  it('reconcilia un starter guest con el servidor y reescribe todas sus relaciones atómicamente', async () => {
+    await seedGuest(database)
+    await seedGuestStarterRelationships(database)
+    await migrateGuest(database)
+    await database.syncOperations.add({
+      operationId: compoundOperationId,
+      ownerId,
+      entityType: 'recurringPaymentOccurrence',
+      entityId: 'a0000000-0000-4000-8000-000000000015',
+      operationType: 'pay_recurring_occurrence',
+      payload: JSON.stringify({
+        occurrence: { id: 'a0000000-0000-4000-8000-000000000015' },
+        expense: {
+          id: secondExpenseId,
+          categoryId: localStarterCategoryId,
+          updatedAt: migrationInstant,
+          syncStatus: 'pending',
+        },
+      }),
+      createdAt: migrationInstant,
+      status: 'pending',
+      errorMessage: null,
+      retryCount: 0,
+    })
+
+    await deterministicStore(database).reconcileRemoteDefaults(
+      ownerId,
+      remoteDefaults([remoteStarterCategory()]),
+      reconciliationInstant,
+    )
+
+    expect(await database.categories.get(localStarterCategoryId)).toBeUndefined()
+    expect(await database.categories.get(remoteStarterCategoryId)).toMatchObject({
+      name: 'Alimentación',
+      normalizedName: 'alimentación',
+      color: '#C026D3',
+      icon: 'basket',
+      syncStatus: 'pending',
+    })
+    expect((await database.expenses.get(firstExpenseId))?.categoryId).toBe(
+      remoteStarterCategoryId,
+    )
+    expect((await database.categoryBudgets.get(categoryBudgetId))?.categoryId).toBe(
+      remoteStarterCategoryId,
+    )
+    expect(
+      (await database.recurringPayments.get(recurringPaymentId))?.categoryId,
+    ).toBe(remoteStarterCategoryId)
+    const compound = await database.syncOperations.get(compoundOperationId)
+    expect(JSON.parse(compound?.payload ?? '{}')).toMatchObject({
+      expense: { categoryId: remoteStarterCategoryId },
+    })
+
+    const activeCategories = (await database.categories.toArray()).filter(
+      ({ ownerId: candidate, deletedAt }) =>
+        candidate === ownerId && deletedAt === null,
+    )
+    expect(
+      activeCategories.filter(
+        ({ normalizedName }) => normalizedName === 'alimentación',
+      ),
+    ).toHaveLength(1)
+    const activeCategoryIds = new Set(activeCategories.map(({ id }) => id))
+    expect(
+      [
+        ...(await database.expenses.where('ownerId').equals(ownerId).toArray()),
+        ...(await database.categoryBudgets
+          .where('ownerId')
+          .equals(ownerId)
+          .toArray()),
+        ...(await database.recurringPayments
+          .where('ownerId')
+          .equals(ownerId)
+          .toArray()),
+      ].every(
+        ({ categoryId, deletedAt }) =>
+          deletedAt !== null || activeCategoryIds.has(categoryId),
+      ),
+    ).toBe(true)
+  })
+
+  it('migra un starter renombrado como categoría ordinaria sin descartarlo', async () => {
+    await seedGuest(database)
+    await database.categories.add({
+      ownerId: guestOwnerId,
+      id: localStarterCategoryId,
+      name: 'Comida',
+      normalizedName: 'comida',
+      color: '#C026D3',
+      icon: null,
+      isSystem: false,
+      createdAt: entityInstant,
+      updatedAt: entityInstant,
+      deletedAt: null,
+      syncStatus: 'pending',
+    })
+    await migrateGuest(database)
+    const remote = new ForeignKeyRemote(
+      remoteDefaults([remoteStarterCategory()]),
+    )
+
+    const result = await new SyncCoordinator(
+      deterministicStore(database),
+      remote,
+      () => reconciliationInstant,
+    ).sync(ownerId)
+
+    expect(result.failed).toBe(0)
+    expect(remote.categories.get(localStarterCategoryId)).toMatchObject({
+      name: 'Comida',
+      normalizedName: 'comida',
+      color: '#C026D3',
+    })
+    expect(remote.categories.get(remoteStarterCategoryId)).toMatchObject({
+      name: 'Alimentación',
+    })
+  })
+
+  it('traslada el tombstone guest al starter remoto y no lo resucita', async () => {
+    await seedGuest(database)
+    await database.categories.add({
+      ownerId: guestOwnerId,
+      id: localStarterCategoryId,
+      name: 'Alimentación',
+      normalizedName: 'alimentación',
+      color: '#2F6FED',
+      icon: null,
+      isSystem: false,
+      createdAt: entityInstant,
+      updatedAt: migrationInstant,
+      deletedAt: migrationInstant,
+      syncStatus: 'pending',
+    })
+    await migrateGuest(database)
+    const remote = new ForeignKeyRemote(
+      remoteDefaults([remoteStarterCategory()]),
+    )
+
+    const result = await new SyncCoordinator(
+      deterministicStore(database),
+      remote,
+      () => reconciliationInstant,
+    ).sync(ownerId)
+
+    expect(result.failed).toBe(0)
+    expect(remote.categories.get(remoteStarterCategoryId)?.deletedAt).toBe(
+      reconciliationInstant,
+    )
+    expect(
+      (await database.categories.toArray()).filter(
+        ({ normalizedName, deletedAt }) =>
+          normalizedName === 'alimentación' && deletedAt === null,
+      ),
+    ).toEqual([])
   })
 })
 
@@ -448,6 +620,48 @@ async function seedGuest(db: GastoClaroDB): Promise<void> {
   })
 }
 
+async function seedGuestStarterRelationships(db: GastoClaroDB): Promise<void> {
+  const base = {
+    ownerId: guestOwnerId,
+    createdAt: entityInstant,
+    updatedAt: entityInstant,
+    deletedAt: null,
+    syncStatus: 'pending' as const,
+  }
+  await db.categories.add({
+    ...base,
+    id: localStarterCategoryId,
+    name: 'Alimentación',
+    normalizedName: 'alimentación',
+    color: '#C026D3',
+    icon: 'basket',
+    isSystem: false,
+  })
+  await db.expenses.update(firstExpenseId, {
+    categoryId: localStarterCategoryId,
+  })
+  const budget: CategoryBudget = {
+    ...base,
+    id: categoryBudgetId,
+    periodId,
+    categoryId: localStarterCategoryId,
+    amount: 80_000,
+  }
+  const recurringPayment: RecurringPayment = {
+    ...base,
+    id: recurringPaymentId,
+    name: 'Despensa recurrente',
+    amount: 15_000,
+    frequency: 'monthly',
+    dueDate: '2026-08-10',
+    endDate: null,
+    categoryId: localStarterCategoryId,
+    status: 'active',
+  }
+  await db.categoryBudgets.add(budget)
+  await db.recurringPayments.add(recurringPayment)
+}
+
 async function migrateGuest(db: GastoClaroDB): Promise<void> {
   const operationIds = [
     'c0000000-0000-4000-8000-000000000001',
@@ -460,7 +674,11 @@ async function migrateGuest(db: GastoClaroDB): Promise<void> {
   let index = 0
   await new DataMigrationService(
     new DexieOwnerDataManager(db, new MemoryStorage(), () => undefined, {
-      ids: { generate: () => operationIds[index++]! },
+      ids: {
+        generate: () =>
+          operationIds[index++] ??
+          `f0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      },
       clock: { now: () => migrationInstant },
     }),
   ).migrate(guestOwnerId, ownerId)
@@ -494,9 +712,11 @@ async function operationFor(
   return operation
 }
 
-function remoteDefaults(): RemoteDefaultSnapshot {
+function remoteDefaults(
+  additionalCategories: Category[] = [],
+): RemoteDefaultSnapshot {
   return {
-    systemCategories: [
+    categories: [
       {
         id: remoteCategoryId,
         ownerId,
@@ -510,6 +730,7 @@ function remoteDefaults(): RemoteDefaultSnapshot {
         deletedAt: null,
         syncStatus: 'synced',
       },
+      ...additionalCategories,
     ],
     userSettings: {
       id: remoteSettingsId,
@@ -520,6 +741,22 @@ function remoteDefaults(): RemoteDefaultSnapshot {
       createdAt: '2026-08-09T06:18:02.723Z',
       updatedAt: '2026-08-09T06:18:02.792Z',
     },
+  }
+}
+
+function remoteStarterCategory(): Category {
+  return {
+    id: remoteStarterCategoryId,
+    ownerId,
+    name: 'Alimentación',
+    normalizedName: 'alimentación',
+    color: '#2F6FED',
+    icon: null,
+    isSystem: false,
+    createdAt: '2026-08-09T06:18:02.723Z',
+    updatedAt: '2026-08-09T06:18:02.899Z',
+    deletedAt: null,
+    syncStatus: 'synced',
   }
 }
 
