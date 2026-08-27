@@ -21,7 +21,13 @@ export type {
   ProjectRecurringPaymentsForRangeInput,
 } from './recurring-projection'
 export { projectRecurringPaymentsForRange } from './recurring-projection'
-export { calculateCurrentBalance } from './balance'
+export {
+  calculateCurrentBalance,
+  findEarliestBalanceEffectiveAt,
+  getExpenseBalanceEffectiveAt,
+  getIncomeBalanceEffectiveAt,
+  isExpenseBalanceEffectiveAfter,
+} from './balance'
 export type { CommitmentTotals } from './commitments'
 export { calculateCommitments } from './commitments'
 export type {

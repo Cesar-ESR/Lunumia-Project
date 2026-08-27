@@ -258,9 +258,19 @@ export function createApplicationServicesMock({
       },
     },
     balance: {
+      getSetupContext: {
+        execute: vi
+          .fn<ApplicationServices['balance']['getSetupContext']['execute']>()
+          .mockResolvedValue({ hasEffectiveBalanceMovements: false }),
+      },
       setCurrentBalance: {
         execute: vi
           .fn<ApplicationServices['balance']['setCurrentBalance']['execute']>()
+          .mockResolvedValue(anchor),
+      },
+      setOpeningBalance: {
+        execute: vi
+          .fn<ApplicationServices['balance']['setOpeningBalance']['execute']>()
           .mockResolvedValue(anchor),
       },
       reconcileCurrentBalance: {

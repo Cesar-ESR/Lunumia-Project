@@ -1,10 +1,8 @@
-import { calculateCurrentBalance } from '@domain/calculations'
-import type {
-  BalanceAnchor,
-  Expense,
-  ExpenseV2,
-  Income,
-} from '@domain/entities'
+import {
+  calculateCurrentBalance,
+  isExpenseBalanceEffectiveAfter,
+} from '@domain/calculations'
+import type { BalanceAnchor, Expense, Income } from '@domain/entities'
 import type {
   AmountCents,
   Instant,
@@ -18,14 +16,6 @@ export interface ResourceUsageSummary {
   currentAvailableCents: SignedMoneyCents
   canCalculatePercentage: boolean
   status: 'available' | 'negative'
-}
-
-const isExpenseV2 = (expense: Expense): expense is ExpenseV2 =>
-  'affectsBalance' in expense
-
-const affectsBalanceAfter = (expense: Expense, cutoff: Instant): boolean => {
-  if (!isExpenseV2(expense)) return expense.createdAt > cutoff
-  return expense.affectsBalance && expense.balanceEffectiveAt > cutoff
 }
 
 export function getResourceUsageSummary({
@@ -45,10 +35,8 @@ export function getResourceUsageSummary({
   if (anchor === null || currentAvailableCents === null) return null
 
   const spentCents = expenses
-    .filter(
-      (expense) =>
-        expense.deletedAt === null &&
-        affectsBalanceAfter(expense, anchor.ledgerCutoffAt),
+    .filter((expense) =>
+      isExpenseBalanceEffectiveAfter(expense, anchor.ledgerCutoffAt),
     )
     .reduce((total, expense) => total + expense.amount, 0)
   const resourceBaseCents = currentAvailableCents + spentCents

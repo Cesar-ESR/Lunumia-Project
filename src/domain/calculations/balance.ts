@@ -5,25 +5,51 @@ import type {
   Income,
   IncomeV2,
 } from '@domain/entities'
-import type { SignedMoneyCents } from '@domain/value-objects'
+import type { Instant, SignedMoneyCents } from '@domain/value-objects'
 
 const isIncomeV2 = (income: Income): income is IncomeV2 => 'status' in income
 const isExpenseV2 = (expense: Expense): expense is ExpenseV2 =>
   'affectsBalance' in expense
 
-const incomeEffectiveAfter = (income: Income, cutoff: string): boolean => {
-  if (!isIncomeV2(income)) return income.createdAt > cutoff
-  return (
-    income.status === 'received' &&
+export const getIncomeBalanceEffectiveAt = (income: Income): Instant | null => {
+  if (income.deletedAt !== null) return null
+  if (!isIncomeV2(income)) return income.createdAt
+  return income.status === 'received' &&
     income.affectsBalance &&
-    income.balanceEffectiveAt !== null &&
-    income.balanceEffectiveAt > cutoff
-  )
+    income.balanceEffectiveAt !== null
+    ? income.balanceEffectiveAt
+    : null
 }
 
-const expenseEffectiveAfter = (expense: Expense, cutoff: string): boolean => {
-  if (!isExpenseV2(expense)) return expense.createdAt > cutoff
-  return expense.affectsBalance && expense.balanceEffectiveAt > cutoff
+export const getExpenseBalanceEffectiveAt = (
+  expense: Expense,
+): Instant | null => {
+  if (expense.deletedAt !== null) return null
+  if (!isExpenseV2(expense)) return expense.createdAt
+  return expense.affectsBalance ? expense.balanceEffectiveAt : null
+}
+
+export const isExpenseBalanceEffectiveAfter = (
+  expense: Expense,
+  cutoff: Instant,
+): boolean => {
+  const effectiveAt = getExpenseBalanceEffectiveAt(expense)
+  return effectiveAt !== null && effectiveAt > cutoff
+}
+
+export function findEarliestBalanceEffectiveAt(
+  incomes: readonly Income[],
+  expenses: readonly Expense[],
+): Instant | null {
+  let earliest: Instant | null = null
+  for (const effectiveAt of [
+    ...incomes.map(getIncomeBalanceEffectiveAt),
+    ...expenses.map(getExpenseBalanceEffectiveAt),
+  ]) {
+    if (effectiveAt !== null && (earliest === null || effectiveAt < earliest))
+      earliest = effectiveAt
+  }
+  return earliest
 }
 
 export function calculateCurrentBalance(
@@ -34,17 +60,14 @@ export function calculateCurrentBalance(
   if (anchor === null || anchor.deletedAt !== null) return null
 
   const receivedAfterAnchor = incomes
-    .filter(
-      (income) =>
-        income.deletedAt === null &&
-        incomeEffectiveAfter(income, anchor.ledgerCutoffAt),
-    )
+    .filter((income) => {
+      const effectiveAt = getIncomeBalanceEffectiveAt(income)
+      return effectiveAt !== null && effectiveAt > anchor.ledgerCutoffAt
+    })
     .reduce((total, income) => total + income.amount, 0)
   const spentAfterAnchor = expenses
-    .filter(
-      (expense) =>
-        expense.deletedAt === null &&
-        expenseEffectiveAfter(expense, anchor.ledgerCutoffAt),
+    .filter((expense) =>
+      isExpenseBalanceEffectiveAfter(expense, anchor.ledgerCutoffAt),
     )
     .reduce((total, expense) => total + expense.amount, 0)
 

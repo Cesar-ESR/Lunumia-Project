@@ -22,6 +22,8 @@ import { MarkIncomeAsReceived } from '@application/use-cases/incomes/MarkIncomeA
 import { CancelExpectedIncome } from '@application/use-cases/incomes/CancelExpectedIncome'
 import { SetCurrentBalance } from '@application/use-cases/balance/SetCurrentBalance'
 import { ReconcileCurrentBalance } from '@application/use-cases/balance/ReconcileCurrentBalance'
+import { SetOpeningBalance } from '@application/use-cases/balance/SetOpeningBalance'
+import { GetBalanceSetupContext } from '@application/use-cases/balance/GetBalanceSetupContext'
 import { CreatePeriod } from '@application/use-cases/periods/CreatePeriod'
 import { DeletePeriod } from '@application/use-cases/periods/DeletePeriod'
 import { ListPeriods } from '@application/use-cases/periods/ListPeriods'
@@ -128,7 +130,9 @@ export interface ApplicationServices {
   initialize: Executable<InitializeLocalOwner>
   settings: { getUserSettings: Executable<GetUserSettings> }
   balance: {
+    getSetupContext: Executable<GetBalanceSetupContext>
     setCurrentBalance: Executable<SetCurrentBalance>
+    setOpeningBalance: Executable<SetOpeningBalance>
     reconcileCurrentBalance: Executable<ReconcileCurrentBalance>
   }
   periods: {
@@ -372,7 +376,15 @@ export function createApplicationServices(
     ),
     settings: { getUserSettings: new GetUserSettings(settings) },
     balance: {
+      getSetupContext: new GetBalanceSetupContext(incomes, expenses),
       setCurrentBalance: new SetCurrentBalance(anchors, ids, clock),
+      setOpeningBalance: new SetOpeningBalance(
+        anchors,
+        incomes,
+        expenses,
+        ids,
+        clock,
+      ),
       reconcileCurrentBalance: new ReconcileCurrentBalance(anchors, ids, clock),
     },
     periods: {
