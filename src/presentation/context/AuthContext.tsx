@@ -347,6 +347,7 @@ export function AuthProvider({
         const result = await runtime.signUp.execute(
           input,
           runtime.redirectUrl('/verify-email'),
+          runtime.redirectUrl('/reset-password'),
         )
         const requiresGuestDecision = result.session
           ? await prepareAuthenticatedSession(result.session, 'register')

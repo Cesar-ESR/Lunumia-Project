@@ -4,7 +4,16 @@ import type { AuthClient, AuthResult } from '@application/services/AuthClient'
 export class SignUp {
   constructor(private readonly authClient: AuthClient) {}
 
-  execute(input: SignUpInput, emailRedirectTo?: string): Promise<AuthResult> {
-    return this.authClient.signUp(signUpSchema.parse(input), emailRedirectTo)
+  async execute(
+    input: SignUpInput,
+    emailVerificationRedirect: string,
+    passwordRecoveryRedirect: string,
+  ): Promise<AuthResult> {
+    const parsed = signUpSchema.parse(input)
+    await this.authClient.requestPasswordReset(
+      parsed.email,
+      passwordRecoveryRedirect,
+    )
+    return this.authClient.signUp(parsed, emailVerificationRedirect)
   }
 }

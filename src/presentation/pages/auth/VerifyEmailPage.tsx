@@ -17,14 +17,17 @@ export function VerifyEmailPage() {
       title="Revisa tu correo"
       description={
         email
-          ? `Si esta dirección puede registrarse, recibirás un correo en ${email} para confirmar tu cuenta.`
-          : 'Si la dirección puede registrarse, recibirás un correo para continuar.'
+          ? `Te enviamos a ${email} las instrucciones correspondientes para continuar con tu cuenta.`
+          : 'Te enviamos las instrucciones correspondientes para continuar con tu cuenta.'
       }
     >
       <p className="auth-help">
-        Si ya tenías una cuenta, puedes <Link to="/login">iniciar sesión</Link>{' '}
-        o <Link to="/forgot-password">restablecer tu contraseña</Link>.
+        Puede ser una confirmación de cuenta o una recuperación de acceso.
       </p>
+      <div className="auth-links">
+        <Link to="/login">Iniciar sesión</Link>
+        <Link to="/forgot-password">Restablecer contraseña</Link>
+      </div>
     </AuthPageLayout>
   )
 }

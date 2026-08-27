@@ -26,19 +26,24 @@ describe('VerifyEmailPage', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Si esta dirección puede registrarse, recibirás un correo en persona@example.com para confirmar tu cuenta.',
+        'Te enviamos a persona@example.com las instrucciones correspondientes para continuar con tu cuenta.',
       ),
     ).toBeInTheDocument()
     expect(
-      screen.queryByText(/enviamos instrucciones/i),
+      screen.getByText(
+        'Puede ser una confirmación de cuenta o una recuperación de acceso.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/ya existe una cuenta/i)).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/el correo ya está registrado/i),
     ).not.toBeInTheDocument()
     expect(screen.queryByText(/tu cuenta fue creada/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/te enviamos un correo/i)).not.toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'iniciar sesión' }),
+      screen.getByRole('link', { name: 'Iniciar sesión' }),
     ).toHaveAttribute('href', '/login')
     expect(
-      screen.getByRole('link', { name: 'restablecer tu contraseña' }),
+      screen.getByRole('link', { name: 'Restablecer contraseña' }),
     ).toHaveAttribute('href', '/forgot-password')
   })
 
@@ -47,13 +52,13 @@ describe('VerifyEmailPage', () => {
 
     expect(
       screen.getByText(
-        'Si la dirección puede registrarse, recibirás un correo para continuar.',
+        'Te enviamos las instrucciones correspondientes para continuar con tu cuenta.',
       ),
     ).toBeInTheDocument()
     expect(screen.queryByText(/@/)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'iniciar sesión' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toBeVisible()
     expect(
-      screen.getByRole('link', { name: 'restablecer tu contraseña' }),
+      screen.getByRole('link', { name: 'Restablecer contraseña' }),
     ).toBeVisible()
   })
 })

@@ -325,6 +325,14 @@ describe('AuthContext', () => {
     )
     expect(action.requiresGuestDecision).toBe(false)
     expect(result.current.ownerId).toBe(session.user.id)
+    expect(setup.authClient.requestPasswordReset).toHaveBeenCalledWith(
+      'persona@example.com',
+      `${window.location.origin}/reset-password`,
+    )
+    expect(setup.authClient.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'persona@example.com' }),
+      `${window.location.origin}/verify-email`,
+    )
     expect(setup.ownerData.migrateOwner).not.toHaveBeenCalled()
   })
 
