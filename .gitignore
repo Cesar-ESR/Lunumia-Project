@@ -6,8 +6,11 @@ dist-landing/
 android/.gradle/
 android/**/build/
 
-# Local configuration and secrets
+# Internal product planning
 .kiro/
+docs/Lunumia_2.0_Plan_Maestro.md
+
+# Local configuration and secrets
 .env
 .env.*
 !.env.example
