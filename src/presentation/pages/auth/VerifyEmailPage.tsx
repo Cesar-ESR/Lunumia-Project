@@ -13,18 +13,17 @@ export function VerifyEmailPage() {
       : null
   return (
     <AuthPageLayout
-      eyebrow="Verifica tu correo"
-      title="Revisa tu bandeja de entrada"
+      eyebrow="Cuenta"
+      title="Revisa tu correo"
       description={
         email
-          ? `Enviamos instrucciones a ${email}. Confirma tu dirección para activar la cuenta.`
-          : 'Enviamos instrucciones para confirmar tu dirección y activar la cuenta.'
+          ? `Si esta dirección puede registrarse, recibirás un correo en ${email} para confirmar tu cuenta.`
+          : 'Si la dirección puede registrarse, recibirás un correo para continuar.'
       }
-      footer={<Link to="/login">Volver a iniciar sesión</Link>}
     >
       <p className="auth-help">
-        La verificación se completa desde el enlace de Supabase. Lunumia no
-        marca cuentas como verificadas desde el navegador.
+        Si ya tenías una cuenta, puedes <Link to="/login">iniciar sesión</Link>{' '}
+        o <Link to="/forgot-password">restablecer tu contraseña</Link>.
       </p>
     </AuthPageLayout>
   )

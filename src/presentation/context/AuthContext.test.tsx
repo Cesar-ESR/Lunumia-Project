@@ -328,6 +328,35 @@ describe('AuthContext', () => {
     expect(setup.ownerData.migrateOwner).not.toHaveBeenCalled()
   })
 
+  it('registro aceptado sin sesión conserva el owner y los datos invitados', async () => {
+    const setup = createRuntime(null)
+    vi.mocked(setup.authClient.signUp).mockResolvedValue({
+      user: session.user,
+      session: null,
+      requiresEmailVerification: true,
+    })
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: wrapper(setup.runtime),
+    })
+    await waitFor(() => expect(result.current.status).toBe('guest'))
+
+    const action = await act(() =>
+      result.current.signUp({
+        email: 'persona@example.com',
+        password: '12345678',
+        passwordConfirmation: '12345678',
+      }),
+    )
+
+    expect(action.requiresGuestDecision).toBe(false)
+    expect(result.current.status).toBe('guest')
+    expect(result.current.ownerId).toBe(guestOwnerId)
+    expect(result.current.pendingGuestData).toBeNull()
+    expect(setup.ownerData.summarize).not.toHaveBeenCalled()
+    expect(setup.ownerData.migrateOwner).not.toHaveBeenCalled()
+    expect(setup.ownerData.deleteOwner).not.toHaveBeenCalled()
+  })
+
   it('pide una decisión antes de mezclar datos invitados con la cuenta', async () => {
     const setup = createRuntime(null)
     vi.mocked(setup.ownerData.summarize).mockResolvedValue({

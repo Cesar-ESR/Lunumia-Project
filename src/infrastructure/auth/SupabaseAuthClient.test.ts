@@ -64,18 +64,23 @@ describe('SupabaseAuthClient', () => {
     })
   })
 
-  it('detecta registro pendiente de verificación', async () => {
+  it('mantiene ambiguo un signup aceptado sin sesión', async () => {
     vi.spyOn(supabase.auth, 'signUp').mockResolvedValue({
       data: { user, session: null },
       error: null,
     })
-    await expect(
-      client.signUp({
-        email: 'persona@example.com',
-        password: '12345678',
-        passwordConfirmation: '12345678',
-      }),
-    ).resolves.toMatchObject({ session: null, requiresEmailVerification: true })
+    const result = await client.signUp({
+      email: 'persona@example.com',
+      password: '12345678',
+      passwordConfirmation: '12345678',
+    })
+
+    expect(result).toMatchObject({
+      user: { id: user.id },
+      session: null,
+      requiresEmailVerification: true,
+    })
+    expect(result).not.toHaveProperty('accountCreated')
   })
 
   it('clasifica un error de registro sin exponer el detalle', async () => {
