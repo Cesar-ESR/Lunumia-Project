@@ -175,11 +175,13 @@ export function createApplicationServicesMock({
   budgetSummary = createDashboardBudgetSummaryMock(),
   categoryBudgetSummaries = [createCategoryBudgetSummaryMock()],
   financialSnapshot = createFinancialSnapshotMock(),
+  categories,
 }: {
   activePeriod?: Period | null
   budgetSummary?: DashboardBudgetSummary
   categoryBudgetSummaries?: CategoryBudgetSummary[]
   financialSnapshot?: FinancialSnapshotReadModel
+  categories?: Category[]
 } = {}) {
   const category = createCategoryMock()
   const expense = createExpenseMock()
@@ -388,7 +390,7 @@ export function createApplicationServicesMock({
       listCategories: {
         execute: vi
           .fn<ApplicationServices['categories']['listCategories']['execute']>()
-          .mockResolvedValue([category]),
+          .mockResolvedValue(categories ?? [category]),
       },
       countCategoryExpenses: {
         execute: vi

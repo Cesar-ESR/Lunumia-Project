@@ -7,6 +7,7 @@ import { readInternalDestination } from '../utils/first-time'
 
 const welcomePath = '/configuracion-inicial'
 const periodSetupPath = '/configuracion-inicial/periodo'
+const categorySetupPath = '/configuracion-inicial/categorias'
 
 export function FirstTimeSetupResolver() {
   const auth = useAuth()
@@ -31,6 +32,7 @@ export function FirstTimeSetupResolver() {
 
   const isWelcomePath = location.pathname === welcomePath
   const isPeriodSetupPath = location.pathname === periodSetupPath
+  const isCategorySetupPath = location.pathname === categorySetupPath
   const setupState = location.state
   const isActiveSetupFlow = Boolean(
     setupState &&
@@ -39,12 +41,29 @@ export function FirstTimeSetupResolver() {
     setupState.firstTimeSetup === true,
   )
 
-  if (!period.activePeriod && !isWelcomePath && !isPeriodSetupPath)
+  if (
+    !period.activePeriod &&
+    !isWelcomePath &&
+    !isPeriodSetupPath &&
+    !isCategorySetupPath
+  )
     return (
       <Navigate
         to={welcomePath}
         replace
         state={{ from: currentDestination, firstTimeSetup: true }}
+      />
+    )
+
+  if (!period.activePeriod && isCategorySetupPath)
+    return (
+      <Navigate
+        to={welcomePath}
+        replace
+        state={{
+          from: readInternalDestination(location.state),
+          firstTimeSetup: true,
+        }}
       />
     )
 

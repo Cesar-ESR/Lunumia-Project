@@ -75,7 +75,7 @@ export function InitialBalancePage() {
   }
 
   return (
-    <SetupPageLayout step="Paso 3 de 3">
+    <SetupPageLayout step="Paso 4 de 4">
       <div className="ln-setup-card">
         <header>
           <p className="eyebrow">Saldo opcional</p>

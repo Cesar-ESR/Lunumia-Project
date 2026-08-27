@@ -33,6 +33,7 @@ import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage'
 import { MoreLandingPage, PlanningLandingPage } from './pages/AreaLandingPages'
 import { InitialBalancePage } from './pages/setup/InitialBalancePage'
+import { InitialCategoriesPage } from './pages/setup/InitialCategoriesPage'
 import { InitialPeriodPage } from './pages/setup/InitialPeriodPage'
 import { WelcomePage } from './pages/setup/WelcomePage'
 
@@ -165,6 +166,10 @@ export function App({
                   <Route
                     path="configuracion-inicial/periodo"
                     element={<InitialPeriodPage />}
+                  />
+                  <Route
+                    path="configuracion-inicial/categorias"
+                    element={<InitialCategoriesPage />}
                   />
                   <Route
                     path="saldo/inicial"

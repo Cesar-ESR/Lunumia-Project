@@ -46,7 +46,9 @@ export function InitialPeriodPage() {
   const continueWithPeriod = async (period: Period) => {
     await periodContext.setActivePeriod(period.id)
     await periodContext.refreshPeriods()
-    navigate('/saldo/inicial', { replace: true, state: { from: destination } })
+    navigate('/configuracion-inicial/categorias', {
+      state: { from: destination },
+    })
   }
 
   const submit = async (event: FormEvent) => {
@@ -86,7 +88,7 @@ export function InitialPeriodPage() {
 
   return (
     <>
-      <SetupPageLayout step="Paso 2 de 3">
+      <SetupPageLayout step="Paso 2 de 4">
         <div className="ln-setup-card">
           <header>
             <p className="eyebrow">Primera configuración</p>

@@ -30,7 +30,7 @@ export function WelcomePage() {
   const navigate = useNavigate()
 
   return (
-    <SetupPageLayout step="Paso 1 de 3" wide>
+    <SetupPageLayout step="Paso 1 de 4" wide>
       <section className="ln-welcome-card" aria-labelledby="welcome-title">
         <header className="ln-welcome-intro">
           <p className="eyebrow">Bienvenido a Lunumia</p>

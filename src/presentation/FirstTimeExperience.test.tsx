@@ -61,7 +61,7 @@ describe('primera experiencia derivada del estado real', () => {
     expect(screen.getByText('Registra lo que entra y sale')).toBeInTheDocument()
     expect(screen.getByText('Entiende cómo estás hoy')).toBeInTheDocument()
     expect(screen.getByText('Mira lo que viene')).toBeInTheDocument()
-    expect(screen.getByText('Paso 1 de 3')).toBeInTheDocument()
+    expect(screen.getByText('Paso 1 de 4')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Comenzar' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /cuenta|sesión/i })).toBeNull()
     expect(services.periods.createPeriod.execute).not.toHaveBeenCalled()
@@ -84,7 +84,7 @@ describe('primera experiencia derivada del estado real', () => {
       }),
     ).toBeInTheDocument()
     expect(screen.getByText('Periodo sugerido')).toBeInTheDocument()
-    expect(screen.getByText('Paso 2 de 3')).toBeInTheDocument()
+    expect(screen.getByText('Paso 2 de 4')).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Cambiar periodo' }),
     ).toHaveAttribute('aria-expanded', 'false')
@@ -131,7 +131,7 @@ describe('primera experiencia derivada del estado real', () => {
     expect(leave).toHaveBeenCalledOnce()
   })
 
-  it('completa Welcome, periodo, saldo omitido e Inicio sin crear un bucle', async () => {
+  it('completa Welcome, periodo, categorías, saldo omitido e Inicio sin crear un bucle', async () => {
     const user = userEvent.setup()
     const { services } = renderFirstTime()
     await screen.findByRole('heading', {
@@ -144,9 +144,15 @@ describe('primera experiencia derivada del estado real', () => {
     vi.mocked(services.periods.createPeriod.execute).mockResolvedValue(created)
     vi.mocked(services.periods.listPeriods.execute).mockResolvedValue([created])
     await user.click(screen.getByRole('button', { name: 'Usar este periodo' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Organiza tus gastos' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Paso 3 de 4')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
     await screen.findByRole('heading', {
       name: '¿Quieres indicar tu saldo actual?',
     })
+    expect(screen.getByText('Paso 4 de 4')).toBeInTheDocument()
     await user.click(
       await screen.findByRole('button', { name: 'Hacerlo después' }),
     )
@@ -205,11 +211,16 @@ describe('primera experiencia derivada del estado real', () => {
       created.id,
     )
     expect(
+      await screen.findByRole('heading', { name: 'Organiza tus gastos' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Paso 3 de 4')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
+    expect(
       await screen.findByRole('heading', {
         name: '¿Quieres indicar tu saldo actual?',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Paso 3 de 3')).toBeInTheDocument()
+    expect(screen.getByText('Paso 4 de 4')).toBeInTheDocument()
     expect(
       screen.getByText(/Puedes hacerlo ahora o más adelante/),
     ).toBeInTheDocument()
@@ -297,6 +308,10 @@ describe('primera experiencia derivada del estado real', () => {
     expect(services.periods.setActivePeriod.execute).toHaveBeenCalledWith(
       existing.id,
     )
+    expect(
+      await screen.findByRole('heading', { name: 'Organiza tus gastos' }),
+    ).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
     expect(
       await screen.findByRole('heading', {
         name: '¿Quieres indicar tu saldo actual?',
@@ -440,6 +455,10 @@ describe('primera experiencia derivada del estado real', () => {
     vi.mocked(services.periods.createPeriod.execute).mockResolvedValue(created)
     vi.mocked(services.periods.listPeriods.execute).mockResolvedValue([created])
     await user.click(screen.getByRole('button', { name: 'Usar este periodo' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Organiza tus gastos' }),
+    ).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }))
     await screen.findByRole('heading', {
       name: '¿Quieres indicar tu saldo actual?',
     })
@@ -577,5 +596,8 @@ describe('primera experiencia derivada del estado real', () => {
     expect(readInternalDestination({ from: '/expenses?draft=1' })).toBe(
       '/expenses?draft=1',
     )
+    expect(
+      readInternalDestination({ from: '/configuracion-inicial/categorias' }),
+    ).toBe('/inicio')
   })
 })
