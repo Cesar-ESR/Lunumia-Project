@@ -158,7 +158,7 @@ export function PeriodsPage() {
             </div>
           </div>
           <form onSubmit={handleSubmit} noValidate>
-            <div className="form-grid">
+            <div className="form-grid ln-period-form-grid">
               <FormField id="period-type" label="Tipo" error={errors.type}>
                 <select
                   id="period-type"

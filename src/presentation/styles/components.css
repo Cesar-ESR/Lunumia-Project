@@ -2211,6 +2211,10 @@
   gap: var(--space-4);
 }
 
+.ln-period-form-grid {
+  align-items: start;
+}
+
 .ln-simulator-heading h2,
 .ln-simulator-heading p,
 .ln-management-heading h2,

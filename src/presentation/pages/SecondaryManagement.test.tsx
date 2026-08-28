@@ -52,6 +52,16 @@ describe('Periodos U9', () => {
       screen.getByText('La fecha final se calcula según el tipo de periodo.'),
     ).toBeInTheDocument()
     expect(screen.queryByText('(Obligatorio)')).toBeNull()
+    const dateGrid = screen
+      .getByLabelText(/Fecha inicial/)
+      .closest('.form-grid')
+    expect(dateGrid).toHaveClass('ln-period-form-grid')
+    expect(screen.getByLabelText(/Fecha final/).closest('.form-grid')).toBe(
+      dateGrid,
+    )
+    expect(
+      screen.getByRole('button', { name: 'Crear periodo' }).parentElement,
+    ).not.toBe(dateGrid)
     await user.click(screen.getByRole('button', { name: 'Crear periodo' }))
     await waitFor(() =>
       expect(services.periods.createPeriod.execute).toHaveBeenCalledWith({
