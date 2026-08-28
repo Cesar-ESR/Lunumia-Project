@@ -3,6 +3,7 @@ import type { AIInsightsProvider } from '@domain/ports'
 import { ExplainPlanning } from './ExplainPlanning'
 
 const snapshot: FinancialSnapshot = {
+  openingBalanceCents: 0,
   currentBalanceCents: 100_000,
   spentCents: 91_919,
   committedCents: 22_222,

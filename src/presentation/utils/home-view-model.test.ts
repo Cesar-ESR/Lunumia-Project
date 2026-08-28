@@ -28,17 +28,22 @@ describe('home-view-model', () => {
   it('selecciona la acción contextual por hechos autoritativos', () => {
     expect(
       selectHomePrimaryAction(
-        createFinancialSnapshotMock({ currentBalanceCents: null }),
+        createFinancialSnapshotMock({ openingBalanceCents: null }),
       ).kind,
     ).toBe('balance')
     expect(
       selectHomePrimaryAction(
-        createFinancialSnapshotMock({ overdueCommittedCents: 1 }),
+        createFinancialSnapshotMock({
+          openingBalanceCents: 150_000,
+          overdueCommittedCents: 1,
+        }),
       ).kind,
     ).toBe('commitments')
-    expect(selectHomePrimaryAction(createFinancialSnapshotMock()).kind).toBe(
-      'register',
-    )
+    expect(
+      selectHomePrimaryAction(
+        createFinancialSnapshotMock({ openingBalanceCents: 150_000 }),
+      ).kind,
+    ).toBe('register')
   })
 
   it('prioriza y limita atención sin derivar over desde importes', () => {

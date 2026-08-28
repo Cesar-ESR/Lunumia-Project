@@ -25,6 +25,7 @@ const resourceFacts = (
   overrides: Partial<ResourceUsageSummary> = {},
 ): ResourceUsageSummary => ({
   referenceAt: createInstant('2026-08-01T12:00:00.000Z'),
+  hasOpeningBalance: true,
   resourceBaseCents: 400_000,
   spentCents: 120_000,
   currentAvailableCents: 280_000,
@@ -143,7 +144,7 @@ describe('HomeUsageProgress', () => {
       '30% de los recursos utilizados. $1,200.00 utilizados de $4,000.00. Actualmente disponibles $2,800.00.',
     )
     expect(
-      screen.getByText('Desde tu última referencia de saldo.'),
+      screen.getByText('Saldo inicial y movimientos registrados.'),
     ).toBeInTheDocument()
     expect(screen.getByText('30% utilizado')).toBeInTheDocument()
     expect(screen.getByLabelText('$1,200.00')).toBeInTheDocument()
@@ -222,13 +223,13 @@ describe('HomeUsageProgress', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Para mostrar cuánto de tus recursos has utilizado, primero necesitamos conocer tu saldo actual.',
+        'Registra movimientos para conocer cómo utilizas tus recursos. El saldo inicial es opcional.',
       ),
     ).toBeInTheDocument()
     expect(screen.queryByRole('progressbar')).toBeNull()
     expect(screen.queryByText(/0%/)).toBeNull()
     expect(
-      screen.getByRole('link', { name: 'Indicar saldo actual' }),
+      screen.getByRole('link', { name: 'Agregar saldo inicial' }),
     ).toHaveAttribute('href', '/saldo/inicial')
   })
 })

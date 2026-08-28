@@ -80,7 +80,7 @@ describe('configuración inicial de categorías', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: '¿Quieres indicar tu saldo actual?',
+        name: '¿Quieres indicar tu saldo inicial?',
       }),
     ).toBeInTheDocument()
     expect(services.categories.createCategory.execute).not.toHaveBeenCalled()
@@ -231,7 +231,7 @@ describe('configuración inicial de categorías', () => {
     )
     expect(
       await screen.findByRole('heading', {
-        name: '¿Quieres indicar tu saldo actual?',
+        name: '¿Quieres indicar tu saldo inicial?',
       }),
     ).toBeInTheDocument()
   })

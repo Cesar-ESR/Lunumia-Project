@@ -232,7 +232,7 @@ describe('primera experiencia derivada del estado real', () => {
     expect(screen.getByText('Paso 3 de 4')).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Continuar' }))
     await screen.findByRole('heading', {
-      name: '¿Quieres indicar tu saldo actual?',
+      name: '¿Quieres indicar tu saldo inicial?',
     })
     expect(screen.getByText('Paso 4 de 4')).toBeInTheDocument()
     await user.click(
@@ -299,12 +299,12 @@ describe('primera experiencia derivada del estado real', () => {
     await user.click(await screen.findByRole('button', { name: 'Continuar' }))
     expect(
       await screen.findByRole('heading', {
-        name: '¿Quieres indicar tu saldo actual?',
+        name: '¿Quieres indicar tu saldo inicial?',
       }),
     ).toBeInTheDocument()
     expect(screen.getByText('Paso 4 de 4')).toBeInTheDocument()
     expect(
-      screen.getByText(/Puedes hacerlo ahora o más adelante/),
+      screen.getByText(/Este monto se sumará a tus movimientos registrados/),
     ).toBeInTheDocument()
     expect(screen.queryByText('(Obligatorio)')).toBeNull()
     expect(services.balance.setCurrentBalance.execute).not.toHaveBeenCalled()
@@ -750,7 +750,7 @@ describe('primera experiencia derivada del estado real', () => {
     await user.click(await screen.findByRole('button', { name: 'Continuar' }))
     expect(
       await screen.findByRole('heading', {
-        name: '¿Quieres indicar tu saldo actual?',
+        name: '¿Quieres indicar tu saldo inicial?',
       }),
     ).toBeInTheDocument()
   })
@@ -896,7 +896,7 @@ describe('primera experiencia derivada del estado real', () => {
     ).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Continuar' }))
     await screen.findByRole('heading', {
-      name: '¿Quieres indicar tu saldo actual?',
+      name: '¿Quieres indicar tu saldo inicial?',
     })
     await user.click(
       await screen.findByRole('button', { name: 'Hacerlo después' }),
@@ -913,24 +913,25 @@ describe('primera experiencia derivada del estado real', () => {
     ['1234.56', 123456],
     ['-250.75', -25075],
   ])(
-    'guarda el saldo %s como centavos firmados mediante SetCurrentBalance',
+    'guarda el saldo inicial %s como centavos firmados',
     async (value, cents) => {
       const user = userEvent.setup()
       window.history.replaceState({ from: '/inicio' }, '', '/saldo/inicial')
       const { services } = createApplicationServicesMock({
         financialSnapshot: createFinancialSnapshotMock({
-          currentBalanceCents: null,
-          projectedAvailableCents: null,
-          projectedClosingBalanceCents: null,
+          openingBalanceCents: null,
+          currentBalanceCents: 0,
         }),
       })
       render(<App services={services} authServices={null} />)
-      const input = await screen.findByRole('textbox', { name: /Saldo actual/ })
+      const input = await screen.findByRole('textbox', {
+        name: /Saldo inicial/,
+      })
       await user.type(input, value)
       await user.click(
-        screen.getByRole('button', { name: 'Indicar saldo actual' }),
+        screen.getByRole('button', { name: 'Guardar saldo inicial' }),
       )
-      expect(services.balance.setCurrentBalance.execute).toHaveBeenCalledWith({
+      expect(services.balance.setOpeningBalance.execute).toHaveBeenCalledWith({
         ownerId: services.ownerId,
         amount: cents,
       })
@@ -942,68 +943,72 @@ describe('primera experiencia derivada del estado real', () => {
     window.history.replaceState({}, '', '/saldo/inicial')
     const { services } = createApplicationServicesMock({
       financialSnapshot: createFinancialSnapshotMock({
-        currentBalanceCents: null,
+        openingBalanceCents: null,
       }),
     })
     render(<App services={services} authServices={null} />)
-    const input = await screen.findByRole('textbox', { name: /Saldo actual/ })
+    const input = await screen.findByRole('textbox', { name: /Saldo inicial/ })
     await user.type(input, '12.345')
     await user.click(
-      screen.getByRole('button', { name: 'Indicar saldo actual' }),
+      screen.getByRole('button', { name: 'Guardar saldo inicial' }),
     )
     expect(input).toHaveValue('12.345')
     expect(
       screen.getAllByText(/Escribe un saldo válido/).length,
     ).toBeGreaterThan(0)
-    expect(services.balance.setCurrentBalance.execute).not.toHaveBeenCalled()
+    expect(services.balance.setOpeningBalance.execute).not.toHaveBeenCalled()
   })
 
-  it('no muestra setup de saldo a un usuario que ya tiene ancla, incluso si es cero', async () => {
+  it('permite editar un saldo inicial existente, incluso si es cero', async () => {
+    const user = userEvent.setup()
     window.history.replaceState({}, '', '/saldo/inicial')
     const { services } = createApplicationServicesMock({
       financialSnapshot: createFinancialSnapshotMock({
+        openingBalanceCents: 0,
         currentBalanceCents: 0,
       }),
     })
     render(<App services={services} authServices={null} />)
-    await waitFor(() => expect(window.location.pathname).toBe('/inicio'))
     expect(
-      await screen.findByRole('heading', { name: 'Tu panorama financiero' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('heading', {
-        name: '¿Quieres indicar tu saldo actual?',
+      await screen.findByRole('heading', {
+        name: 'Actualiza tu saldo inicial',
       }),
-    ).toBeNull()
+    ).toBeInTheDocument()
+    const input = screen.getByRole('textbox', { name: /Saldo inicial/ })
+    expect(input).toHaveValue('0.00')
+    await user.clear(input)
+    await user.type(input, '200')
+    await user.click(
+      screen.getByRole('button', { name: 'Actualizar saldo inicial' }),
+    )
+    expect(services.balance.setOpeningBalance.execute).toHaveBeenCalledWith({
+      ownerId: services.ownerId,
+      amount: 20_000,
+    })
   })
 
-  it('exige una elección explícita cuando ya existen movimientos efectivos', async () => {
+  it('explica que el saldo inicial se suma aunque ya existan movimientos', async () => {
     window.history.replaceState({}, '', '/saldo/inicial')
     const { services } = createApplicationServicesMock({
       financialSnapshot: createFinancialSnapshotMock({
-        currentBalanceCents: null,
+        openingBalanceCents: null,
+        currentBalanceCents: 88_000,
       }),
-    })
-    vi.mocked(services.balance.getSetupContext.execute).mockResolvedValue({
-      hasEffectiveBalanceMovements: true,
     })
     render(<App services={services} authServices={null} />)
 
     expect(
       await screen.findByRole('heading', {
-        name: '¿Qué saldo quieres indicar?',
+        name: '¿Quieres indicar tu saldo inicial?',
       }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('radio', { name: /Saldo inicial/ }),
-    ).not.toBeChecked()
+      screen.getByText(/Este monto se sumará a tus movimientos registrados/),
+    ).toBeInTheDocument()
     expect(
-      screen.getByRole('radio', { name: /Saldo actual/ }),
-    ).not.toBeChecked()
-    expect(
-      screen.getByRole('button', { name: 'Elige una referencia' }),
-    ).toBeDisabled()
-    expect(screen.queryByRole('textbox')).toBeNull()
+      await screen.findByRole('textbox', { name: /Saldo inicial/ }),
+    ).toBeInTheDocument()
+    expect(services.balance.getSetupContext.execute).not.toHaveBeenCalled()
   })
 
   it('guarda saldo inicial con el writer de apertura y conserva el destino', async () => {
@@ -1015,22 +1020,17 @@ describe('primera experiencia derivada del estado real', () => {
     )
     const { services } = createApplicationServicesMock({
       financialSnapshot: createFinancialSnapshotMock({
-        currentBalanceCents: null,
+        openingBalanceCents: null,
+        currentBalanceCents: 88_000,
       }),
-    })
-    vi.mocked(services.balance.getSetupContext.execute).mockResolvedValue({
-      hasEffectiveBalanceMovements: true,
     })
     render(<App services={services} authServices={null} />)
 
-    await user.click(
-      await screen.findByRole('radio', { name: /Saldo inicial/ }),
-    )
     expect(
-      screen.getByText(/aplicará los ingresos y gastos efectivos/),
+      await screen.findByText(/se sumará a tus movimientos registrados/i),
     ).toBeInTheDocument()
     await user.type(
-      screen.getByRole('textbox', { name: /Saldo inicial/ }),
+      await screen.findByRole('textbox', { name: /Saldo inicial/ }),
       '100',
     )
     await user.click(
@@ -1045,44 +1045,14 @@ describe('primera experiencia derivada del estado real', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/expenses'))
   })
 
-  it('guarda saldo actual sin reaplicar movimientos anteriores', async () => {
-    const user = userEvent.setup()
+  it('muestra error recuperable si falla la lectura del saldo inicial', async () => {
     window.history.replaceState({}, '', '/saldo/inicial')
-    const { services } = createApplicationServicesMock({
+    const { services, mocks } = createApplicationServicesMock({
       financialSnapshot: createFinancialSnapshotMock({
-        currentBalanceCents: null,
+        openingBalanceCents: null,
       }),
     })
-    vi.mocked(services.balance.getSetupContext.execute).mockResolvedValue({
-      hasEffectiveBalanceMovements: true,
-    })
-    render(<App services={services} authServices={null} />)
-
-    await user.click(await screen.findByRole('radio', { name: /Saldo actual/ }))
-    expect(screen.getByText(/no se volverán a sumar/)).toBeInTheDocument()
-    await user.type(
-      screen.getByRole('textbox', { name: /Saldo actual/ }),
-      '100',
-    )
-    await user.click(
-      screen.getByRole('button', { name: 'Indicar saldo actual' }),
-    )
-
-    expect(services.balance.setCurrentBalance.execute).toHaveBeenCalledWith({
-      ownerId: services.ownerId,
-      amount: 10_000,
-    })
-    expect(services.balance.setOpeningBalance.execute).not.toHaveBeenCalled()
-  })
-
-  it('muestra error recuperable si falla el contexto de saldo', async () => {
-    window.history.replaceState({}, '', '/saldo/inicial')
-    const { services } = createApplicationServicesMock({
-      financialSnapshot: createFinancialSnapshotMock({
-        currentBalanceCents: null,
-      }),
-    })
-    vi.mocked(services.balance.getSetupContext.execute).mockRejectedValue(
+    mocks.getFinancialSnapshot.mockRejectedValueOnce(
       new Error('No se pudo leer el historial.'),
     )
     render(<App services={services} authServices={null} />)
@@ -1123,25 +1093,22 @@ describe('primera experiencia derivada del estado real', () => {
     expect(window.location.pathname).toBe('/expenses')
   })
 
-  it('muestra un estado resolutivo sin convertir saldo desconocido en cero', async () => {
+  it('muestra movimientos conocidos aunque el saldo inicial sea opcional', async () => {
     window.history.replaceState({}, '', '/inicio')
     const { services } = createApplicationServicesMock({
       financialSnapshot: createFinancialSnapshotMock({
-        currentBalanceCents: null,
-        projectedAvailableCents: null,
-        projectedClosingBalanceCents: null,
+        openingBalanceCents: null,
+        currentBalanceCents: 88_000,
+        projectedAvailableCents: 78_000,
+        projectedClosingBalanceCents: 78_000,
       }),
     })
     render(<App services={services} authServices={null} />)
+    expect(await screen.findByLabelText('$880.00')).toBeInTheDocument()
     expect(
-      await screen.findByRole('heading', {
-        name: 'Aún no conocemos tu saldo actual',
-      }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: 'Indicar mi saldo actual' }),
+      screen.getByRole('link', { name: 'Agregar saldo inicial' }),
     ).toHaveAttribute('href', '/saldo/inicial')
-    expect(screen.queryByText('$0.00')).toBeNull()
+    expect(screen.queryByText('Aún sin saldo')).toBeNull()
   })
 
   it('rechaza destinos externos en el retorno de setup', () => {

@@ -56,20 +56,15 @@ export function calculateCurrentBalance(
   anchor: BalanceAnchor | null,
   incomes: readonly Income[],
   expenses: readonly Expense[],
-): SignedMoneyCents | null {
-  if (anchor === null || anchor.deletedAt !== null) return null
-
-  const receivedAfterAnchor = incomes
-    .filter((income) => {
-      const effectiveAt = getIncomeBalanceEffectiveAt(income)
-      return effectiveAt !== null && effectiveAt > anchor.ledgerCutoffAt
-    })
+): SignedMoneyCents {
+  const openingBalance =
+    anchor === null || anchor.deletedAt !== null ? 0 : anchor.amount
+  const received = incomes
+    .filter((income) => getIncomeBalanceEffectiveAt(income) !== null)
     .reduce((total, income) => total + income.amount, 0)
-  const spentAfterAnchor = expenses
-    .filter((expense) =>
-      isExpenseBalanceEffectiveAfter(expense, anchor.ledgerCutoffAt),
-    )
+  const spent = expenses
+    .filter((expense) => getExpenseBalanceEffectiveAt(expense) !== null)
     .reduce((total, expense) => total + expense.amount, 0)
 
-  return anchor.amount + receivedAfterAnchor - spentAfterAnchor
+  return openingBalance + received - spent
 }

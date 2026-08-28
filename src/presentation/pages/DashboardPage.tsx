@@ -582,6 +582,7 @@ export function DashboardPage() {
 function Situation({ snapshot }: { snapshot: FinancialSnapshot }) {
   const balance = snapshot.currentBalanceCents
   const unknown = balance === null
+  const showOpeningBalanceNotice = snapshot.openingBalanceCents === null
   return (
     <Surface
       className={`ln-home-situation-surface ${unknown ? 'ln-home-situation-surface--unknown' : ''}`.trim()}
@@ -596,7 +597,9 @@ function Situation({ snapshot }: { snapshot: FinancialSnapshot }) {
           supporting={
             unknown
               ? 'Puedes registrar movimientos; las proyecciones dependientes del saldo permanecen no calculables.'
-              : 'Saldo reconciliado con los movimientos efectivos conocidos.'
+              : showOpeningBalanceNotice
+                ? 'Calculado con tus movimientos registrados.'
+                : 'Saldo inicial más tus movimientos efectivos.'
           }
           status={
             balance === null
@@ -607,14 +610,32 @@ function Situation({ snapshot }: { snapshot: FinancialSnapshot }) {
           }
           state={projectionMetricState(balance)}
         />
+        {showOpeningBalanceNotice ? (
+          <div className="ln-home-opening-balance-notice">
+            <Notice
+              tone="info"
+              title="Saldo inicial no confirmado"
+              message="Tu saldo se calcula con los movimientos registrados. Puedes agregar tu saldo inicial después y se sumará automáticamente."
+              action={
+                <Link
+                  className="ln-button ln-button--secondary"
+                  to="/saldo/inicial"
+                  state={{ from: '/inicio' }}
+                >
+                  Agregar saldo inicial
+                </Link>
+              }
+            />
+          </div>
+        ) : null}
       </div>
-      {unknown ? (
+      {!showOpeningBalanceNotice ? (
         <Link
-          className="ln-button ln-button--primary"
+          className="ln-button ln-button--secondary"
           to="/saldo/inicial"
           state={{ from: '/inicio' }}
         >
-          Indicar mi saldo actual
+          Editar saldo inicial
         </Link>
       ) : null}
     </Surface>

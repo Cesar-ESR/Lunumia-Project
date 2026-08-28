@@ -107,11 +107,25 @@ const snapshot = (
   })
 
 describe('calculateFinancialSnapshot', () => {
-  it('keeps balance-derived projections unknown without an anchor', () => {
+  it('uses zero as the opening baseline when no anchor exists', () => {
     expect(snapshot({ anchor: null })).toMatchObject({
-      currentBalanceCents: null,
-      projectedAvailableCents: null,
-      projectedClosingBalanceCents: null,
+      openingBalanceCents: null,
+      currentBalanceCents: 0,
+      projectedAvailableCents: 0,
+      projectedClosingBalanceCents: 0,
+    })
+  })
+
+  it('shows movement-only balance without requiring an opening balance', () => {
+    expect(
+      snapshot({
+        anchor: null,
+        incomes: [income({ amount: 100_000 })],
+        expenses: [expense({ amount: 12_000 })],
+      }),
+    ).toMatchObject({
+      openingBalanceCents: null,
+      currentBalanceCents: 88_000,
     })
   })
 
@@ -125,7 +139,7 @@ describe('calculateFinancialSnapshot', () => {
     )
   })
 
-  it('uses only effective received movements strictly after the cutoff', () => {
+  it('uses every effective movement regardless of the anchor cutoff timestamp', () => {
     const incomes = [
       income({ id: 'before', balanceEffectiveAt: instant, amount: 1 }),
       income({ id: 'equal', balanceEffectiveAt: cutoff, amount: 10 }),
@@ -151,7 +165,7 @@ describe('calculateFinancialSnapshot', () => {
       expense({ id: 'historical', affectsBalance: false, amount: 400 }),
     ]
 
-    expect(snapshot({ incomes, expenses }).currentBalanceCents).toBe(1_060)
+    expect(snapshot({ incomes, expenses }).currentBalanceCents).toBe(1_049)
   })
 
   it('counts a historical expense as spent without changing current balance', () => {
@@ -326,6 +340,7 @@ describe('calculateFinancialSnapshot', () => {
         occurrences: [occurrence({ amount: 500, deletedAt })],
       }),
     ).toEqual({
+      openingBalanceCents: 1_000,
       currentBalanceCents: 1_000,
       spentCents: 0,
       committedCents: 0,
@@ -376,5 +391,22 @@ describe('calculateFinancialSnapshot', () => {
 
     expect(result.currentBalanceCents).toBe(999_999_999_999)
     expect(Number.isInteger(result.currentBalanceCents)).toBe(true)
+  })
+
+  it('keeps global current balance invariant across selected planning periods', () => {
+    const input = {
+      anchor: anchor({ amount: 10_000 }),
+      incomes: [income({ amount: 100_000, periodId: 'period-a' })],
+      expenses: [expense({ amount: 12_000, periodId: 'period-b' })],
+    }
+
+    expect(
+      snapshot({ ...input, currentPeriod: period({ id: 'period-a' }) })
+        .currentBalanceCents,
+    ).toBe(98_000)
+    expect(
+      snapshot({ ...input, currentPeriod: period({ id: 'period-b' }) })
+        .currentBalanceCents,
+    ).toBe(98_000)
   })
 })

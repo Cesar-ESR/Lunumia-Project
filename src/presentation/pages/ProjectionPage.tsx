@@ -107,7 +107,11 @@ export function ProjectionPage() {
           <MetricBlock
             label="Saldo actual de referencia"
             value={<ProjectionMoney amount={financial.currentBalanceCents} />}
-            supporting="Saldo reconciliado con los movimientos efectivos conocidos."
+            supporting={
+              financial.openingBalanceCents === null
+                ? 'Calculado con tus movimientos registrados.'
+                : 'Saldo inicial más tus movimientos efectivos.'
+            }
             state={projectionMetricState(financial.currentBalanceCents)}
           />
         </Surface>

@@ -1785,6 +1785,10 @@
   margin: 0 0 var(--space-2);
 }
 
+.ln-home-opening-balance-notice {
+  margin-top: var(--space-4);
+}
+
 .ln-home-attention-list {
   display: grid;
   min-width: 0;
@@ -2640,6 +2644,14 @@
   .ln-home-situation-surface > svg {
     width: 2.25rem;
     height: 2.25rem;
+  }
+
+  .ln-home-opening-balance-notice .ln-notice {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ln-home-opening-balance-notice .ln-button {
+    width: 100%;
   }
 
   .ln-home-primary-action--register {

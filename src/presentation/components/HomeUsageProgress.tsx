@@ -102,7 +102,9 @@ function ResourceUsage({ facts }: { facts: ResourceUsageSummary }) {
       <div>
         <h4>Uso de tus recursos</h4>
         <p className="ln-budget-usage__context">
-          Desde tu última referencia de saldo.
+          {facts.hasOpeningBalance
+            ? 'Saldo inicial y movimientos registrados.'
+            : 'Calculado con tus movimientos registrados.'}
         </p>
       </div>
       <p className="ln-budget-usage__amounts">
@@ -149,11 +151,11 @@ export function HomeUsageProgress(props: HomeUsageProgressProps) {
     <div className="ln-budget-usage ln-budget-usage--empty">
       <h4>Uso de tus recursos</h4>
       <p>
-        Para mostrar cuánto de tus recursos has utilizado, primero necesitamos
-        conocer tu saldo actual.
+        Registra movimientos para conocer cómo utilizas tus recursos. El saldo
+        inicial es opcional.
       </p>
       <Link className="ln-button ln-button--secondary" to="/saldo/inicial">
-        Indicar saldo actual
+        Agregar saldo inicial
       </Link>
     </div>
   )

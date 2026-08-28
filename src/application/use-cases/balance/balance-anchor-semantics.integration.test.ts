@@ -9,8 +9,6 @@ import {
   DexiePeriodRepository,
   DexieRecurringPaymentOccurrenceRepository,
 } from '@infrastructure/local/repositories'
-import { ReconcileCurrentBalance } from './ReconcileCurrentBalance'
-import { SetCurrentBalance } from './SetCurrentBalance'
 import { SetOpeningBalance } from './SetOpeningBalance'
 
 const ownerId = '10000000-0000-4000-8000-000000000001'
@@ -22,11 +20,13 @@ const t3 = '2026-08-28T10:00:00.000Z'
 const t4 = '2026-08-28T11:00:00.000Z'
 
 let database: GastoClaroDB
+let databaseName: string
 let clockValue = t2
 let sequence = 0
 
 beforeEach(async () => {
-  database = new GastoClaroDB(`balance-anchor-semantics-${crypto.randomUUID()}`)
+  databaseName = `balance-anchor-semantics-${crypto.randomUUID()}`
+  database = new GastoClaroDB(databaseName)
   clockValue = t2
   sequence = 0
   const persisted = {
@@ -116,14 +116,86 @@ async function addIncome(
   })
 }
 
+async function addExpense(
+  id: string,
+  amount: number,
+  balanceEffectiveAt: string,
+  period = periodId,
+) {
+  await database.expenses.add({
+    id,
+    ownerId,
+    periodId: period,
+    categoryId: 'category',
+    amount,
+    description: 'Gasto',
+    date: '2026-08-20',
+    recurringOccurrenceId: null,
+    affectsBalance: true,
+    balanceEffectiveAt,
+    createdAt: balanceEffectiveAt,
+    updatedAt: balanceEffectiveAt,
+    deletedAt: null,
+    syncStatus: 'synced',
+  })
+}
+
 describe('balance anchor semantics with real Dexie repositories', () => {
+  it('preserva la secuencia manual completa al cerrar y reabrir la base local', async () => {
+    let values = harness()
+
+    await expect(values.snapshot.execute()).resolves.toMatchObject({
+      openingBalanceCents: null,
+      currentBalanceCents: 0,
+    })
+
+    await addIncome('income-1000', 100_000, t1)
+    await expect(values.snapshot.execute()).resolves.toMatchObject({
+      openingBalanceCents: null,
+      currentBalanceCents: 100_000,
+    })
+
+    await addExpense('expense-120', 12_000, t1)
+    await expect(values.snapshot.execute()).resolves.toMatchObject({
+      openingBalanceCents: null,
+      currentBalanceCents: 88_000,
+    })
+
+    await new SetOpeningBalance(
+      values.anchors,
+      values.ids,
+      values.clock,
+    ).execute({ ownerId, amount: 10_000 })
+    await expect(values.snapshot.execute()).resolves.toMatchObject({
+      openingBalanceCents: 10_000,
+      currentBalanceCents: 98_000,
+    })
+
+    await addIncome('income-200', 20_000, t3)
+    await expect(values.snapshot.execute()).resolves.toMatchObject({
+      currentBalanceCents: 118_000,
+    })
+
+    await addIncome('income-300', 30_000, t4)
+    await expect(values.snapshot.execute()).resolves.toMatchObject({
+      currentBalanceCents: 148_000,
+    })
+
+    database.close()
+    database = new GastoClaroDB(databaseName)
+    values = harness()
+    await expect(values.snapshot.execute()).resolves.toMatchObject({
+      openingBalanceCents: 10_000,
+      currentBalanceCents: 148_000,
+    })
+    expect(await database.balanceAnchors.count()).toBe(1)
+  })
+
   it('golden A: opening 100 plus historical income 1000 produces 1100 owner-wide', async () => {
     const values = harness()
     await addIncome('historical-income', 100_000, t1, oldPeriodId)
     const anchor = await new SetOpeningBalance(
       values.anchors,
-      values.incomes,
-      values.expenses,
       values.ids,
       values.clock,
     ).execute({ ownerId, amount: 10_000 })
@@ -131,7 +203,7 @@ describe('balance anchor semantics with real Dexie repositories', () => {
     expect(anchor).toMatchObject({
       amount: 10_000,
       capturedAt: t2,
-      ledgerCutoffAt: '2026-08-20T09:59:59.999Z',
+      ledgerCutoffAt: t2,
       syncStatus: 'pending',
     })
     await expect(values.snapshot.execute()).resolves.toMatchObject({
@@ -139,18 +211,25 @@ describe('balance anchor semantics with real Dexie repositories', () => {
     })
   })
 
-  it('golden B: current 100 excludes the historical income 1000', async () => {
+  it('golden B: a legacy anchor with cutoff semantics is interpreted as opening balance', async () => {
     const values = harness()
     await addIncome('historical-income', 100_000, t1)
-    const anchor = await new SetCurrentBalance(
-      values.anchors,
-      values.ids,
-      values.clock,
-    ).execute({ ownerId, amount: 10_000 })
+    const anchor = await values.anchors.create({
+      id: values.ids.generate(),
+      ownerId,
+      amount: 10_000,
+      capturedAt: t2,
+      ledgerCutoffAt: t2,
+      createdAt: t2,
+      updatedAt: t2,
+      deletedAt: null,
+      syncStatus: 'pending',
+    })
 
     expect(anchor).toMatchObject({ capturedAt: t2, ledgerCutoffAt: t2 })
     await expect(values.snapshot.execute()).resolves.toMatchObject({
-      currentBalanceCents: 10_000,
+      openingBalanceCents: 10_000,
+      currentBalanceCents: 110_000,
     })
   })
 
@@ -159,60 +238,42 @@ describe('balance anchor semantics with real Dexie repositories', () => {
     await addIncome('historical-income', 100_000, t1)
     await new SetOpeningBalance(
       values.anchors,
-      values.incomes,
-      values.expenses,
       values.ids,
       values.clock,
     ).execute({ ownerId, amount: 10_000 })
-    await database.expenses.add({
-      id: 'later-expense',
-      ownerId,
-      periodId,
-      categoryId: 'category',
-      amount: 25_000,
-      description: 'Gasto posterior',
-      date: '2026-08-28',
-      recurringOccurrenceId: null,
-      affectsBalance: true,
-      balanceEffectiveAt: t3,
-      createdAt: t3,
-      updatedAt: t3,
-      deletedAt: null,
-      syncStatus: 'synced',
-    })
+    await addExpense('later-expense', 25_000, t3)
 
     await expect(values.snapshot.execute()).resolves.toMatchObject({
       currentBalanceCents: 85_000,
       resourceUsage: {
-        referenceAt: '2026-08-20T09:59:59.999Z',
+        referenceAt: t2,
         resourceBaseCents: 110_000,
       },
     })
   })
 
-  it('golden D: reconciliation resets the reference and only later income applies', async () => {
+  it('golden D: editing the opening balance changes only the baseline delta', async () => {
     const values = harness()
     await addIncome('historical-income', 100_000, t1)
     await new SetOpeningBalance(
       values.anchors,
-      values.incomes,
-      values.expenses,
       values.ids,
       values.clock,
     ).execute({ ownerId, amount: 10_000 })
     clockValue = t3
-    await new ReconcileCurrentBalance(
+    await new SetOpeningBalance(
       values.anchors,
       values.ids,
       values.clock,
-    ).execute({ ownerId, amount: 90_000 })
+    ).execute({ ownerId, amount: 20_000 })
     await expect(values.snapshot.execute()).resolves.toMatchObject({
-      currentBalanceCents: 90_000,
+      openingBalanceCents: 20_000,
+      currentBalanceCents: 120_000,
     })
 
     await addIncome('later-income', 5_000, t4)
     await expect(values.snapshot.execute()).resolves.toMatchObject({
-      currentBalanceCents: 95_000,
+      currentBalanceCents: 125_000,
     })
     expect(await database.balanceAnchors.count()).toBe(2)
   })

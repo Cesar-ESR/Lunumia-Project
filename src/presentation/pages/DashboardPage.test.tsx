@@ -1,5 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { AuthSession } from '@application/services/AuthClient'
+import type { AuthRuntime } from '../../app/composition-root'
 import { App } from '../App'
 import { getLocalDateOnly } from '@shared/utils/date'
 import {
@@ -31,12 +33,35 @@ function currentPeriod() {
 function renderDashboard(
   result = createApplicationServicesMock({ activePeriod: currentPeriod() }),
   path = '/inicio',
+  authServices: AuthRuntime | null = null,
 ) {
   window.history.replaceState({}, '', path)
   return {
     ...result,
-    view: render(<App services={result.services} authServices={null} />),
+    view: render(
+      <App services={result.services} authServices={authServices} />,
+    ),
   }
+}
+
+function createAuthenticatedRuntime(ownerId: string): AuthRuntime {
+  const session: AuthSession = {
+    user: { id: ownerId, email: 'persona@example.com' },
+    expiresAt: 1_900_000_000,
+  }
+  return {
+    sessionManager: {
+      restore: vi.fn(async () => ({
+        status: 'authenticated' as const,
+        session,
+      })),
+      subscribe: vi.fn(() => () => undefined),
+    },
+    ownerStore: { setActive: vi.fn() },
+    cleaner: { hasLocalData: vi.fn(async () => true) },
+    authSessionLifecycle: null,
+    authCallbacks: null,
+  } as unknown as AuthRuntime
 }
 
 function quietSecondaryData(
@@ -108,6 +133,7 @@ describe('DashboardPage U8 Home', () => {
       financialSnapshot: createFinancialSnapshotMock({
         resourceUsage: {
           referenceAt: '2026-08-01T12:00:00.000Z',
+          hasOpeningBalance: true,
           resourceBaseCents: 400_000,
           spentCents: 120_000,
           currentAvailableCents: 280_000,
@@ -142,7 +168,7 @@ describe('DashboardPage U8 Home', () => {
     ).toHaveAttribute('href', '/plan/presupuestos')
   })
 
-  it('solicita el saldo sin fabricar 0% cuando no hay presupuesto ni referencia', async () => {
+  it('muestra uso basado en movimientos cuando no hay presupuesto ni saldo inicial', async () => {
     const result = createApplicationServicesMock({
       activePeriod: currentPeriod(),
       budgetSummary: createDashboardBudgetSummaryMock({
@@ -151,7 +177,19 @@ describe('DashboardPage U8 Home', () => {
         budgetRemaining: 0,
         configuredBudgetCount: 0,
       }),
-      financialSnapshot: createFinancialSnapshotMock({ resourceUsage: null }),
+      financialSnapshot: createFinancialSnapshotMock({
+        openingBalanceCents: null,
+        currentBalanceCents: 88_000,
+        resourceUsage: {
+          referenceAt: null,
+          hasOpeningBalance: false,
+          resourceBaseCents: 100_000,
+          spentCents: 12_000,
+          currentAvailableCents: 88_000,
+          canCalculatePercentage: true,
+          status: 'available',
+        },
+      }),
     })
     quietSecondaryData(result)
     renderDashboard(result)
@@ -162,20 +200,14 @@ describe('DashboardPage U8 Home', () => {
     })
     const block = usage.closest('.ln-budget-usage') as HTMLElement
 
-    expect(within(block).queryByRole('progressbar')).toBeNull()
-    expect(within(block).queryByText(/0%/)).toBeNull()
+    expect(within(block).getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '12',
+    )
     expect(
-      within(block).getByText(
-        'Para mostrar cuánto de tus recursos has utilizado, primero necesitamos conocer tu saldo actual.',
-      ),
+      within(block).getByText('Calculado con tus movimientos registrados.'),
     ).toBeInTheDocument()
-    const link = within(block).getByRole('link', {
-      name: 'Indicar saldo actual',
-    })
-    expect(link).toHaveAttribute('href', '/saldo/inicial')
-    expect(link.tagName).toBe('A')
-    expect(link).toHaveClass('ln-button', 'ln-button--secondary')
-    expect(link).not.toHaveAttribute('role', 'button')
+    expect(within(block).getByLabelText('$880.00')).toBeInTheDocument()
   })
 
   it('compone hechos financieros independientes y respeta la jerarquía Home', async () => {
@@ -259,30 +291,151 @@ describe('DashboardPage U8 Home', () => {
     }
   })
 
-  it('mantiene saldo y proyecciones unknown sin sustituirlos por cero', async () => {
+  it('muestra saldo y aviso informativo por movimientos sin exigir saldo inicial al guest', async () => {
     const result = createApplicationServicesMock({
       activePeriod: currentPeriod(),
       financialSnapshot: createFinancialSnapshotMock({
-        currentBalanceCents: null,
-        projectedAvailableCents: null,
-        projectedClosingBalanceCents: null,
+        openingBalanceCents: null,
+        currentBalanceCents: 88_000,
+        projectedAvailableCents: 78_000,
+        projectedClosingBalanceCents: 78_000,
       }),
     })
     quietSecondaryData(result)
     renderDashboard(result)
 
-    await screen.findByText('Aún sin saldo')
+    await screen.findByLabelText('$880.00')
     const situationHeading = screen.getByRole('heading', {
       name: 'Situación actual',
     })
     const situation = situationHeading.closest('section')!
-    expect(within(situation).getByText('—')).toBeInTheDocument()
-    expect(within(situation).getByText('Aún sin saldo')).toBeInTheDocument()
     expect(
-      within(situation).getByRole('link', { name: 'Indicar mi saldo actual' }),
+      within(situation).getByRole('link', { name: 'Agregar saldo inicial' }),
     ).toHaveAttribute('href', '/saldo/inicial')
-    expect(screen.getAllByText('No calculable')).toHaveLength(2)
-    expect(within(situation).queryByLabelText('$0.00')).toBeNull()
+    expect(
+      within(situation).getByText('Calculado con tus movimientos registrados.'),
+    ).toBeInTheDocument()
+    expect(
+      within(situation).getByText('Saldo inicial no confirmado'),
+    ).toBeInTheDocument()
+    expect(
+      within(situation).getByText(
+        'Tu saldo se calcula con los movimientos registrados. Puedes agregar tu saldo inicial después y se sumará automáticamente.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('No calculable')).toBeNull()
+  })
+
+  it.each([
+    ['cero', 0],
+    ['positivo', 10_000],
+    ['negativo', -10_000],
+  ])(
+    'oculta el aviso cuando el saldo inicial configurado es %s',
+    async (_label, openingBalanceCents) => {
+      const result = createApplicationServicesMock({
+        activePeriod: currentPeriod(),
+        financialSnapshot: createFinancialSnapshotMock({
+          openingBalanceCents,
+        }),
+      })
+      quietSecondaryData(result)
+      renderDashboard(result)
+
+      await screen.findByLabelText('$1,250.00')
+      expect(screen.queryByText('Saldo inicial no confirmado')).toBeNull()
+      expect(
+        screen.queryByRole('link', { name: 'Agregar saldo inicial' }),
+      ).toBeNull()
+      expect(
+        screen.getByRole('link', { name: 'Editar saldo inicial' }),
+      ).toHaveAttribute('href', '/saldo/inicial')
+    },
+  )
+
+  it('muestra el aviso también para un usuario autenticado', async () => {
+    const result = createApplicationServicesMock({
+      activePeriod: currentPeriod(),
+      financialSnapshot: createFinancialSnapshotMock({
+        openingBalanceCents: null,
+        currentBalanceCents: 88_000,
+      }),
+    })
+    quietSecondaryData(result)
+    renderDashboard(
+      result,
+      '/inicio',
+      createAuthenticatedRuntime(result.services.ownerId),
+    )
+
+    expect(
+      await screen.findByText('Saldo inicial no confirmado'),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('$880.00')).toBeInTheDocument()
+  })
+
+  it('reutiliza el formulario y oculta el aviso al guardar sin recargar', async () => {
+    const user = userEvent.setup()
+    let financialSnapshot = createFinancialSnapshotMock({
+      openingBalanceCents: null,
+      currentBalanceCents: 88_000,
+      projectedAvailableCents: 88_000,
+      projectedClosingBalanceCents: 88_000,
+    })
+    const result = createApplicationServicesMock({
+      activePeriod: currentPeriod(),
+      financialSnapshot,
+    })
+    quietSecondaryData(result)
+    result.mocks.getFinancialSnapshot.mockImplementation(
+      async () => financialSnapshot,
+    )
+    vi.mocked(
+      result.services.balance.setOpeningBalance.execute,
+    ).mockImplementation(async () => {
+      financialSnapshot = createFinancialSnapshotMock({
+        openingBalanceCents: 10_000,
+        currentBalanceCents: 98_000,
+        projectedAvailableCents: 98_000,
+        projectedClosingBalanceCents: 98_000,
+      })
+      return {
+        id: 'opening-balance-after-save',
+        ownerId: result.services.ownerId,
+        amount: 10_000,
+        capturedAt: '2026-08-27T12:00:00.000Z',
+        ledgerCutoffAt: '2026-08-27T12:00:00.000Z',
+        createdAt: '2026-08-27T12:00:00.000Z',
+        updatedAt: '2026-08-27T12:00:00.000Z',
+        deletedAt: null,
+        syncStatus: 'pending',
+      }
+    })
+    renderDashboard(result)
+
+    await user.click(
+      await screen.findByRole('link', { name: 'Agregar saldo inicial' }),
+    )
+    expect(window.location.pathname).toBe('/saldo/inicial')
+    await user.type(
+      await screen.findByRole('textbox', { name: /Saldo inicial/ }),
+      '100',
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Guardar saldo inicial' }),
+    )
+
+    await waitFor(() => expect(window.location.pathname).toBe('/inicio'))
+    const situation = (
+      await screen.findByRole('heading', { name: 'Situación actual' })
+    ).closest('section')!
+    expect(
+      await within(situation).findByLabelText('$980.00'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Saldo inicial no confirmado')).toBeNull()
+    expect(
+      screen.getByRole('link', { name: 'Editar saldo inicial' }),
+    ).toBeInTheDocument()
   })
 
   it('preserva signos negativos en saldo, disponible y cierre', async () => {

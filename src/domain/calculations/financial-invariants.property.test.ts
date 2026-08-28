@@ -138,7 +138,7 @@ describe('D9 financial invariants', () => {
     )
   })
 
-  it('P7: a new signed anchor resets any history at or before its cutoff', () => {
+  it('P7: opening balance is additive with every effective signed movement', () => {
     fc.assert(
       fc.property(
         signedCentsArbitrary,
@@ -164,7 +164,11 @@ describe('D9 financial invariants', () => {
             occurrences: [],
           })
 
-          expect(result.currentBalanceCents).toBe(anchorAmount)
+          expect(result.currentBalanceCents).toBe(
+            anchorAmount +
+              incomeAmounts.reduce((total, amount) => total + amount, 0) -
+              expenseAmounts.reduce((total, amount) => total + amount, 0),
+          )
         },
       ),
       { numRuns: PROPERTY_RUNS },
@@ -360,6 +364,44 @@ describe('D9 financial invariants', () => {
           }),
         ).toEqual([])
       }),
+      { numRuns: PROPERTY_RUNS },
+    )
+  })
+
+  it('P12: anchor timestamps and ledger ordering cannot change current balance', () => {
+    fc.assert(
+      fc.property(
+        signedCentsArbitrary,
+        fc.array(incomeArbitrary, { maxLength: 12 }),
+        fc.array(expenseArbitrary, { maxLength: 12 }),
+        (opening, incomes, expenses) => {
+          const baseInput = {
+            today: TODAY,
+            currentPeriod: makePeriod(),
+            incomes,
+            expenses,
+            occurrences: [],
+          } as const
+          const before = calculateFinancialSnapshot({
+            ...baseInput,
+            anchor: makeAnchor(opening, {
+              capturedAt: '2026-01-01T00:00:00.000Z',
+              ledgerCutoffAt: '2026-01-01T00:00:00.000Z',
+            }),
+          })
+          const after = calculateFinancialSnapshot({
+            ...baseInput,
+            anchor: makeAnchor(opening, {
+              capturedAt: '2030-01-01T00:00:00.000Z',
+              ledgerCutoffAt: '2030-01-01T00:00:00.000Z',
+            }),
+            incomes: [...incomes].reverse(),
+            expenses: [...expenses].reverse(),
+          })
+
+          expect(after.currentBalanceCents).toBe(before.currentBalanceCents)
+        },
+      ),
       { numRuns: PROPERTY_RUNS },
     )
   })

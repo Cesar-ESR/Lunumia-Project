@@ -64,10 +64,37 @@ const income = (
 })
 
 describe('getResourceUsageSummary', () => {
-  it('devuelve unknown cuando no existe una referencia de saldo', () => {
+  it('usa base cero y movimientos conocidos cuando no existe saldo inicial', () => {
     expect(
-      getResourceUsageSummary({ anchor: null, incomes: [], expenses: [] }),
-    ).toBeNull()
+      getResourceUsageSummary({
+        anchor: null,
+        incomes: [income(100_000)],
+        expenses: [expense(12_000)],
+      }),
+    ).toEqual({
+      referenceAt: null,
+      hasOpeningBalance: false,
+      resourceBaseCents: 100_000,
+      spentCents: 12_000,
+      currentAvailableCents: 88_000,
+      canCalculatePercentage: true,
+      status: 'available',
+    })
+  })
+
+  it('trata un anchor eliminado como saldo inicial ausente', () => {
+    expect(
+      getResourceUsageSummary({
+        anchor: anchor(400_000, { deletedAt: afterCutoff }),
+        incomes: [income(100_000)],
+        expenses: [expense(12_000)],
+      }),
+    ).toMatchObject({
+      referenceAt: null,
+      hasOpeningBalance: false,
+      resourceBaseCents: 100_000,
+      currentAvailableCents: 88_000,
+    })
   })
 
   it('deriva base y disponibilidad desde el balance autoritativo', () => {
@@ -79,6 +106,7 @@ describe('getResourceUsageSummary', () => {
       }),
     ).toEqual({
       referenceAt: cutoff,
+      hasOpeningBalance: true,
       resourceBaseCents: 400_000,
       spentCents: 120_000,
       currentAvailableCents: 280_000,
@@ -87,7 +115,7 @@ describe('getResourceUsageSummary', () => {
     })
   })
 
-  it('excluye gasto histórico, previo, igual al corte y tombstone', () => {
+  it('excluye solo gasto no efectivo y tombstone, no por fecha de corte', () => {
     const expenses = [
       expense(10_000, { id: 'historical', affectsBalance: false }),
       expense(20_000, {
@@ -102,8 +130,8 @@ describe('getResourceUsageSummary', () => {
     expect(
       getResourceUsageSummary({ anchor: anchor(), incomes: [], expenses }),
     ).toMatchObject({
-      spentCents: 50_000,
-      currentAvailableCents: 350_000,
+      spentCents: 100_000,
+      currentAvailableCents: 300_000,
       resourceBaseCents: 400_000,
     })
   })
@@ -150,7 +178,7 @@ describe('getResourceUsageSummary', () => {
     ).toMatchObject({ spentCents: 75_000, currentAvailableCents: 325_000 })
   })
 
-  it('rebasa la ventana al corte del anchor más reciente', () => {
+  it('el anchor más reciente cambia la base, no la ventana del ledger', () => {
     const latestCutoff = '2026-08-20T00:00:00.000Z'
 
     expect(
@@ -171,8 +199,8 @@ describe('getResourceUsageSummary', () => {
     ).toMatchObject({
       referenceAt: latestCutoff,
       resourceBaseCents: 200_000,
-      spentCents: 50_000,
-      currentAvailableCents: 150_000,
+      spentCents: 140_000,
+      currentAvailableCents: 60_000,
     })
   })
 
@@ -208,7 +236,7 @@ describe('getResourceUsageSummary', () => {
     })
   })
 
-  it('mantiene el límite legacy basado en createdAt', () => {
+  it('mantiene compatibilidad legacy sin usar createdAt como corte', () => {
     const legacyAfter: Expense = {
       ...base,
       id: 'legacy-after',
@@ -233,6 +261,6 @@ describe('getResourceUsageSummary', () => {
         incomes: [],
         expenses: [legacyBefore, legacyAfter],
       }),
-    ).toMatchObject({ spentCents: 30_000 })
+    ).toMatchObject({ spentCents: 120_000 })
   })
 })

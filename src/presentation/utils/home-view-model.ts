@@ -41,10 +41,10 @@ type AttentionSyncState = Pick<
 export function selectHomePrimaryAction(
   snapshot: FinancialSnapshot,
 ): HomePrimaryAction {
-  if (snapshot.currentBalanceCents === null)
+  if (snapshot.openingBalanceCents === null)
     return {
       kind: 'balance',
-      label: 'Indicar mi saldo actual',
+      label: 'Agregar saldo inicial',
       to: '/saldo/inicial',
     }
   if (snapshot.overdueCommittedCents > 0)

@@ -378,13 +378,7 @@ export function createApplicationServices(
     balance: {
       getSetupContext: new GetBalanceSetupContext(incomes, expenses),
       setCurrentBalance: new SetCurrentBalance(anchors, ids, clock),
-      setOpeningBalance: new SetOpeningBalance(
-        anchors,
-        incomes,
-        expenses,
-        ids,
-        clock,
-      ),
+      setOpeningBalance: new SetOpeningBalance(anchors, ids, clock),
       reconcileCurrentBalance: new ReconcileCurrentBalance(anchors, ids, clock),
     },
     periods: {

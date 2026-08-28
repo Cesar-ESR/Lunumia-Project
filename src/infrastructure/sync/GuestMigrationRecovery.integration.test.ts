@@ -21,9 +21,17 @@ import {
   type RemoteSyncGateway,
 } from '@application/services/SyncCoordinator'
 import { DataMigrationService } from '@application/services/DataMigrationService'
+import { GetFinancialSnapshot } from '@application/use-cases/dashboard/GetFinancialSnapshot'
 import { GastoClaroDB } from '@infrastructure/local/database'
 import { DexieOwnerDataManager } from '@infrastructure/local/DexieOwnerDataManager'
 import type { KeyValueStorage } from '@infrastructure/local/GuestOwnerStore'
+import {
+  DexieBalanceAnchorRepository,
+  DexieExpenseRepository,
+  DexieIncomeRepository,
+  DexiePeriodRepository,
+  DexieRecurringPaymentOccurrenceRepository,
+} from '@infrastructure/local/repositories'
 import { DexieSyncStore } from './DexieSyncStore'
 
 const guestOwnerId = 'guest:10000000-0000-4000-8000-000000000001'
@@ -306,6 +314,7 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
   it('un cliente nuevo descarga el mismo periodo, gastos, categorÃ­a y settings', async () => {
     await seedGuest(database)
     await migrateGuest(database)
+    const beforeSync = await financialSnapshotFor(database)
     const remote = new ForeignKeyRemote()
     const firstResult = await new SyncCoordinator(
       deterministicStore(database),
@@ -313,6 +322,18 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
       () => reconciliationInstant,
     ).sync(ownerId)
     expect(firstResult.failed).toBe(0)
+    await expect(financialSnapshotFor(database)).resolves.toMatchObject({
+      openingBalanceCents: beforeSync.openingBalanceCents,
+      currentBalanceCents: beforeSync.currentBalanceCents,
+    })
+
+    const repeatedResult = await new SyncCoordinator(
+      deterministicStore(database),
+      remote,
+      () => reconciliationInstant,
+    ).sync(ownerId)
+    expect(repeatedResult.failed).toBe(0)
+    expect(remote.balanceAnchors).toHaveLength(1)
 
     const newClient = new GastoClaroDB(`new-client-${crypto.randomUUID()}`)
     try {
@@ -330,6 +351,10 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
           ownerId,
         },
       )
+      await expect(financialSnapshotFor(newClient)).resolves.toMatchObject({
+        openingBalanceCents: beforeSync.openingBalanceCents,
+        currentBalanceCents: beforeSync.currentBalanceCents,
+      })
       expect(await newClient.categories.toArray()).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: remoteCategoryId }),
@@ -710,6 +735,18 @@ async function migrateGuest(db: GastoClaroDB): Promise<void> {
 
 function deterministicStore(db: GastoClaroDB): DexieSyncStore {
   return new DexieSyncStore(db, deterministicDependencies())
+}
+
+async function financialSnapshotFor(db: GastoClaroDB) {
+  const dependencies = deterministicDependencies()
+  return new GetFinancialSnapshot(
+    new DexiePeriodRepository(db, ownerId, dependencies),
+    new DexieBalanceAnchorRepository(db, ownerId, dependencies),
+    new DexieIncomeRepository(db, ownerId, dependencies),
+    new DexieExpenseRepository(db, ownerId, dependencies),
+    new DexieRecurringPaymentOccurrenceRepository(db, ownerId, dependencies),
+    dependencies.clock,
+  ).execute()
 }
 
 function deterministicDependencies() {

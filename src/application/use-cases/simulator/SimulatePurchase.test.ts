@@ -22,6 +22,7 @@ const period: Period = {
 const snapshot = (
   overrides: Partial<FinancialSnapshot> = {},
 ): FinancialSnapshot => ({
+  openingBalanceCents: 0,
   currentBalanceCents: 10_000,
   spentCents: 0,
   committedCents: 4_000,

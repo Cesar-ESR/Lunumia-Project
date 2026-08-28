@@ -199,6 +199,7 @@ describe('GetFinancialSnapshot', () => {
     })
 
     await expect(harness.useCase.execute()).resolves.toEqual({
+      openingBalanceCents: 1_000,
       currentBalanceCents: 1_050,
       spentCents: 50,
       committedCents: 300,
@@ -212,6 +213,7 @@ describe('GetFinancialSnapshot', () => {
       projectionCoverage: 'full_period',
       resourceUsage: {
         referenceAt: cutoff,
+        hasOpeningBalance: true,
         resourceBaseCents: 1_100,
         spentCents: 50,
         currentAvailableCents: 1_050,
@@ -260,13 +262,22 @@ describe('GetFinancialSnapshot', () => {
     })
   })
 
-  it('returns nullable balance projections without an anchor', async () => {
-    const harness = createHarness({ anchor: null })
+  it('returns movement-only balance projections without an anchor', async () => {
+    const harness = createHarness({
+      anchor: null,
+      incomes: [income(1_000)],
+      expenses: [expense(120)],
+    })
 
     await expect(harness.useCase.execute()).resolves.toMatchObject({
-      currentBalanceCents: null,
-      projectedAvailableCents: null,
-      projectedClosingBalanceCents: null,
+      openingBalanceCents: null,
+      currentBalanceCents: 880,
+      projectedAvailableCents: 880,
+      projectedClosingBalanceCents: 880,
+      resourceUsage: {
+        hasOpeningBalance: false,
+        currentAvailableCents: 880,
+      },
     })
   })
 

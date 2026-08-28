@@ -143,6 +143,7 @@ export const createCategoryBudgetSummaryMock = (
 export const createFinancialSnapshotMock = (
   overrides: Partial<FinancialSnapshotReadModel> = {},
 ): FinancialSnapshotReadModel => ({
+  openingBalanceCents: null,
   currentBalanceCents: 125000,
   spentCents: 25000,
   committedCents: 10000,
@@ -162,6 +163,7 @@ export const createResourceUsageSummaryMock = (
   overrides: Partial<ResourceUsageSummary> = {},
 ): ResourceUsageSummary => ({
   referenceAt: '2026-07-01T00:00:00.000Z',
+  hasOpeningBalance: true,
   resourceBaseCents: 150000,
   spentCents: 25000,
   currentAvailableCents: 125000,

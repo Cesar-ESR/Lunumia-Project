@@ -1,6 +1,6 @@
 import {
   calculateCurrentBalance,
-  isExpenseBalanceEffectiveAfter,
+  getExpenseBalanceEffectiveAt,
 } from '@domain/calculations'
 import type { BalanceAnchor, Expense, Income } from '@domain/entities'
 import type {
@@ -10,7 +10,8 @@ import type {
 } from '@domain/value-objects'
 
 export interface ResourceUsageSummary {
-  referenceAt: Instant
+  referenceAt: Instant | null
+  hasOpeningBalance: boolean
   resourceBaseCents: SignedMoneyCents
   spentCents: AmountCents
   currentAvailableCents: SignedMoneyCents
@@ -26,23 +27,22 @@ export function getResourceUsageSummary({
   anchor: BalanceAnchor | null
   incomes: readonly Income[]
   expenses: readonly Expense[]
-}): ResourceUsageSummary | null {
+}): ResourceUsageSummary {
   const currentAvailableCents = calculateCurrentBalance(
     anchor,
     incomes,
     expenses,
   )
-  if (anchor === null || currentAvailableCents === null) return null
-
   const spentCents = expenses
-    .filter((expense) =>
-      isExpenseBalanceEffectiveAfter(expense, anchor.ledgerCutoffAt),
-    )
+    .filter((expense) => getExpenseBalanceEffectiveAt(expense) !== null)
     .reduce((total, expense) => total + expense.amount, 0)
   const resourceBaseCents = currentAvailableCents + spentCents
+  const activeAnchor =
+    anchor !== null && anchor.deletedAt === null ? anchor : null
 
   return {
-    referenceAt: anchor.ledgerCutoffAt,
+    referenceAt: activeAnchor?.capturedAt ?? null,
+    hasOpeningBalance: activeAnchor !== null,
     resourceBaseCents,
     spentCents,
     currentAvailableCents,

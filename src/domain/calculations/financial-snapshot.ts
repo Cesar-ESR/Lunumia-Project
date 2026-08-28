@@ -18,6 +18,7 @@ import { calculateCommitments } from './commitments'
 export type ProjectionCoverage = 'full_period' | 'overdue_only'
 
 export interface FinancialSnapshot {
+  openingBalanceCents: SignedMoneyCents | null
   currentBalanceCents: SignedMoneyCents | null
   spentCents: AmountCents
   committedCents: AmountCents
@@ -92,21 +93,16 @@ export function calculateFinancialSnapshot({
   }
 
   return {
+    openingBalanceCents:
+      anchor === null || anchor.deletedAt !== null ? null : anchor.amount,
     currentBalanceCents,
     spentCents,
     ...commitments,
-    projectedAvailableCents:
-      currentBalanceCents === null
-        ? null
-        : currentBalanceCents - commitments.committedCents,
+    projectedAvailableCents: currentBalanceCents - commitments.committedCents,
     expectedIncomeCents,
     overdueExpectedIncomeCents,
     projectedClosingBalanceCents:
-      currentBalanceCents === null
-        ? null
-        : currentBalanceCents +
-          expectedIncomeCents -
-          commitments.committedCents,
+      currentBalanceCents + expectedIncomeCents - commitments.committedCents,
     projectionHorizonEnd,
     projectionCoverage:
       activeCurrentPeriod === null ? 'overdue_only' : 'full_period',

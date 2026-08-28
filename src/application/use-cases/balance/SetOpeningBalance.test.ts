@@ -6,7 +6,7 @@ import type {
   IIncomeRepository,
 } from '@domain/repositories'
 import { GetBalanceSetupContext } from './GetBalanceSetupContext'
-import { instantBefore, SetOpeningBalance } from './SetOpeningBalance'
+import { SetOpeningBalance } from './SetOpeningBalance'
 
 const ownerId = 'guest:owner'
 const now = '2026-08-27T20:00:00.000Z'
@@ -58,8 +58,6 @@ function harness(incomes: IncomeV2[] = [], expenses: ExpenseV2[] = []) {
     context: new GetBalanceSetupContext(incomeRepository, expenseRepository),
     useCase: new SetOpeningBalance(
       { create } as unknown as IBalanceAnchorRepository,
-      incomeRepository,
-      expenseRepository,
       { generate: () => 'anchor' },
       { now: () => now },
     ),
@@ -86,14 +84,14 @@ describe('SetOpeningBalance', () => {
     },
   )
 
-  it('reads owner-wide repositories and cuts one millisecond before the earliest movement', async () => {
+  it('does not inspect movement history or turn the capture time into a financial cutoff', async () => {
     const test = harness([income()], [expense()])
     const result = await test.useCase.execute({ ownerId, amount: 10_000 })
-    expect(test.findIncomes).toHaveBeenCalledTimes(1)
-    expect(test.findExpenses).toHaveBeenCalledTimes(1)
+    expect(test.findIncomes).not.toHaveBeenCalled()
+    expect(test.findExpenses).not.toHaveBeenCalled()
     expect(result).toMatchObject({
       capturedAt: now,
-      ledgerCutoffAt: '2026-08-20T10:59:59.999Z',
+      ledgerCutoffAt: now,
     })
     await expect(test.context.execute()).resolves.toEqual({
       hasEffectiveBalanceMovements: true,
@@ -114,12 +112,6 @@ describe('SetOpeningBalance', () => {
     await expect(test.context.execute()).resolves.toEqual({
       hasEffectiveBalanceMovements: false,
     })
-  })
-
-  it('fails safely when a prior persistable instant cannot be represented', () => {
-    expect(() => instantBefore('0000-01-01T00:00:00.000Z')).toThrow(
-      /referencia anterior/,
-    )
   })
 
   it('validates owner and signed amount before reading history', async () => {

@@ -44,6 +44,7 @@ const aggregatedData: PeriodAggregatedData = {
 const historicalRequest = buildHistoricalAnalysisRequest(aggregatedData)
 
 const planningSnapshot: FinancialSnapshot = {
+  openingBalanceCents: 0,
   currentBalanceCents: -10_00,
   spentCents: 40_00,
   committedCents: 25_00,
