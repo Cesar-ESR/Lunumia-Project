@@ -172,12 +172,14 @@ export const createResourceUsageSummaryMock = (
 
 export function createApplicationServicesMock({
   activePeriod = createPeriodMock(),
+  periods,
   budgetSummary = createDashboardBudgetSummaryMock(),
   categoryBudgetSummaries = [createCategoryBudgetSummaryMock()],
   financialSnapshot = createFinancialSnapshotMock(),
   categories,
 }: {
   activePeriod?: Period | null
+  periods?: Period[]
   budgetSummary?: DashboardBudgetSummary
   categoryBudgetSummaries?: CategoryBudgetSummary[]
   financialSnapshot?: FinancialSnapshotReadModel
@@ -298,7 +300,7 @@ export function createApplicationServicesMock({
       listPeriods: {
         execute: vi
           .fn<ApplicationServices['periods']['listPeriods']['execute']>()
-          .mockResolvedValue(activePeriod ? [activePeriod] : []),
+          .mockResolvedValue(periods ?? (activePeriod ? [activePeriod] : [])),
       },
       setActivePeriod: {
         execute: vi

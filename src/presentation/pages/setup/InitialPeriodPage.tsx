@@ -47,7 +47,7 @@ export function InitialPeriodPage() {
     await periodContext.setActivePeriod(period.id)
     await periodContext.refreshPeriods()
     navigate('/configuracion-inicial/categorias', {
-      state: { from: destination },
+      state: { from: destination, firstTimeSetup: true },
     })
   }
 

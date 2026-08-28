@@ -123,3 +123,8 @@ export function useSync(): SyncContextValue {
   if (!context) throw new Error('useSync debe usarse dentro de SyncProvider.')
   return context
 }
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useOptionalSync(): SyncContextValue | null {
+  return useContext(SyncContext)
+}

@@ -1,6 +1,10 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AuthSession } from '@application/services/AuthClient'
+import type {
+  SyncOrchestrator,
+  SyncState,
+} from '@application/services/SyncOrchestrator'
 import type { AuthRuntime } from '../app/composition-root'
 import { PeriodOverlapError } from '@domain/errors'
 import { App } from './App'
@@ -49,6 +53,84 @@ function createAuthenticatedRuntime(): AuthRuntime {
     authCallbacks: null,
   } as unknown as AuthRuntime
 }
+
+function createLoginRuntime(onAuthenticated: () => void) {
+  const session: AuthSession = {
+    user: { id: 'account-owner', email: 'persona@example.com' },
+    expiresAt: 1_900_000_000,
+  }
+  const signIn = vi.fn(async () => {
+    onAuthenticated()
+    return {
+      user: session.user,
+      session,
+      requiresEmailVerification: false,
+    }
+  })
+  const runtime = {
+    sessionManager: {
+      restore: vi.fn(async () => ({ status: 'guest' as const, session: null })),
+      subscribe: vi.fn(() => () => undefined),
+    },
+    signIn: { execute: signIn },
+    migration: {
+      summarize: vi.fn(async () => ({
+        periods: 0,
+        incomes: 0,
+        expenses: 0,
+        categories: 0,
+        budgets: 0,
+        recurringPayments: 0,
+        occurrences: 0,
+        balanceAnchors: 0,
+        hasData: false,
+      })),
+    },
+    ownerStore: { setActive: vi.fn() },
+    cleaner: { hasLocalData: vi.fn(async () => false) },
+    authSessionLifecycle: null,
+    authCallbacks: null,
+    redirectUrl: (path: string) => `${window.location.origin}${path}`,
+  } as unknown as AuthRuntime
+  return { runtime, signIn }
+}
+
+class TestSyncOrchestrator {
+  constructor(public state: SyncState) {}
+  readonly start = vi.fn()
+  readonly stop = vi.fn()
+  readonly pause = vi.fn()
+  readonly resume = vi.fn()
+  readonly syncNow = vi.fn().mockResolvedValue(null)
+  private readonly listeners = new Set<(state: SyncState) => void>()
+  getState = () => this.state
+  subscribe = (listener: (state: SyncState) => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+  emit(state: SyncState) {
+    this.state = state
+    this.listeners.forEach((listener) => listener(state))
+  }
+}
+
+const authenticatedSyncState = (
+  overrides: Partial<SyncState> = {},
+): SyncState => ({
+  status: 'syncing',
+  ownerId: 'account-owner',
+  pendingCount: 0,
+  isOnline: true,
+  isSyncing: true,
+  lastAttemptAt: '2026-08-27T12:00:00.000Z',
+  lastSuccessfulSyncAt: null,
+  nextRetryAt: null,
+  retryCount: 0,
+  error: null,
+  lastResult: null,
+  canRetryManually: false,
+  ...overrides,
+})
 
 describe('primera experiencia derivada del estado real', () => {
   it('presenta Lunumia antes de pedir configuración y sin persistir', async () => {
@@ -259,7 +341,7 @@ describe('primera experiencia derivada del estado real', () => {
     ).toBeNull()
   })
 
-  it('muestra el mismo Welcome a una persona autenticada sin periodo', async () => {
+  it('muestra Welcome a una persona autenticada con estado vacío autoritativo', async () => {
     window.history.replaceState({}, '', '/inicio')
     const result = createApplicationServicesMock({ activePeriod: null })
     render(
@@ -275,6 +357,360 @@ describe('primera experiencia derivada del estado real', () => {
       }),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Comenzar' })).toBeInTheDocument()
+    expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
+  })
+
+  it('no muestra Welcome si existen periodos históricos aunque activePeriod sea null', async () => {
+    window.history.replaceState({}, '', '/inicio')
+    const historical = createPeriodMock({
+      ownerId: 'account-owner',
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+    })
+    const result = createApplicationServicesMock({
+      activePeriod: null,
+      periods: [historical],
+    })
+    result.services.ownerId = 'account-owner'
+    render(
+      <App
+        services={result.services}
+        authServices={createAuthenticatedRuntime()}
+      />,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Tu panorama financiero' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Bienvenido a Lunumia')).toBeNull()
+    expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
+    expect(
+      result.services.periods.setActivePeriod.execute,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('preserva una selección explícita de periodo histórico', async () => {
+    window.history.replaceState({}, '', '/inicio')
+    const historical = createPeriodMock({
+      ownerId: 'account-owner',
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+    })
+    const result = createApplicationServicesMock({
+      activePeriod: null,
+      periods: [historical],
+    })
+    result.services.ownerId = 'account-owner'
+    vi.mocked(
+      result.services.settings.getUserSettings.execute,
+    ).mockResolvedValue({
+      id: 'settings',
+      ownerId: 'account-owner',
+      activePeriodId: historical.id,
+      currency: 'MXN',
+      theme: 'system',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    })
+    render(
+      <App
+        services={result.services}
+        authServices={createAuthenticatedRuntime()}
+      />,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Tu panorama financiero' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Bienvenido a Lunumia')).toBeNull()
+    expect(
+      result.services.periods.setActivePeriod.execute,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('espera la hidratación autenticada antes de decidir Welcome', async () => {
+    window.history.replaceState({}, '', '/inicio')
+    const result = createApplicationServicesMock({ activePeriod: null })
+    result.services.ownerId = 'account-owner'
+    const orchestrator = new TestSyncOrchestrator(authenticatedSyncState())
+    result.services.syncOrchestrator =
+      orchestrator as unknown as SyncOrchestrator
+    render(
+      <App
+        services={result.services}
+        authServices={createAuthenticatedRuntime()}
+      />,
+    )
+
+    expect(
+      await screen.findByText('Sincronizando tu cuenta…'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Bienvenido a Lunumia')).toBeNull()
+    expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
+  })
+
+  it('muestra Welcome solo después de confirmar una cuenta autenticada vacía', async () => {
+    window.history.replaceState({}, '', '/inicio')
+    const result = createApplicationServicesMock({ activePeriod: null })
+    result.services.ownerId = 'account-owner'
+    const orchestrator = new TestSyncOrchestrator(
+      authenticatedSyncState({
+        status: 'up_to_date',
+        isSyncing: false,
+        lastSuccessfulSyncAt: '2026-08-27T12:01:00.000Z',
+      }),
+    )
+    result.services.syncOrchestrator =
+      orchestrator as unknown as SyncOrchestrator
+    render(
+      <App
+        services={result.services}
+        authServices={createAuthenticatedRuntime()}
+      />,
+    )
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Entiende tu dinero con más claridad',
+      }),
+    ).toBeInTheDocument()
+    expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
+  })
+
+  it('refresca tras hidratación y entra a Inicio sin recrear el periodo remoto', async () => {
+    window.history.replaceState({}, '', '/inicio')
+    const hydrated = createPeriodMock({
+      ownerId: 'account-owner',
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+    })
+    let periods = [] as ReturnType<typeof createPeriodMock>[]
+    let activePeriodId: string | null = null
+    const result = createApplicationServicesMock({ activePeriod: null })
+    result.services.ownerId = 'account-owner'
+    vi.mocked(result.services.periods.listPeriods.execute).mockImplementation(
+      async () => periods,
+    )
+    vi.mocked(
+      result.services.settings.getUserSettings.execute,
+    ).mockImplementation(async () => ({
+      id: 'settings',
+      ownerId: 'account-owner',
+      activePeriodId,
+      currency: 'MXN',
+      theme: 'system',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    }))
+    const orchestrator = new TestSyncOrchestrator(authenticatedSyncState())
+    result.services.syncOrchestrator =
+      orchestrator as unknown as SyncOrchestrator
+    render(
+      <App
+        services={result.services}
+        authServices={createAuthenticatedRuntime()}
+      />,
+    )
+    await screen.findByText('Sincronizando tu cuenta…')
+
+    periods = [hydrated]
+    activePeriodId = hydrated.id
+    act(() =>
+      orchestrator.emit(
+        authenticatedSyncState({
+          status: 'up_to_date',
+          isSyncing: false,
+          lastSuccessfulSyncAt: '2026-08-27T12:01:00.000Z',
+        }),
+      ),
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Tu panorama financiero' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Bienvenido a Lunumia')).toBeNull()
+    expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
+    expect(
+      result.services.periods.setActivePeriod.execute,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('muestra error recuperable si la historia remota sigue desconocida', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState({}, '', '/inicio')
+    const result = createApplicationServicesMock({ activePeriod: null })
+    result.services.ownerId = 'account-owner'
+    const orchestrator = new TestSyncOrchestrator(
+      authenticatedSyncState({
+        status: 'error',
+        isSyncing: false,
+        error: {
+          kind: 'network',
+          code: 'network_error',
+          retryable: true,
+          message: 'No se pudo conectar.',
+        },
+        canRetryManually: true,
+      }),
+    )
+    result.services.syncOrchestrator =
+      orchestrator as unknown as SyncOrchestrator
+    render(
+      <App
+        services={result.services}
+        authServices={createAuthenticatedRuntime()}
+      />,
+    )
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No pudimos comprobar tu configuración',
+      }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Bienvenido a Lunumia')).toBeNull()
+    await user.click(screen.getByRole('button', { name: /reintentar/i }))
+    expect(orchestrator.syncNow).toHaveBeenCalledTimes(1)
+    expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    {
+      label: 'un error de sincronización',
+      state: authenticatedSyncState({
+        status: 'error',
+        isSyncing: false,
+        error: {
+          kind: 'network',
+          code: 'network_error',
+          retryable: true,
+          message: 'No se pudo conectar.',
+        },
+      }),
+    },
+    {
+      label: 'una sesión offline',
+      state: authenticatedSyncState({
+        status: 'offline',
+        isOnline: false,
+        isSyncing: false,
+      }),
+    },
+  ])(
+    'mantiene disponible la historia local durante $label',
+    async ({ state }) => {
+      window.history.replaceState({}, '', '/inicio')
+      const historical = createPeriodMock({
+        ownerId: 'account-owner',
+        startDate: '2026-07-01',
+        endDate: '2026-07-31',
+      })
+      const result = createApplicationServicesMock({
+        activePeriod: null,
+        periods: [historical],
+      })
+      result.services.ownerId = 'account-owner'
+      result.services.syncOrchestrator = new TestSyncOrchestrator(
+        state,
+      ) as unknown as SyncOrchestrator
+      render(
+        <App
+          services={result.services}
+          authServices={createAuthenticatedRuntime()}
+        />,
+      )
+
+      expect(
+        await screen.findByRole('heading', { name: 'Tu panorama financiero' }),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Bienvenido a Lunumia')).toBeNull()
+      expect(
+        result.services.periods.createPeriod.execute,
+      ).not.toHaveBeenCalled()
+    },
+  )
+
+  it('inicia sesión, hidrata la cuenta existente y entra a Inicio sin setup', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState({}, '', '/login')
+    const hydrated = createPeriodMock({
+      ownerId: 'account-owner',
+      startDate: '2026-08-01',
+      endDate: '2026-08-31',
+    })
+    let periods = [] as ReturnType<typeof createPeriodMock>[]
+    let activePeriodId: string | null = null
+    const result = createApplicationServicesMock({ activePeriod: null })
+    vi.mocked(result.services.periods.listPeriods.execute).mockImplementation(
+      async () => periods,
+    )
+    vi.mocked(
+      result.services.settings.getUserSettings.execute,
+    ).mockImplementation(async () => ({
+      id: 'settings',
+      ownerId: 'account-owner',
+      activePeriodId,
+      currency: 'MXN',
+      theme: 'system',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    }))
+    const orchestrator = new TestSyncOrchestrator(authenticatedSyncState())
+    result.services.syncOrchestrator =
+      orchestrator as unknown as SyncOrchestrator
+    const login = createLoginRuntime(() => {
+      result.services.ownerId = 'account-owner'
+    })
+    render(<App services={result.services} authServices={login.runtime} />)
+
+    await screen.findByRole('heading', { name: 'Inicia sesión' })
+    await user.type(
+      screen.getByRole('textbox', { name: 'Correo' }),
+      'persona@example.com',
+    )
+    await user.type(screen.getByLabelText('Contraseña'), 'correcta-123')
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    expect(
+      await screen.findByText('Sincronizando tu cuenta…'),
+    ).toBeInTheDocument()
+
+    periods = [hydrated]
+    activePeriodId = hydrated.id
+    act(() =>
+      orchestrator.emit(
+        authenticatedSyncState({
+          status: 'up_to_date',
+          isSyncing: false,
+          lastSuccessfulSyncAt: '2026-08-27T12:02:00.000Z',
+        }),
+      ),
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Tu panorama financiero' }),
+    ).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/inicio')
+    expect(screen.queryByText('Bienvenido a Lunumia')).toBeNull()
+    expect(login.signIn).toHaveBeenCalledTimes(1)
+    expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
+    expect(
+      result.services.periods.setActivePeriod.execute,
+    ).not.toHaveBeenCalled()
+  })
+
+  it('redirige fuera del setup de periodo si la cuenta ya tiene historia', async () => {
+    window.history.replaceState({}, '', '/configuracion-inicial/periodo')
+    const historical = createPeriodMock({
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+    })
+    const result = createApplicationServicesMock({
+      activePeriod: null,
+      periods: [historical],
+    })
+    render(<App services={result.services} authServices={null} />)
+
+    await waitFor(() => expect(window.location.pathname).toBe('/inicio'))
+    expect(screen.queryByText('Organicemos tus movimientos')).toBeNull()
     expect(result.services.periods.createPeriod.execute).not.toHaveBeenCalled()
   })
 

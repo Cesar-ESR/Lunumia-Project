@@ -4,16 +4,19 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import type { Period } from '@domain/entities'
 import { getLocalDateOnly } from '@shared/utils/date'
 import { useApplicationServices } from './ApplicationServicesContext'
+import { useOptionalSync } from './SyncContext'
 
 interface PeriodContextValue {
   periods: Period[]
   activePeriod: Period | null
+  lastAppliedSyncAt: string | null
   isLoading: boolean
   error: Error | null
   setActivePeriod(periodId: string): Promise<void>
@@ -24,51 +27,84 @@ const PeriodContext = createContext<PeriodContextValue | null>(null)
 
 export function PeriodProvider({ children }: { children: ReactNode }) {
   const services = useApplicationServices()
+  const sync = useOptionalSync()
   const [periods, setPeriods] = useState<Period[]>([])
   const [activePeriod, setActivePeriodState] = useState<Period | null>(null)
+  const [lastAppliedSyncAt, setLastAppliedSyncAt] = useState<string | null>(
+    null,
+  )
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const loadQueue = useRef<Promise<void>>(Promise.resolve())
+  const refreshedSyncAt = useRef<string | null>(null)
 
-  const loadPeriods = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      await services.initialize.execute()
-      const [nextPeriods, settings] = await Promise.all([
-        services.periods.listPeriods.execute(),
-        services.settings.getUserSettings.execute(),
-      ])
-      let selected = settings?.activePeriodId
-        ? (nextPeriods.find(
-            (period) => period.id === settings.activePeriodId,
-          ) ?? null)
-        : null
-      if (!selected) {
-        const today = getLocalDateOnly()
-        selected =
-          nextPeriods.find(
-            (period) => period.startDate <= today && today <= period.endDate,
-          ) ?? null
-        if (selected)
-          await services.periods.setActivePeriod.execute(selected.id)
+  const readPeriods = useCallback(
+    async (showLoading: boolean, onSuccess?: () => void) => {
+      if (showLoading) setIsLoading(true)
+      setError(null)
+      try {
+        await services.initialize.execute()
+        const [nextPeriods, settings] = await Promise.all([
+          services.periods.listPeriods.execute(),
+          services.settings.getUserSettings.execute(),
+        ])
+        let selected = settings?.activePeriodId
+          ? (nextPeriods.find(
+              (period) => period.id === settings.activePeriodId,
+            ) ?? null)
+          : null
+        if (!selected) {
+          const today = getLocalDateOnly()
+          selected =
+            nextPeriods.find(
+              (period) => period.startDate <= today && today <= period.endDate,
+            ) ?? null
+          if (selected)
+            await services.periods.setActivePeriod.execute(selected.id)
+        }
+        setPeriods(nextPeriods)
+        setActivePeriodState(selected)
+        onSuccess?.()
+      } catch (reason) {
+        setError(
+          reason instanceof Error
+            ? reason
+            : new Error('No se pudieron cargar los periodos.'),
+        )
+      } finally {
+        if (showLoading) setIsLoading(false)
       }
-      setPeriods(nextPeriods)
-      setActivePeriodState(selected)
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason
-          : new Error('No se pudieron cargar los periodos.'),
+    },
+    [services],
+  )
+
+  const loadPeriods = useCallback(
+    (showLoading = true, onSuccess?: () => void) => {
+      const operation = loadQueue.current.then(() =>
+        readPeriods(showLoading, onSuccess),
       )
-    } finally {
-      setIsLoading(false)
-    }
-  }, [services])
+      loadQueue.current = operation
+      return operation
+    },
+    [readPeriods],
+  )
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void loadPeriods(), 0)
     return () => window.clearTimeout(timeoutId)
   }, [loadPeriods])
+
+  useEffect(() => {
+    const successfulAt = sync?.lastSuccessfulSyncAt ?? null
+    if (
+      !successfulAt ||
+      sync?.ownerId !== services.ownerId ||
+      refreshedSyncAt.current === successfulAt
+    )
+      return
+    refreshedSyncAt.current = successfulAt
+    void loadPeriods(false, () => setLastAppliedSyncAt(successfulAt))
+  }, [loadPeriods, services.ownerId, sync?.lastSuccessfulSyncAt, sync?.ownerId])
 
   const setActivePeriod = useCallback(
     async (periodId: string) => {
@@ -89,12 +125,21 @@ export function PeriodProvider({ children }: { children: ReactNode }) {
     () => ({
       periods,
       activePeriod,
+      lastAppliedSyncAt,
       isLoading,
       error,
       setActivePeriod,
       refreshPeriods: loadPeriods,
     }),
-    [activePeriod, error, isLoading, loadPeriods, periods, setActivePeriod],
+    [
+      activePeriod,
+      error,
+      isLoading,
+      lastAppliedSyncAt,
+      loadPeriods,
+      periods,
+      setActivePeriod,
+    ],
   )
 
   return (
