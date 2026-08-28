@@ -88,6 +88,12 @@ describe('SettingsPage', () => {
       await screen.findByRole('heading', { name: 'Preferencias compatibles' }),
     ).toBeInTheDocument()
     expect(screen.getByText('Pesos mexicanos (MXN)')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Por ahora, Lunumia utiliza pesos mexicanos (MXN). Próximamente podrás elegir otras monedas.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('La moneda es fija durante UX 2.0.')).toBeNull()
     expect(screen.getByText('Modo claro')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /moneda/i })).toBeNull()
     expect(screen.queryByRole('switch', { name: /oscuro|tema/i })).toBeNull()

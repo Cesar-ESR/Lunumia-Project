@@ -170,7 +170,10 @@ export function SettingsPage() {
             <Surface variant="subtle">
               <h3>Moneda</h3>
               <strong>Pesos mexicanos (MXN)</strong>
-              <p>La moneda es fija durante UX 2.0.</p>
+              <p>
+                Por ahora, Lunumia utiliza pesos mexicanos (MXN). Próximamente
+                podrás elegir otras monedas.
+              </p>
             </Surface>
             <Surface variant="subtle">
               <h3>Apariencia</h3>
