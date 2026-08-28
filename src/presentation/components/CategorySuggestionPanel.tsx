@@ -38,12 +38,18 @@ export function CategorySuggestionPanel({
   if (!categoryName) return null
   return (
     <aside className="ai-suggestion" aria-live="polite">
-      <div>
+      <header className="ai-suggestion__header">
         <span className="ai-label">Sugerencia inteligente</span>
+      </header>
+      <div className="ai-suggestion__content">
         <strong>Sugerencia: {categoryName}</strong>
         <p>Es una recomendación; tú decides si usarla.</p>
       </div>
-      <div className="ai-actions">
+      <div
+        className="ai-actions"
+        role="group"
+        aria-label="Acciones de sugerencia"
+      >
         <button type="button" className="button secondary" onClick={onUse}>
           Usar categoría
         </button>

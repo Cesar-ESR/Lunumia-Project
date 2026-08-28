@@ -402,14 +402,22 @@
   min-width: 0;
 }
 .ai-suggestion {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  container-name: ai-suggestion;
+  container-type: inline-size;
+  display: grid;
+  align-items: stretch;
   gap: 1rem;
   padding: 1rem;
   border: 1px solid var(--color-planned-border);
   border-radius: 0.85rem;
   background: var(--color-planned-subtle);
+}
+.ai-suggestion__header,
+.ai-suggestion__content {
+  min-width: 0;
+}
+.ai-suggestion__content {
+  overflow-wrap: anywhere;
 }
 .ai-suggestion strong,
 .ai-suggestion p {
@@ -429,6 +437,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+.ai-suggestion .ai-actions {
+  min-width: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.ai-suggestion .ai-actions .button {
+  max-width: 100%;
+  white-space: nowrap;
 }
 .ai-inline-status,
 .ai-disclaimer {
@@ -493,6 +510,16 @@
   }
 }
 
+@container ai-suggestion (max-width: 28rem) {
+  .ai-suggestion .ai-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .ai-suggestion .ai-actions .button {
+    width: 100%;
+  }
+}
+
 @media (max-width: 560px) {
   .page-header {
     align-items: stretch;
@@ -505,7 +532,6 @@
   .page-actions .button {
     width: 100%;
   }
-  .ai-suggestion,
   .ai-section-header,
   .ai-actions {
     align-items: stretch;
