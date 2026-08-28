@@ -46,7 +46,12 @@ describe('Periodos U9', () => {
     await screen.findByRole('heading', { name: 'Periodos disponibles' })
     await user.selectOptions(screen.getByLabelText(/Tipo/), 'biweekly')
     await user.type(screen.getByLabelText(/Fecha inicial/), '2026-08-01')
-    await user.type(screen.getByLabelText(/Fecha final/), '2026-08-15')
+    expect(screen.getByLabelText(/Fecha final/)).toHaveValue('2026-08-15')
+    expect(screen.getByLabelText(/Fecha final/)).toHaveAttribute('readonly')
+    expect(
+      screen.getByText('La fecha final se calcula según el tipo de periodo.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('(Obligatorio)')).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Crear periodo' }))
     await waitFor(() =>
       expect(services.periods.createPeriod.execute).toHaveBeenCalledWith({
@@ -58,6 +63,39 @@ describe('Periodos U9', () => {
     )
   })
 
+  it('recalcula la fecha final al cambiar la fecha inicial y el tipo', async () => {
+    const user = userEvent.setup()
+    renderPeriods()
+    await screen.findByRole('heading', { name: 'Periodos disponibles' })
+    const type = screen.getByLabelText(/Tipo/)
+    const startDate = screen.getByLabelText(/Fecha inicial/)
+    const endDate = screen.getByLabelText(/Fecha final/)
+
+    await user.type(startDate, '2026-12-15')
+    expect(endDate).toHaveValue('2027-01-14')
+
+    await user.selectOptions(type, 'biweekly')
+    expect(endDate).toHaveValue('2026-12-29')
+
+    await user.clear(startDate)
+    await user.type(startDate, '2024-02-20')
+    expect(endDate).toHaveValue('2024-03-05')
+  })
+
+  it('impide crear un periodo sin una fecha inicial válida', async () => {
+    const user = userEvent.setup()
+    const { services } = renderPeriods()
+    await screen.findByRole('heading', { name: 'Periodos disponibles' })
+
+    await user.click(screen.getByRole('button', { name: 'Crear periodo' }))
+
+    expect(services.periods.createPeriod.execute).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(/Fecha inicial/)).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+  })
+
   it('presenta el overlap del contrato en lenguaje humano', async () => {
     const user = userEvent.setup()
     const { services } = renderPeriods()
@@ -66,7 +104,6 @@ describe('Periodos U9', () => {
     )
     await screen.findByRole('heading', { name: 'Periodos disponibles' })
     await user.type(screen.getByLabelText(/Fecha inicial/), '2026-07-01')
-    await user.type(screen.getByLabelText(/Fecha final/), '2026-07-15')
     await user.click(screen.getByRole('button', { name: 'Crear periodo' }))
     expect(
       await screen.findByText(
@@ -114,13 +151,13 @@ describe('Periodos U9', () => {
     const user = userEvent.setup()
     const { services } = renderPeriods()
     await user.click(await screen.findByRole('button', { name: 'Editar' }))
-    await user.clear(screen.getByLabelText(/Fecha final/))
-    await user.type(screen.getByLabelText(/Fecha final/), '2026-07-30')
+    await user.selectOptions(screen.getByLabelText(/Tipo/), 'biweekly')
+    expect(screen.getByLabelText(/Fecha final/)).toHaveValue('2026-07-15')
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
     await waitFor(() =>
       expect(services.periods.updatePeriod.execute).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ endDate: '2026-07-30' }),
+        expect.objectContaining({ type: 'biweekly', endDate: '2026-07-15' }),
       ),
     )
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))

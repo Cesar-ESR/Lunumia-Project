@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { CalendarDays, CheckCircle2 } from 'lucide-react'
 import { createPeriodSchema } from '@application/contracts'
-import type { Period } from '@domain/entities'
+import type { Period, PeriodType } from '@domain/entities'
+import { derivePeriodEndDate } from '@domain/rules'
+import { isDateOnly } from '@domain/value-objects'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -18,9 +20,13 @@ import { formatCompactDate } from '../utils/movement-view-model'
 
 const initialForm = { type: 'monthly' as const, startDate: '', endDate: '' }
 type PeriodForm = {
-  type: 'monthly' | 'biweekly'
+  type: PeriodType
   startDate: string
   endDate: string
+}
+
+function deriveFormEndDate(type: PeriodType, startDate: string): string {
+  return isDateOnly(startDate) ? derivePeriodEndDate(type, startDate) : ''
 }
 
 export function PeriodsPage() {
@@ -54,7 +60,7 @@ export function PeriodsPage() {
     setForm({
       type: period.type,
       startDate: period.startDate,
-      endDate: period.endDate,
+      endDate: derivePeriodEndDate(period.type, period.startDate),
     })
     setErrors({})
     setNotice(null)
@@ -62,10 +68,14 @@ export function PeriodsPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    const input = { ...form, ownerId: services.ownerId }
+    const input = {
+      ...form,
+      endDate: deriveFormEndDate(form.type, form.startDate),
+      ownerId: services.ownerId,
+    }
     const parsed = createPeriodSchema.safeParse(input)
     const nextErrors = parsed.success ? {} : zodFieldErrors(parsed.error)
-    if (form.startDate && form.endDate && form.startDate > form.endDate)
+    if (input.startDate && input.endDate && input.startDate > input.endDate)
       nextErrors.endDate =
         'La fecha final debe ser igual o posterior a la inicial.'
     setErrors(nextErrors)
@@ -149,21 +159,19 @@ export function PeriodsPage() {
           </div>
           <form onSubmit={handleSubmit} noValidate>
             <div className="form-grid">
-              <FormField
-                id="period-type"
-                label="Tipo"
-                error={errors.type}
-                required
-              >
+              <FormField id="period-type" label="Tipo" error={errors.type}>
                 <select
                   id="period-type"
+                  required
                   value={form.type}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      type: event.target.value as 'monthly' | 'biweekly',
-                    })
-                  }
+                  onChange={(event) => {
+                    const type = event.target.value as PeriodType
+                    setForm((current) => ({
+                      ...current,
+                      type,
+                      endDate: deriveFormEndDate(type, current.startDate),
+                    }))
+                  }}
                 >
                   <option value="monthly">Mensual</option>
                   <option value="biweekly">Quincenal</option>
@@ -174,31 +182,30 @@ export function PeriodsPage() {
                 id="period-start"
                 label="Fecha inicial"
                 error={errors.startDate}
-                required
               >
                 <input
                   id="period-start"
                   type="date"
+                  required
                   value={form.startDate}
-                  onChange={(event) =>
-                    setForm({ ...form, startDate: event.target.value })
-                  }
+                  onChange={(event) => {
+                    const startDate = event.target.value
+                    setForm((current) => ({
+                      ...current,
+                      startDate,
+                      endDate: deriveFormEndDate(current.type, startDate),
+                    }))
+                  }}
                 />
               </FormField>
               <FormField
                 id="period-end"
                 label="Fecha final"
                 error={errors.endDate}
-                required
+                hint="La fecha final se calcula según el tipo de periodo."
+                readOnly
               >
-                <input
-                  id="period-end"
-                  type="date"
-                  value={form.endDate}
-                  onChange={(event) =>
-                    setForm({ ...form, endDate: event.target.value })
-                  }
-                />
+                <input id="period-end" type="date" value={form.endDate} />
               </FormField>
             </div>
             <div className="ln-form-actions">
