@@ -143,7 +143,7 @@ describe('IA mantiene el flujo local-first', () => {
       categoryId: category!.id,
       amount: 50_000,
     })
-    await services.balance.setCurrentBalance.execute({
+    await services.balance.setOpeningBalance.execute({
       ownerId,
       amount: 75_000,
     })
@@ -153,8 +153,9 @@ describe('IA mantiene el flujo local-first', () => {
       services.dashboard.getBudgetSummary.execute(period, '2026-08-15'),
     ])
     expect(financial).toMatchObject({
-      currentBalanceCents: 75_000,
-      projectedAvailableCents: 75_000,
+      openingBalanceCents: 75_000,
+      currentBalanceCents: 150_000,
+      projectedAvailableCents: 150_000,
     })
     expect(budget).toMatchObject({
       totalBudget: 50_000,
