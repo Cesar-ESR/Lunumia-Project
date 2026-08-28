@@ -84,6 +84,24 @@ class ForeignKeyRemote implements RemoteSyncGateway {
     }
   }
 
+  async findEquivalentPeriod(
+    candidateOwnerId: string,
+    candidate: Period,
+  ): Promise<Period | null> {
+    await this.verifyAuthenticatedOwner(candidateOwnerId)
+    return (
+      [...this.periods.values()].find(
+        (value) =>
+          value.id !== candidate.id &&
+          value.ownerId === candidate.ownerId &&
+          value.type === candidate.type &&
+          value.startDate === candidate.startDate &&
+          value.endDate === candidate.endDate &&
+          value.deletedAt === null,
+      ) ?? null
+    )
+  }
+
   async applyOperation(
     operation: SyncOperation,
   ): Promise<RemoteMutationResult> {
@@ -351,13 +369,15 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
     expect(await database.categories.get(localCategoryId)).toBeDefined()
     expect(await database.categories.get(remoteCategoryId)).toBeUndefined()
     expect(await database.categories.get(localStarterCategoryId)).toBeDefined()
-    expect(await database.categories.get(remoteStarterCategoryId)).toBeUndefined()
+    expect(
+      await database.categories.get(remoteStarterCategoryId),
+    ).toBeUndefined()
     expect((await database.expenses.get(firstExpenseId))?.categoryId).toBe(
       localStarterCategoryId,
     )
-    expect((await database.categoryBudgets.get(categoryBudgetId))?.categoryId).toBe(
-      localStarterCategoryId,
-    )
+    expect(
+      (await database.categoryBudgets.get(categoryBudgetId))?.categoryId,
+    ).toBe(localStarterCategoryId)
     expect(
       (await database.recurringPayments.get(recurringPaymentId))?.categoryId,
     ).toBe(localStarterCategoryId)
@@ -430,8 +450,12 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
       reconciliationInstant,
     )
 
-    expect(await database.categories.get(localStarterCategoryId)).toBeUndefined()
-    expect(await database.categories.get(remoteStarterCategoryId)).toMatchObject({
+    expect(
+      await database.categories.get(localStarterCategoryId),
+    ).toBeUndefined()
+    expect(
+      await database.categories.get(remoteStarterCategoryId),
+    ).toMatchObject({
       name: 'Alimentación',
       normalizedName: 'alimentación',
       color: '#C026D3',
@@ -441,9 +465,9 @@ describe('recuperaciÃ³n guest -> cuenta con dependencias y defaults remotos', 
     expect((await database.expenses.get(firstExpenseId))?.categoryId).toBe(
       remoteStarterCategoryId,
     )
-    expect((await database.categoryBudgets.get(categoryBudgetId))?.categoryId).toBe(
-      remoteStarterCategoryId,
-    )
+    expect(
+      (await database.categoryBudgets.get(categoryBudgetId))?.categoryId,
+    ).toBe(remoteStarterCategoryId)
     expect(
       (await database.recurringPayments.get(recurringPaymentId))?.categoryId,
     ).toBe(remoteStarterCategoryId)

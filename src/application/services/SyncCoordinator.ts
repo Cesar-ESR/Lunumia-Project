@@ -87,6 +87,10 @@ export interface SyncResult {
 export interface RemoteSyncGateway {
   verifyAuthenticatedOwner(ownerId: string): Promise<void>
   fetchCanonicalDefaults?(ownerId: string): Promise<RemoteDefaultSnapshot>
+  findEquivalentPeriod(
+    ownerId: string,
+    candidate: Period,
+  ): Promise<Period | null>
   applyOperation(operation: SyncOperation): Promise<RemoteMutationResult>
   downloadPage(
     ownerId: string,
@@ -131,6 +135,11 @@ export interface LocalSyncStore {
   reconcileRemoteDefaults?(
     ownerId: string,
     snapshot: RemoteDefaultSnapshot,
+    reconciledAt: string,
+  ): Promise<void>
+  reconcileEquivalentPeriod(
+    operation: SyncOperation,
+    canonical: Period,
     reconciledAt: string,
   ): Promise<void>
 }
@@ -200,33 +209,53 @@ export class SyncCoordinator {
   }
 
   private async upload(ownerId: string, result: SyncResult): Promise<boolean> {
-    const operations = await this.local.findUploadable(ownerId)
-    for (const operation of operations) {
-      try {
-        await this.local.markProcessing(operation)
-        const remoteResult = await this.remote.applyOperation(operation)
-        await this.local.completeUpload(operation, remoteResult)
-        if (remoteResult.status === 'applied') result.uploaded += 1
-        else result.skipped += 1
-        if (remoteResult.status === 'remote_wins') result.conflicts += 1
-      } catch (error) {
-        const syncError = toSyncError(error, 'upload', operation.operationId)
-        const message = syncError.message
+    let restartAfterReconciliation = true
+    while (restartAfterReconciliation) {
+      restartAfterReconciliation = false
+      const operations = await this.local.findUploadable(ownerId)
+      for (const operation of operations) {
         try {
-          await this.local.markUploadError(operation, message)
-        } catch (persistenceError) {
-          result.errors.push({
-            stage: 'upload',
-            kind: 'unknown',
-            code: 'persist_upload_error_failed',
-            retryable: false,
-            operationId: operation.operationId,
-            message: `No se pudo persistir el error de subida: ${toErrorMessage(persistenceError)}`,
-          })
+          await this.local.markProcessing(operation)
+          const remoteResult = await this.remote.applyOperation(operation)
+          await this.local.completeUpload(operation, remoteResult)
+          if (remoteResult.status === 'applied') result.uploaded += 1
+          else result.skipped += 1
+          if (remoteResult.status === 'remote_wins') result.conflicts += 1
+        } catch (error) {
+          let failure: unknown = error
+          try {
+            if (await this.recoverEquivalentPeriod(operation, error)) {
+              result.conflicts += 1
+              result.skipped += 1
+              restartAfterReconciliation = true
+              break
+            }
+          } catch (recoveryError) {
+            failure = recoveryError
+          }
+
+          const syncError = toSyncError(
+            failure,
+            'upload',
+            operation.operationId,
+          )
+          const message = syncError.message
+          try {
+            await this.local.markUploadError(operation, message)
+          } catch (persistenceError) {
+            result.errors.push({
+              stage: 'upload',
+              kind: 'unknown',
+              code: 'persist_upload_error_failed',
+              retryable: false,
+              operationId: operation.operationId,
+              message: `No se pudo persistir el error de subida: ${toErrorMessage(persistenceError)}`,
+            })
+          }
+          result.failed += 1
+          result.errors.push(syncError)
+          return false
         }
-        result.failed += 1
-        result.errors.push(syncError)
-        return false
       }
     }
 
@@ -242,6 +271,42 @@ export class SyncCoordinator {
       })
       return false
     }
+    return true
+  }
+
+  private async recoverEquivalentPeriod(
+    operation: SyncOperation,
+    error: unknown,
+  ): Promise<boolean> {
+    if (
+      !(error instanceof SyncFailure) ||
+      error.kind !== 'conflict' ||
+      error.code !== '23P01' ||
+      operation.entityType !== 'period' ||
+      operation.operationType !== 'create'
+    ) {
+      return false
+    }
+
+    const candidate = readCreatedPeriod(operation)
+    if (!candidate) return false
+    const canonical = await this.remote.findEquivalentPeriod(
+      operation.ownerId,
+      candidate,
+    )
+    if (
+      !canonical ||
+      canonical.id === candidate.id ||
+      canonical.ownerId !== candidate.ownerId ||
+      canonical.type !== candidate.type ||
+      canonical.startDate !== candidate.startDate ||
+      canonical.endDate !== candidate.endDate ||
+      canonical.deletedAt !== null
+    ) {
+      return false
+    }
+
+    await this.local.reconcileEquivalentPeriod(operation, canonical, this.now())
     return true
   }
 
@@ -378,5 +443,38 @@ function toSyncError(
     message: failure.message,
     ...(operationId ? { operationId } : {}),
     ...(entityType ? { entityType } : {}),
+  }
+}
+
+function readCreatedPeriod(operation: SyncOperation): Period | null {
+  try {
+    const parsed: unknown = JSON.parse(operation.payload)
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('id' in parsed) ||
+      parsed.id !== operation.entityId ||
+      !('ownerId' in parsed) ||
+      parsed.ownerId !== operation.ownerId ||
+      !('type' in parsed) ||
+      (parsed.type !== 'monthly' && parsed.type !== 'biweekly') ||
+      !('startDate' in parsed) ||
+      typeof parsed.startDate !== 'string' ||
+      !('endDate' in parsed) ||
+      typeof parsed.endDate !== 'string' ||
+      !('createdAt' in parsed) ||
+      typeof parsed.createdAt !== 'string' ||
+      !('updatedAt' in parsed) ||
+      typeof parsed.updatedAt !== 'string' ||
+      !('deletedAt' in parsed) ||
+      parsed.deletedAt !== null ||
+      !('syncStatus' in parsed) ||
+      !['synced', 'pending', 'error'].includes(String(parsed.syncStatus))
+    ) {
+      return null
+    }
+    return parsed as Period
+  } catch {
+    return null
   }
 }

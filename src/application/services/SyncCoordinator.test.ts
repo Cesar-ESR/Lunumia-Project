@@ -8,6 +8,7 @@ import type {
 import { resolveLastWriteWins } from '@domain/rules'
 import {
   SyncCoordinator,
+  SyncFailure,
   type LocalSyncStore,
   type RemoteApplySummary,
   type RemoteEntityChange,
@@ -94,6 +95,33 @@ class MemoryLocalStore implements LocalSyncStore {
       })
     }
   }
+  async reconcileEquivalentPeriod(
+    value: SyncOperation,
+    canonical: Period,
+  ): Promise<void> {
+    const alias = this.records.get(value.entityId)
+    if (alias) this.records.delete(alias.id)
+    this.records.set(canonical.id, { ...canonical, syncStatus: 'synced' })
+    const index = this.operations.findIndex(
+      ({ operationId: id }) => id === value.operationId,
+    )
+    if (index >= 0) this.operations.splice(index, 1)
+    for (
+      let operationIndex = 0;
+      operationIndex < this.operations.length;
+      operationIndex += 1
+    ) {
+      const queued = this.operations[operationIndex]
+      if (!queued) continue
+      const payload = JSON.parse(queued.payload) as Record<string, unknown>
+      if (payload.periodId === value.entityId) {
+        this.operations[operationIndex] = {
+          ...queued,
+          payload: JSON.stringify({ ...payload, periodId: canonical.id }),
+        }
+      }
+    }
+  }
   async countUploadable(): Promise<number> {
     return this.operations.length
   }
@@ -153,13 +181,47 @@ class MemoryRemoteGateway implements RemoteSyncGateway {
   applyCalls = 0
   readonly downloadCalls = new Map<SyncEntityType, number>()
   failAfterFirstApply = false
+  periodCreateFailureCode: string | null = null
 
   async verifyAuthenticatedOwner(candidate: string): Promise<void> {
     this.verifyCalls += 1
     if (candidate !== ownerId) throw new Error('sesión incorrecta')
   }
+  async findEquivalentPeriod(
+    candidateOwnerId: string,
+    candidate: Period,
+  ): Promise<Period | null> {
+    await this.verifyAuthenticatedOwner(candidateOwnerId)
+    return (
+      [...this.records.values()].find(
+        (value) =>
+          value.id !== candidate.id &&
+          value.ownerId === candidate.ownerId &&
+          value.type === candidate.type &&
+          value.startDate === candidate.startDate &&
+          value.endDate === candidate.endDate &&
+          value.deletedAt === null,
+      ) ?? null
+    )
+  }
   async applyOperation(value: SyncOperation): Promise<RemoteMutationResult> {
     this.applyCalls += 1
+    if (value.entityType !== 'period') {
+      this.processed.add(value.operationId)
+      return {
+        status: 'applied',
+        entityUpdatedAt: secondInstant,
+        relatedEntityId: null,
+        relatedUpdatedAt: null,
+      }
+    }
+    if (value.operationType === 'create' && this.periodCreateFailureCode) {
+      throw new SyncFailure(
+        'conflict',
+        'El periodo se superpone con otro periodo activo.',
+        this.periodCreateFailureCode,
+      )
+    }
     if (this.processed.has(value.operationId)) {
       const current = this.records.get(value.entityId)
       return {
@@ -321,5 +383,120 @@ describe('SyncCoordinator', () => {
     expect(second.errors[0]?.message).toContain('activa')
     releaseVerification?.()
     await first
+  })
+
+  it('reconcilia un periodo remoto exactamente equivalente y continúa con dependencias en la misma sincronización', async () => {
+    const alias = period()
+    const canonical = {
+      ...period(secondInstant),
+      id: '21000000-0000-4000-8000-000000000021',
+      syncStatus: 'synced' as const,
+    }
+    const dependent: SyncOperation = {
+      operationId: '31000000-0000-4000-8000-000000000031',
+      ownerId,
+      entityType: 'income',
+      entityId: '41000000-0000-4000-8000-000000000041',
+      operationType: 'create',
+      payload: JSON.stringify({ periodId: alias.id }),
+      createdAt: secondInstant,
+      status: 'pending',
+      errorMessage: null,
+      retryCount: 0,
+    }
+    const local = new MemoryLocalStore()
+    local.records.set(alias.id, alias)
+    local.operations.push(operation(alias), dependent)
+    const remote = new MemoryRemoteGateway()
+    remote.records.set(canonical.id, canonical)
+    remote.periodCreateFailureCode = '23P01'
+
+    const first = await new SyncCoordinator(
+      local,
+      remote,
+      () => secondInstant,
+    ).sync(ownerId)
+
+    expect(first).toMatchObject({
+      uploaded: 1,
+      skipped: 1,
+      conflicts: 1,
+      failed: 0,
+      errors: [],
+    })
+    expect(local.records.has(alias.id)).toBe(false)
+    expect(local.records.get(canonical.id)).toEqual(canonical)
+    expect(local.operations).toHaveLength(0)
+    expect(remote.processed.has(dependent.operationId)).toBe(true)
+
+    const second = await new SyncCoordinator(local, remote).sync(ownerId)
+    expect(second.failed).toBe(0)
+    expect(remote.applyCalls).toBe(2)
+  })
+
+  it('conserva el error cuando el periodo superpuesto no es exactamente equivalente', async () => {
+    const alias = period()
+    const overlappingDifferentInterval = {
+      ...period(secondInstant),
+      id: '22000000-0000-4000-8000-000000000022',
+      startDate: '2026-08-15' as const,
+      endDate: '2026-09-14' as const,
+      syncStatus: 'synced' as const,
+    }
+    const local = new MemoryLocalStore()
+    local.records.set(alias.id, alias)
+    local.operations.push(operation(alias))
+    const remote = new MemoryRemoteGateway()
+    remote.records.set(
+      overlappingDifferentInterval.id,
+      overlappingDifferentInterval,
+    )
+    remote.periodCreateFailureCode = '23P01'
+
+    const result = await new SyncCoordinator(local, remote).sync(ownerId)
+
+    expect(result).toMatchObject({ failed: 1, conflicts: 0, skipped: 0 })
+    expect(result.errors[0]).toMatchObject({ kind: 'conflict', code: '23P01' })
+    expect(local.operations[0]).toMatchObject({
+      status: 'error',
+      retryCount: 1,
+    })
+    expect(local.records.has(alias.id)).toBe(true)
+  })
+
+  it('no canonicaliza periodos con las mismas fechas y distinto tipo', async () => {
+    const alias = period()
+    const differentType = {
+      ...period(secondInstant, 'biweekly'),
+      id: '23000000-0000-4000-8000-000000000023',
+      syncStatus: 'synced' as const,
+    }
+    const local = new MemoryLocalStore()
+    local.records.set(alias.id, alias)
+    local.operations.push(operation(alias))
+    const remote = new MemoryRemoteGateway()
+    remote.records.set(differentType.id, differentType)
+    remote.periodCreateFailureCode = '23P01'
+
+    const result = await new SyncCoordinator(local, remote).sync(ownerId)
+
+    expect(result.failed).toBe(1)
+    expect(result.errors[0]).toMatchObject({ kind: 'conflict', code: '23P01' })
+    expect(local.records.has(alias.id)).toBe(true)
+  })
+
+  it('no intercepta conflictos que no provienen de la exclusión de periodos', async () => {
+    const local = new MemoryLocalStore()
+    const alias = period()
+    local.records.set(alias.id, alias)
+    local.operations.push(operation(alias))
+    const remote = new MemoryRemoteGateway()
+    remote.periodCreateFailureCode = '23505'
+
+    const result = await new SyncCoordinator(local, remote).sync(ownerId)
+
+    expect(result.failed).toBe(1)
+    expect(result.errors[0]).toMatchObject({ kind: 'conflict', code: '23505' })
+    expect(local.records.has(alias.id)).toBe(true)
   })
 })

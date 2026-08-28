@@ -11,6 +11,7 @@ import {
   type RemoteSyncGateway,
 } from '@application/services/SyncCoordinator'
 import type {
+  Period,
   SyncCursor,
   SyncEntityType,
   SyncOperation,
@@ -100,6 +101,69 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
       categories,
       userSettings: settingsChange?.record ?? null,
     }
+  }
+
+  async findEquivalentPeriod(
+    ownerId: string,
+    candidate: Period,
+  ): Promise<Period | null> {
+    await this.verifyAuthenticatedOwner(ownerId)
+    if (candidate.ownerId !== ownerId || candidate.deletedAt !== null) {
+      throw new SyncFailure(
+        'permission_denied',
+        'El periodo local no pertenece al usuario autenticado.',
+        'cross_owner_record',
+      )
+    }
+
+    let response
+    try {
+      response = await this.client
+        .from('periods')
+        .select('*')
+        .eq('user_id', ownerId)
+        .eq('type', candidate.type)
+        .eq('start_date', candidate.startDate)
+        .eq('end_date', candidate.endDate)
+        .is('deleted_at', null)
+        .maybeSingle()
+    } catch (error) {
+      throw classifyRemoteFailure(
+        error,
+        'No se pudo buscar el periodo remoto equivalente.',
+      )
+    }
+    if (response.error) {
+      throw classifyRemoteFailure(
+        { ...response.error, status: response.status },
+        'No se pudo buscar el periodo remoto equivalente.',
+      )
+    }
+    if (!response.data) return null
+
+    const change = deserializeRemoteChange('period', response.data)
+    if (change.entityType !== 'period')
+      throw new SyncFailure(
+        'validation',
+        'El periodo remoto equivalente no pudo validarse.',
+        'invalid_equivalent_period',
+      )
+    if (change.record.ownerId !== ownerId) {
+      throw new SyncFailure(
+        'permission_denied',
+        'Supabase devolvió un periodo perteneciente a otro usuario.',
+        'cross_owner_record',
+      )
+    }
+    if (
+      change.record.deletedAt !== null ||
+      change.record.type !== candidate.type ||
+      change.record.startDate !== candidate.startDate ||
+      change.record.endDate !== candidate.endDate
+    ) {
+      return null
+    }
+    return change.record
   }
 
   async applyOperation(

@@ -11,7 +11,10 @@ import type {
   CategoryBudget,
   DeviceSyncState,
   Expense,
+  Income,
+  Period,
   RecurringPayment,
+  RecurringPaymentOccurrence,
   SyncCursor,
   SyncEntityType,
   SyncOperation,
@@ -152,10 +155,7 @@ export class DexieSyncStore implements LocalSyncStore {
             .equals([ownerId, remoteCategory.normalizedName])
             .toArray()
         )
-          .filter(
-            (category) =>
-              category.id !== remoteCategory.id,
-          )
+          .filter((category) => category.id !== remoteCategory.id)
           .sort(compareRecords)
 
         let canonicalCategory: Category = {
@@ -256,6 +256,169 @@ export class DexieSyncStore implements LocalSyncStore {
           'La reconciliación de defaults no puede crear ni eliminar periodos o gastos.',
         )
       }
+    })
+  }
+
+  async reconcileEquivalentPeriod(
+    operation: SyncOperation,
+    canonical: Period,
+    reconciledAt: string,
+  ): Promise<void> {
+    await this.db.transaction('rw', this.allMutableTables(), async () => {
+      const currentOperation = await this.ownedOperation(operation)
+      if (
+        currentOperation.entityType !== 'period' ||
+        currentOperation.operationType !== 'create'
+      ) {
+        throw new Error(
+          'Solo una creación de periodo pendiente puede reconciliarse.',
+        )
+      }
+
+      const localAlias = await this.db.periods.get(currentOperation.entityId)
+      if (
+        !localAlias ||
+        localAlias.ownerId !== currentOperation.ownerId ||
+        localAlias.deletedAt !== null
+      ) {
+        throw new Error(
+          'El periodo local en conflicto ya no existe, está eliminado o pertenece a otro usuario.',
+        )
+      }
+      if (
+        canonical.id === localAlias.id ||
+        canonical.ownerId !== localAlias.ownerId ||
+        canonical.deletedAt !== null ||
+        canonical.type !== localAlias.type ||
+        canonical.startDate !== localAlias.startDate ||
+        canonical.endDate !== localAlias.endDate
+      ) {
+        throw new Error(
+          'El periodo remoto no es un equivalente exacto y activo del periodo local.',
+        )
+      }
+      const canonicalCollision = await this.db.periods.get(canonical.id)
+      if (
+        canonicalCollision &&
+        canonicalCollision.ownerId !== currentOperation.ownerId
+      ) {
+        throw new Error(
+          'El periodo remoto colisiona con un periodo local de otro usuario.',
+        )
+      }
+
+      this.onReconciliationStep(`period:${localAlias.id}`)
+      await this.rewriteQueuedPeriodReferences(
+        currentOperation.ownerId,
+        localAlias.id,
+        canonical.id,
+      )
+
+      const incomes = await this.db.incomes
+        .where('[ownerId+periodId]')
+        .equals([currentOperation.ownerId, localAlias.id])
+        .toArray()
+      for (const income of incomes) {
+        const rewritten: Income = {
+          ...income,
+          periodId: canonical.id,
+          updatedAt: strictlyAfterRemote(reconciledAt, income.updatedAt),
+          syncStatus: 'pending',
+        }
+        await this.db.incomes.put(rewritten)
+        await this.rewriteOrEnqueuePeriodDependent(
+          'income',
+          rewritten,
+          reconciledAt,
+        )
+      }
+
+      const expenses = await this.db.expenses
+        .where('[ownerId+periodId]')
+        .equals([currentOperation.ownerId, localAlias.id])
+        .toArray()
+      for (const expense of expenses) {
+        const rewritten: Expense = {
+          ...expense,
+          periodId: canonical.id,
+          updatedAt: strictlyAfterRemote(reconciledAt, expense.updatedAt),
+          syncStatus: 'pending',
+        }
+        await this.db.expenses.put(rewritten)
+        await this.rewriteOrEnqueuePeriodDependent(
+          'expense',
+          rewritten,
+          reconciledAt,
+        )
+      }
+
+      const budgets = (
+        await this.db.categoryBudgets
+          .where('periodId')
+          .equals(localAlias.id)
+          .toArray()
+      ).filter((budget) => budget.ownerId === currentOperation.ownerId)
+      for (const budget of budgets) {
+        const rewritten: CategoryBudget = {
+          ...budget,
+          periodId: canonical.id,
+          updatedAt: strictlyAfterRemote(reconciledAt, budget.updatedAt),
+          syncStatus: 'pending',
+        }
+        await this.db.categoryBudgets.put(rewritten)
+        await this.rewriteOrEnqueuePeriodDependent(
+          'categoryBudget',
+          rewritten,
+          reconciledAt,
+        )
+      }
+
+      const occurrences = await this.db.recurringPaymentOccurrences
+        .where('[ownerId+periodId]')
+        .equals([currentOperation.ownerId, localAlias.id])
+        .toArray()
+      for (const occurrence of occurrences) {
+        const rewritten: RecurringPaymentOccurrence = {
+          ...occurrence,
+          periodId: canonical.id,
+          updatedAt: strictlyAfterRemote(reconciledAt, occurrence.updatedAt),
+          syncStatus: 'pending',
+        }
+        await this.db.recurringPaymentOccurrences.put(rewritten)
+        await this.rewriteOrEnqueuePeriodDependent(
+          'recurringPaymentOccurrence',
+          rewritten,
+          reconciledAt,
+        )
+      }
+
+      const settings = await this.db.userSettings
+        .where('ownerId')
+        .equals(currentOperation.ownerId)
+        .and((value) => value.activePeriodId === localAlias.id)
+        .toArray()
+      for (const value of settings) {
+        const rewritten: UserSettings = {
+          ...value,
+          activePeriodId: canonical.id,
+          updatedAt: strictlyAfterRemote(reconciledAt, value.updatedAt),
+        }
+        await this.db.userSettings.put(rewritten)
+        await this.rewriteOrEnqueuePeriodDependent(
+          'userSettings',
+          rewritten,
+          reconciledAt,
+        )
+      }
+
+      this.onReconciliationStep(`period:${localAlias.id}:references-rewritten`)
+      await this.db.periods.put({ ...canonical, syncStatus: 'synced' })
+      await this.removeQueuedEntityOperations(
+        currentOperation.ownerId,
+        'period',
+        localAlias.id,
+      )
+      await this.db.periods.delete(localAlias.id)
     })
   }
 
@@ -495,6 +658,131 @@ export class DexieSyncStore implements LocalSyncStore {
             reconciledAt,
           ),
     )
+  }
+
+  private async rewriteQueuedPeriodReferences(
+    ownerId: string,
+    previousPeriodId: string,
+    canonicalPeriodId: string,
+  ): Promise<void> {
+    const operations = await this.db.syncOperations
+      .where('ownerId')
+      .equals(ownerId)
+      .toArray()
+    const rewritten: SyncOperation[] = []
+    for (const operation of operations) {
+      const payload = parseObject(operation.payload)
+      if (!payload) continue
+      let nextPayload: Record<string, unknown> | null = null
+
+      if (operation.operationType === 'pay_recurring_occurrence') {
+        const occurrence = isRecord(payload.occurrence)
+          ? payload.occurrence
+          : null
+        const expense = isRecord(payload.expense) ? payload.expense : null
+        const nextOccurrence =
+          occurrence?.periodId === previousPeriodId
+            ? { ...occurrence, periodId: canonicalPeriodId }
+            : occurrence
+        const nextExpense =
+          expense?.periodId === previousPeriodId
+            ? { ...expense, periodId: canonicalPeriodId }
+            : expense
+        if (nextOccurrence !== occurrence || nextExpense !== expense) {
+          nextPayload = {
+            ...payload,
+            ...(nextOccurrence ? { occurrence: nextOccurrence } : {}),
+            ...(nextExpense ? { expense: nextExpense } : {}),
+          }
+        }
+      } else if (
+        (operation.entityType === 'income' ||
+          operation.entityType === 'expense' ||
+          operation.entityType === 'categoryBudget' ||
+          operation.entityType === 'recurringPaymentOccurrence') &&
+        payload.periodId === previousPeriodId
+      ) {
+        nextPayload = { ...payload, periodId: canonicalPeriodId }
+      } else if (
+        operation.entityType === 'userSettings' &&
+        payload.activePeriodId === previousPeriodId
+      ) {
+        nextPayload = { ...payload, activePeriodId: canonicalPeriodId }
+      }
+
+      if (nextPayload) {
+        rewritten.push({
+          ...operation,
+          payload: JSON.stringify(nextPayload),
+        })
+      }
+    }
+    if (rewritten.length > 0) await this.db.syncOperations.bulkPut(rewritten)
+  }
+
+  private async rewriteOrEnqueuePeriodDependent(
+    entityType:
+      | 'income'
+      | 'expense'
+      | 'categoryBudget'
+      | 'recurringPaymentOccurrence'
+      | 'userSettings',
+    record:
+      | Income
+      | Expense
+      | CategoryBudget
+      | RecurringPaymentOccurrence
+      | UserSettings,
+    reconciledAt: string,
+  ): Promise<void> {
+    const operations = await this.db.syncOperations
+      .where('ownerId')
+      .equals(record.ownerId)
+      .toArray()
+    const rewritten: SyncOperation[] = []
+    let covered = false
+    for (const operation of operations) {
+      if (
+        operation.operationType !== 'pay_recurring_occurrence' &&
+        operation.entityType === entityType &&
+        operation.entityId === record.id
+      ) {
+        covered = true
+        rewritten.push({ ...operation, payload: JSON.stringify(record) })
+        continue
+      }
+      if (
+        operation.operationType !== 'pay_recurring_occurrence' ||
+        (entityType !== 'expense' &&
+          entityType !== 'recurringPaymentOccurrence')
+      ) {
+        continue
+      }
+      const payload = parseObject(operation.payload)
+      if (!payload) continue
+      const payloadKey = entityType === 'expense' ? 'expense' : 'occurrence'
+      const nested = isRecord(payload[payloadKey]) ? payload[payloadKey] : null
+      if (nested?.id !== record.id) continue
+      covered = true
+      rewritten.push({
+        ...operation,
+        payload: JSON.stringify({ ...payload, [payloadKey]: record }),
+      })
+    }
+    if (rewritten.length > 0) await this.db.syncOperations.bulkPut(rewritten)
+    if (!covered) {
+      await this.db.syncOperations.add(
+        createSyncOperation(
+          this.sync,
+          record.ownerId,
+          entityType,
+          record.id,
+          'update',
+          record,
+          reconciledAt,
+        ),
+      )
+    }
   }
 
   private async rewriteOrEnqueueOperation(

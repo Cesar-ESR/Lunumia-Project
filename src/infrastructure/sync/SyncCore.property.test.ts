@@ -58,6 +58,23 @@ class SharedPeriodRemote implements RemoteSyncGateway {
       throw new Error('El propietario autenticado no coincide.')
   }
 
+  async findEquivalentPeriod(
+    ownerId: string,
+    candidate: Period,
+  ): Promise<Period | null> {
+    await this.verifyAuthenticatedOwner(ownerId)
+    return (
+      [...this.periods.values()].find(
+        (value) =>
+          value.id !== candidate.id &&
+          value.type === candidate.type &&
+          value.startDate === candidate.startDate &&
+          value.endDate === candidate.endDate &&
+          value.deletedAt === null,
+      ) ?? null
+    )
+  }
+
   async applyOperation(
     operation: SyncOperation,
   ): Promise<RemoteMutationResult> {
