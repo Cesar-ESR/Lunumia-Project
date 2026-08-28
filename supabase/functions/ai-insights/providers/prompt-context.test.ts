@@ -61,15 +61,15 @@ describe('contexto monetario para Groq', () => {
     expect(JSON.stringify(context)).not.toMatch(/700000|21300|14000|12000/)
   })
 
-  it('prepara planificación en integer cents sin recalcular y conserva null y negativos', () => {
+  it('prepara planificación en MXN para presentación y conserva null', () => {
     const context = buildPlanningPromptContext({
       context: 'planning',
       facts: {
-        currentBalanceCents: null,
-        committedCents: 25_00,
+        currentBalanceCents: 100_000,
+        committedCents: 0,
         expectedIncomeCents: 30_00,
-        projectedAvailableCents: -35_00,
-        projectedClosingBalanceCents: -5_00,
+        projectedAvailableCents: null,
+        projectedClosingBalanceCents: -125_050,
         projectionCoverage: 'overdue_only',
         projectionHorizonEnd: null,
       },
@@ -78,15 +78,16 @@ describe('contexto monetario para Groq', () => {
     expect(context).toEqual({
       context: 'planning',
       facts: {
-        currentBalanceCents: null,
-        committedCents: 25_00,
-        expectedIncomeCents: 30_00,
-        projectedAvailableCents: -35_00,
-        projectedClosingBalanceCents: -5_00,
+        currentBalance: '$1,000.00 MXN',
+        committed: '$0.00 MXN',
+        expectedIncome: '$30.00 MXN',
+        projectedAvailable: null,
+        projectedClosingBalance: '-$1,250.50 MXN',
         projectionCoverage: 'overdue_only',
         projectionHorizonEnd: null,
       },
     })
+    expect(JSON.stringify(context)).not.toMatch(/Cents|100000|3000|125050/)
   })
 
   it('prepara explain-changes después del cálculo TypeScript', () => {

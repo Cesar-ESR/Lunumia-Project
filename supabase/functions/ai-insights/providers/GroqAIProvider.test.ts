@@ -140,6 +140,33 @@ describe('GroqAIProvider', () => {
     )
   })
 
+  it('mantiene period-summary sin recuperación automática', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          error: {
+            type: 'invalid_request_error',
+            code: 'json_validate_failed',
+          },
+        },
+        { status: 400 },
+      ),
+    )
+    const provider = new GroqAIProvider({ apiKey, model, fetcher })
+
+    await expect(
+      provider.generatePeriodSummary(
+        summaryInput(),
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: 'provider_unavailable' })
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(infoLogs()).toContain(
+      'operation=period-summary phase=upstream upstreamStatus=400 internalType=structured_output_validation_failed',
+    )
+    expect(infoLogs()).not.toContain('recovery=')
+  })
+
   it('valida resumen y explicaciones estructuradas', async () => {
     const fetcher = vi
       .fn<typeof fetch>()

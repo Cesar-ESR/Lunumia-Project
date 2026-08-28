@@ -39,6 +39,7 @@ type GroqOperation =
 
 type GroqDiagnosticType =
   | 'upstream_bad_request'
+  | 'structured_output_validation_failed'
   | 'upstream_unprocessable'
   | 'rate_limit'
   | 'capacity'
@@ -54,6 +55,13 @@ type GroqDiagnosticType =
   | 'upstream_http_error'
 
 type DiagnosticFields = Record<string, string | number | undefined>
+type GroqRecovery = 'json_validate_failed_retry' | 'json_object_fallback'
+
+interface CompletionAttemptOptions {
+  attempt?: 1 | 2 | 3
+  recovery?: GroqRecovery
+  recoverStructuredOutputValidation?: boolean
+}
 
 const JSON_OBJECT_RESPONSE_FORMAT = { type: 'json_object' } as const
 const PERIOD_SUMMARY_RESPONSE_FORMAT = {
@@ -108,6 +116,13 @@ const MAX_COMPLETION_TOKENS = 800
 const REASONING_EFFORT = 'default'
 const MESSAGE_COUNT = 2
 const MAX_DIAGNOSTIC_TOKEN_LENGTH = 100
+
+class StructuredOutputValidationFailure extends Error {
+  constructor() {
+    super('Structured output validation failed upstream.')
+    this.name = 'StructuredOutputValidationFailure'
+  }
+}
 
 const completionSchema = z.object({
   choices: z
@@ -240,9 +255,9 @@ export class GroqAIProvider implements AIProvider {
     const operation = 'planning-analysis'
     const output = parseProviderOutput(
       PlanningAnalysisResponseSchema,
-      await this.complete(
+      await this.completeWithStructuredOutputRecovery(
         operation,
-        'Explica brevemente en español la proyección usando exclusivamente los hechos suministrados. Los campos monetarios son enteros en centavos y ya fueron calculados por la aplicación: no los sumes, restes, conviertas, recalcules, reemplaces ni inventes. Un valor null significa desconocido y nunca significa cero. Los valores negativos son válidos. expectedIncomeCents representa dinero futuro, no saldo actual. projectedClosingBalanceCents es una estimación, no una certeza. Respeta exactamente projectionCoverage y projectionHorizonEnd; no definas otro horizonte. Si projectionCoverage es overdue_only, declara que la cobertura es limitada y no afirmes certeza del periodo completo. No apruebes gastos, no indiques montos seguros, no generes órdenes financieras y no sugieras modificar transacciones. Ninguna transacción se modifica: la respuesta es únicamente explicativa. Responde solo JSON con summary, observations y considerations.',
+        'Explica brevemente en español la proyección usando exclusivamente los hechos suministrados. Todos los importes monetarios proporcionados ya están calculados y formateados por la aplicación en pesos mexicanos (MXN). Reprodúcelos literalmente cuando los menciones. No recalcules, conviertas, sumes, restes, reformatees ni inventes cifras. Un valor null significa desconocido y nunca significa cero. Los valores negativos son válidos. expectedIncome representa dinero futuro, no saldo actual. projectedClosingBalance es una estimación, no una certeza. Respeta exactamente projectionCoverage y projectionHorizonEnd; no definas otro horizonte. Si projectionCoverage es overdue_only, declara que la cobertura es limitada y no afirmes certeza del periodo completo. No apruebes gastos, no indiques montos seguros, no generes órdenes financieras y no sugieras modificar transacciones. Ninguna transacción se modifica: la respuesta es únicamente explicativa. Responde solo un objeto JSON con exactamente las propiedades summary, observations y considerations, sin propiedades adicionales.',
         buildPlanningPromptContext(input),
         signal,
         PLANNING_ANALYSIS_RESPONSE_FORMAT,
@@ -253,12 +268,60 @@ export class GroqAIProvider implements AIProvider {
     return output
   }
 
+  private async completeWithStructuredOutputRecovery(
+    operation: GroqOperation,
+    systemPrompt: string,
+    input: unknown,
+    signal: AbortSignal,
+    responseFormat: GroqResponseFormat,
+  ): Promise<unknown> {
+    try {
+      return await this.complete(
+        operation,
+        systemPrompt,
+        input,
+        signal,
+        responseFormat,
+        { attempt: 1, recoverStructuredOutputValidation: true },
+      )
+    } catch (reason) {
+      if (!(reason instanceof StructuredOutputValidationFailure)) throw reason
+    }
+
+    try {
+      return await this.complete(
+        operation,
+        systemPrompt,
+        input,
+        signal,
+        responseFormat,
+        {
+          attempt: 2,
+          recovery: 'json_validate_failed_retry',
+          recoverStructuredOutputValidation: true,
+        },
+      )
+    } catch (reason) {
+      if (!(reason instanceof StructuredOutputValidationFailure)) throw reason
+    }
+
+    return this.complete(
+      operation,
+      systemPrompt,
+      input,
+      signal,
+      JSON_OBJECT_RESPONSE_FORMAT,
+      { attempt: 3, recovery: 'json_object_fallback' },
+    )
+  }
+
   private async complete(
     operation: GroqOperation,
     systemPrompt: string,
     input: unknown,
     signal: AbortSignal,
     responseFormat: GroqResponseFormat = JSON_OBJECT_RESPONSE_FORMAT,
+    attemptOptions: CompletionAttemptOptions = {},
   ): Promise<unknown> {
     const startedAt = this.now()
     const userMessage = JSON.stringify(input)
@@ -268,6 +331,8 @@ export class GroqAIProvider implements AIProvider {
       phase: 'request',
       model: sanitizeDiagnosticToken(this.model),
       responseFormat: responseFormat.type,
+      attempt: attemptOptions.attempt,
+      recovery: attemptOptions.recovery,
       maxCompletionTokens: MAX_COMPLETION_TOKENS,
       reasoningEffort: REASONING_EFFORT,
       messageCount: MESSAGE_COUNT,
@@ -302,6 +367,9 @@ export class GroqAIProvider implements AIProvider {
         internalType: aborted ? 'timeout' : 'network_error',
         errorClass: readErrorClass(reason),
         durationMs: elapsedMilliseconds(startedAt, this.now()),
+        responseFormat: responseFormat.type,
+        attempt: attemptOptions.attempt,
+        recovery: attemptOptions.recovery,
       })
       if (aborted) throw new AIInsightsFunctionError('provider_timeout')
       throw new AIInsightsFunctionError('provider_unavailable')
@@ -314,16 +382,28 @@ export class GroqAIProvider implements AIProvider {
         systemPrompt,
         userMessage,
       ])
+      const structuredOutputValidationFailure =
+        isStructuredOutputValidationFailure(response.status, metadata)
       logDiagnostic({
         provider: 'groq',
         operation,
         phase: 'upstream',
         upstreamStatus: response.status,
-        internalType: classifyGroqStatus(response.status),
+        internalType: structuredOutputValidationFailure
+          ? 'structured_output_validation_failed'
+          : classifyGroqStatus(response.status),
         upstreamErrorType: metadata.type,
         upstreamErrorCode: metadata.code,
         durationMs,
+        responseFormat: responseFormat.type,
+        attempt: attemptOptions.attempt,
+        recovery: attemptOptions.recovery,
       })
+      if (
+        structuredOutputValidationFailure &&
+        attemptOptions.recoverStructuredOutputValidation
+      )
+        throw new StructuredOutputValidationFailure()
       throw mapGroqStatus(response.status)
     }
 
@@ -333,6 +413,9 @@ export class GroqAIProvider implements AIProvider {
       phase: 'response',
       upstreamStatus: response.status,
       durationMs,
+      responseFormat: responseFormat.type,
+      attempt: attemptOptions.attempt,
+      recovery: attemptOptions.recovery,
     })
 
     let responseBody: unknown
@@ -397,6 +480,17 @@ function classifyGroqStatus(status: number): GroqDiagnosticType {
   if (status === 498) return 'capacity'
   if (status === 500 || status === 502 || status === 503) return 'upstream_5xx'
   return 'upstream_http_error'
+}
+
+function isStructuredOutputValidationFailure(
+  status: number,
+  metadata: { type?: string; code?: string },
+): boolean {
+  return (
+    status === 400 &&
+    metadata.type === 'invalid_request_error' &&
+    metadata.code === 'json_validate_failed'
+  )
 }
 
 async function readUpstreamErrorMetadata(
