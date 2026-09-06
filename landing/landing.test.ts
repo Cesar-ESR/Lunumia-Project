@@ -23,6 +23,19 @@ const landingText = () =>
   (landingDocument.body.textContent ?? '').replace(/\s+/g, ' ').trim()
 
 describe('Lunumia Landing v1', () => {
+  it('integra el logo sin fondo añadido y un icono de apariencia de medio disco', () => {
+    expect(styles).not.toContain('--logo-backing')
+    expect(styles).not.toMatch(/\.brand-logo\s*\{[^}]*background/s)
+    const icon = landingDocument.querySelector('.appearance-menu summary svg')
+    expect(icon?.getAttribute('aria-hidden')).toBe('true')
+    expect(icon?.querySelector('path')?.getAttribute('fill')).toBe(
+      'currentColor',
+    )
+    expect(icon?.querySelector('path')?.getAttribute('d')).toBe(
+      'M12 4a8 8 0 0 1 0 16Z',
+    )
+  })
+
   it('mantiene contraste AA en pares de texto semánticos de ambos temas', () => {
     const blocks = styles.match(/:root(?:\[data-theme='dark'\])?\s*\{[^}]+\}/g)!
     const luminance = (hex: string) => {
