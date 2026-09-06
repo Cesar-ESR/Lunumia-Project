@@ -61,7 +61,7 @@
   padding: 0.65rem 1rem;
   border: 1px solid var(--brand);
   border-radius: 0.7rem;
-  color: #fff;
+  color: var(--text-on-brand);
   background: var(--brand);
   cursor: pointer;
   font-weight: 750;
@@ -106,7 +106,7 @@
   border: 1px solid var(--color-control-border);
   border-radius: 0.6rem;
   color: var(--ink);
-  background: #fff;
+  background: var(--color-surface);
 }
 .form-field textarea {
   min-height: 5rem;
@@ -196,8 +196,8 @@
   background: transparent;
 }
 .button.ghost.danger-text:hover {
-  color: #fff;
-  background: var(--danger);
+  color: var(--text-on-danger);
+  background: var(--color-danger-solid);
 }
 .stack-form {
   display: grid;
@@ -261,7 +261,11 @@
   margin-top: auto;
 }
 .danger-zone {
-  border-color: color-mix(in srgb, var(--danger) 38%, white);
+  border-color: color-mix(
+    in srgb,
+    var(--color-danger) 38%,
+    var(--color-surface)
+  );
 }
 .file-button {
   cursor: pointer;
@@ -300,8 +304,8 @@
   max-width: min(30rem, calc(100vw - 2rem));
   padding: 0.55rem 1rem;
   border-radius: 0.7rem;
-  color: #fff;
-  background: #6f4b00;
+  color: var(--text-on-warning-strong);
+  background: var(--color-warning-solid);
   box-shadow: var(--shadow);
   text-align: center;
   font-size: 0.85rem;
@@ -319,8 +323,8 @@
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 0.9rem;
-  background: #fff;
-  box-shadow: 0 20px 60px rgba(16, 24, 32, 0.24);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-dialog);
 }
 .pwa-prompt > span {
   flex: 1;
@@ -358,7 +362,7 @@
   padding: clamp(1.3rem, 5vw, 2.3rem);
   border: 1px solid var(--line);
   border-radius: 1.2rem;
-  background: #fff;
+  background: var(--color-surface-elevated);
   box-shadow: var(--shadow);
 }
 .auth-brand {
@@ -456,7 +460,7 @@
 }
 .ai-inline-error,
 .ai-error {
-  color: #7f1d1d;
+  color: var(--color-danger);
 }
 .ai-section {
   display: grid;

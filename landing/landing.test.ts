@@ -23,6 +23,46 @@ const landingText = () =>
   (landingDocument.body.textContent ?? '').replace(/\s+/g, ' ').trim()
 
 describe('Lunumia Landing v1', () => {
+  it('mantiene contraste AA en pares de texto semánticos de ambos temas', () => {
+    const blocks = styles.match(/:root(?:\[data-theme='dark'\])?\s*\{[^}]+\}/g)!
+    const luminance = (hex: string) => {
+      const channels = hex.match(/\w\w/g)!.map((channel) => {
+        const value = parseInt(channel, 16) / 255
+        return value <= 0.04045
+          ? value / 12.92
+          : ((value + 0.055) / 1.055) ** 2.4
+      })
+      return (
+        channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722
+      )
+    }
+    for (const block of blocks) {
+      const tokens = Object.fromEntries(
+        [...block.matchAll(/--([\w-]+):\s*#([\da-f]{6});/g)].map((match) => [
+          match[1],
+          match[2],
+        ]),
+      )
+      for (const [foreground, background] of [
+        ['text', 'surface'],
+        ['text-secondary', 'surface'],
+        ['muted', 'background'],
+        ['muted', 'primary-soft'],
+        ['primary', 'primary-soft'],
+        ['on-primary', 'primary'],
+        ['secondary-text', 'secondary-soft'],
+        ['accent-text', 'accent-soft'],
+      ]) {
+        const a = luminance(tokens[foreground!]!)
+        const b = luminance(tokens[background!]!)
+        expect(
+          (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+          `${foreground}/${background}`,
+        ).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
   it('presenta un único H1 y landmarks semánticos completos', () => {
     const headings = landingDocument.querySelectorAll('h1')
     expect(headings).toHaveLength(1)
@@ -211,6 +251,6 @@ describe('Lunumia Landing v1', () => {
     expect(styles).toContain('@media (max-width: 380px)')
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)')
     expect(source).not.toMatch(/supabase|serviceWorker|registerSW/i)
-    expect(landingDocument.querySelectorAll('script')).toHaveLength(1)
+    expect(landingDocument.querySelectorAll('script')).toHaveLength(2)
   })
 })

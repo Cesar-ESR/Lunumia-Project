@@ -260,6 +260,13 @@ export function createApplicationServicesMock({
           .fn<ApplicationServices['settings']['getUserSettings']['execute']>()
           .mockResolvedValue(settings),
       },
+      setThemePreference: {
+        execute: vi
+          .fn<
+            ApplicationServices['settings']['setThemePreference']['execute']
+          >()
+          .mockImplementation(async (theme) => ({ ...settings, theme })),
+      },
     },
     balance: {
       getSetupContext: {

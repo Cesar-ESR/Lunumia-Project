@@ -45,6 +45,8 @@
   --text-muted: #65778a;
   --text-disabled: #7d8c9a;
   --text-on-brand: #ffffff;
+  --text-on-danger: #ffffff;
+  --text-on-warning-strong: #ffffff;
   --text-link: #1267d6;
   --text-planned: #5746d8;
   --text-navigation: #4e647d;
@@ -56,12 +58,15 @@
   --semantic-warning-background: #fff3d9;
   --semantic-danger-foreground: #b93845;
   --semantic-danger-background: #fceaec;
+  --semantic-danger-solid: #b93845;
+  --semantic-danger-solid-hover: #922d38;
   --semantic-info-foreground: #1267d6;
   --semantic-info-background: #eaf4ff;
   --semantic-planned-foreground: #6b5cff;
   --semantic-planned-background: #f0edff;
   --semantic-neutral-foreground: #64748b;
   --semantic-neutral-background: #eef2f6;
+  --semantic-warning-solid: #6f4b00;
 
   /* Charts differentiate series; they do not encode financial status. */
   --chart-1: #1267d6;
@@ -110,6 +115,8 @@
   --color-warning-subtle: var(--semantic-warning-background);
   --color-danger: var(--semantic-danger-foreground);
   --color-danger-subtle: var(--semantic-danger-background);
+  --color-danger-solid: var(--semantic-danger-solid);
+  --color-danger-solid-hover: var(--semantic-danger-solid-hover);
   --color-info: var(--semantic-info-foreground);
   --color-info-subtle: var(--semantic-info-background);
   --color-planned: var(--text-planned);
@@ -120,6 +127,8 @@
   --color-focus: var(--focus-color);
   --color-disabled-bg: var(--surface-disabled);
   --color-disabled-text: var(--text-disabled);
+  --color-warning-solid: var(--semantic-warning-solid);
+  --color-overlay: rgba(16, 24, 32, 0.56);
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -136,6 +145,7 @@
   --radius-pill: 999px;
 
   --shadow-base: 0 1px 2px rgba(16, 24, 32, 0.06);
+  --shadow-navigation: 0 -1px 8px rgba(16, 24, 32, 0.06);
   --shadow-popover: 0 8px 24px rgba(16, 24, 32, 0.14);
   --shadow-dialog: 0 16px 48px rgba(16, 24, 32, 0.22);
 
@@ -184,4 +194,88 @@
   --danger: var(--color-danger);
   --warning: var(--color-warning);
   --shadow: var(--shadow-base);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --brand-primary: #7ab0ff;
+  --brand-primary-hover: #9ac3ff;
+  --brand-primary-pressed: #b8d5ff;
+  --brand-primary-soft: #142d50;
+  --brand-primary-border: #356397;
+  --brand-secondary: #b0a5ff;
+  --brand-secondary-hover: #c4bcff;
+  --brand-secondary-soft: #292348;
+  --brand-accent: #55d5f6;
+  --brand-accent-soft: #123344;
+  --brand-gradient: linear-gradient(
+    135deg,
+    #55d5f6 0%,
+    #5f9cff 48%,
+    #9c8dff 78%,
+    #bd86ff 100%
+  );
+
+  --surface-background: #0c111b;
+  --surface-default: #151d29;
+  --surface-subtle: #1b2634;
+  --surface-selected: #142d50;
+  --surface-planned: #292348;
+  --surface-disabled: #202a36;
+  --surface-hover: #1d2a3a;
+  --navigation-sidebar-surface: #101a28;
+  --navigation-topbar-surface: #111c2b;
+  --navigation-border: #2a3c51;
+  --navigation-active-surface: #17375f;
+  --navigation-hover-surface: #182b42;
+  --border-default: #314154;
+  --border-strong: #4c6075;
+  --border-interactive: #71869b;
+  --border-brand: #4d7fb8;
+  --border-planned: #665ca8;
+
+  --text-primary: #f3f7fb;
+  --text-secondary: #c1cedb;
+  --text-muted: #98a9ba;
+  --text-disabled: #8291a1;
+  --text-on-brand: #07111f;
+  --text-on-danger: #ffffff;
+  --text-on-warning-strong: #ffffff;
+  --text-link: #8bb9ff;
+  --text-planned: #c0b7ff;
+  --text-navigation: #b9c8d8;
+
+  --semantic-success-foreground: #75d6ab;
+  --semantic-success-background: #12382b;
+  --semantic-warning-foreground: #ffd078;
+  --semantic-warning-background: #402d0f;
+  --semantic-warning-solid: #76500a;
+  --semantic-danger-foreground: #ff9da5;
+  --semantic-danger-background: #421a20;
+  --semantic-danger-solid: #b93845;
+  --semantic-danger-solid-hover: #d35a65;
+  --semantic-info-foreground: #8bb9ff;
+  --semantic-info-background: #142d50;
+  --semantic-planned-foreground: #b0a5ff;
+  --semantic-planned-background: #292348;
+  --semantic-neutral-foreground: #b1bfce;
+  --semantic-neutral-background: #202b38;
+
+  --chart-1: #7ab0ff;
+  --chart-2: #b0a5ff;
+  --chart-3: #55d5f6;
+  --chart-4: #75d6ab;
+  --chart-5: #ffd078;
+  --chart-6: #ee91bd;
+  --chart-7: #9fb4ce;
+  --chart-8: #c7a5ef;
+
+  --focus-color: #8bb9ff;
+  --focus-ring: rgba(122, 176, 255, 0.32);
+  --color-overlay: rgba(2, 6, 12, 0.72);
+  --shadow-base: 0 1px 2px rgba(0, 0, 0, 0.42);
+  --shadow-navigation: 0 -1px 10px rgba(0, 0, 0, 0.38);
+  --shadow-popover: 0 10px 28px rgba(0, 0, 0, 0.48);
+  --shadow-dialog: 0 18px 52px rgba(0, 0, 0, 0.58);
 }

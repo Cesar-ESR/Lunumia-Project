@@ -11,6 +11,7 @@ export type OccurrenceStatus = 'pending' | 'paid' | 'skipped'
 export type IncomeStatus = 'expected' | 'received' | 'cancelled'
 export type PeriodTemporalState = 'future' | 'active' | 'ended'
 export type PaymentStatus = 'active' | 'inactive'
+export type ThemePreference = 'system' | 'light' | 'dark'
 export type SyncStatus = 'synced' | 'pending' | 'error'
 export type SyncOperationType =
   'create' | 'update' | 'delete' | 'pay_recurring_occurrence'
@@ -144,7 +145,7 @@ export interface UserSettings {
   ownerId: string
   activePeriodId: string | null
   currency: string
-  theme: 'light' | 'dark' | 'system'
+  theme: ThemePreference
   createdAt: Instant
   updatedAt: Instant
 }

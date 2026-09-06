@@ -1,5 +1,5 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   SyncOrchestrator,
   SyncState,
@@ -63,6 +63,7 @@ function Consumer() {
 
 describe('PeriodProvider authenticated hydration refresh', () => {
   beforeEach(() => {
+    vi.setSystemTime(new Date('2026-08-27T12:00:00.000Z'))
     vi.mocked(useAuth).mockReturnValue({
       user: { id: ownerId },
       ownerId,
@@ -70,6 +71,8 @@ describe('PeriodProvider authenticated hydration refresh', () => {
       revalidateSession: vi.fn(),
     } as never)
   })
+
+  afterEach(() => vi.useRealTimers())
 
   it('refreshes hydrated repositories once per successful sync timestamp', async () => {
     const current = createPeriodMock({

@@ -41,6 +41,7 @@ import { ToggleRecurringPaymentStatus } from '@application/use-cases/recurring-p
 import { UpdateRecurringPayment } from '@application/use-cases/recurring-payments/UpdateRecurringPayment'
 import { GetUserSettings } from '@application/use-cases/settings/GetUserSettings'
 import { InitializeLocalOwner } from '@application/use-cases/settings/InitializeLocalOwner'
+import { SetThemePreference } from '@application/use-cases/settings/SetThemePreference'
 import { SimulatePurchase } from '@application/use-cases/simulator/SimulatePurchase'
 import { PrepareReceiptImage, RecognizeReceipt } from './receipt-workflow'
 import { SignIn } from '@application/use-cases/auth/SignIn'
@@ -128,7 +129,10 @@ type Executable<T> = Pick<T, Extract<keyof T, 'execute'>>
 export interface ApplicationServices {
   ownerId: string
   initialize: Executable<InitializeLocalOwner>
-  settings: { getUserSettings: Executable<GetUserSettings> }
+  settings: {
+    getUserSettings: Executable<GetUserSettings>
+    setThemePreference: Executable<SetThemePreference>
+  }
   balance: {
     getSetupContext: Executable<GetBalanceSetupContext>
     setCurrentBalance: Executable<SetCurrentBalance>
@@ -374,7 +378,10 @@ export function createApplicationServices(
       ids,
       clock,
     ),
-    settings: { getUserSettings: new GetUserSettings(settings) },
+    settings: {
+      getUserSettings: new GetUserSettings(settings),
+      setThemePreference: new SetThemePreference(settings, clock),
+    },
     balance: {
       getSetupContext: new GetBalanceSetupContext(incomes, expenses),
       setCurrentBalance: new SetCurrentBalance(anchors, ids, clock),

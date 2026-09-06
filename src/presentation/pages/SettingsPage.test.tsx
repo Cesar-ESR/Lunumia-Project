@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApplicationServices } from '../../app/composition-root'
 import { App } from '../App'
 import { createApplicationServicesMock } from '../test/test-factories'
@@ -10,6 +10,12 @@ function renderSettings(services: ApplicationServices) {
   window.history.replaceState({}, '', '/settings')
   return render(<App services={services} authServices={null} />)
 }
+
+beforeEach(() => {
+  localStorage.clear()
+  delete document.documentElement.dataset.theme
+  delete document.documentElement.dataset.themePreference
+})
 
 describe('SettingsPage', () => {
   it('valida, resume y confirma una importación antes de escribir', async () => {
@@ -81,7 +87,7 @@ describe('SettingsPage', () => {
     )
   })
 
-  it('muestra sólo preferencias soportadas y mantiene al invitado como estado válido', async () => {
+  it('muestra preferencias soportadas y mantiene al invitado como estado válido', async () => {
     const { services } = createApplicationServicesMock()
     renderSettings(services)
     expect(
@@ -94,7 +100,12 @@ describe('SettingsPage', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.queryByText('La moneda es fija durante UX 2.0.')).toBeNull()
-    expect(screen.getByText('Modo claro')).toBeInTheDocument()
+    expect(
+      screen.getByRole('group', { name: 'Tema visual' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Sistema/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Claro/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Oscuro/ })).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /moneda/i })).toBeNull()
     expect(screen.queryByRole('switch', { name: /oscuro|tema/i })).toBeNull()
     expect(
@@ -106,6 +117,43 @@ describe('SettingsPage', () => {
     expect(
       screen.queryByRole('button', { name: 'Eliminar mi cuenta' }),
     ).toBeNull()
+  })
+
+  it('aplica y persiste inmediatamente la preferencia seleccionada', async () => {
+    const user = userEvent.setup()
+    const { services } = createApplicationServicesMock()
+    renderSettings(services)
+    const dark = await screen.findByRole('radio', { name: /Oscuro/ })
+
+    await user.click(dark)
+
+    expect(dark).toBeChecked()
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(services.settings.setThemePreference.execute).toHaveBeenCalledWith(
+      'dark',
+    )
+    expect(screen.getByText('Tema aplicado:')).toHaveTextContent(
+      'Tema aplicado: Oscuro',
+    )
+  })
+
+  it('revierte el tema y muestra el error cuando falla la persistencia', async () => {
+    const user = userEvent.setup()
+    const { services } = createApplicationServicesMock()
+    vi.mocked(services.settings.setThemePreference.execute).mockRejectedValue(
+      new Error('No se pudo guardar la preferencia.'),
+    )
+    renderSettings(services)
+
+    await user.click(await screen.findByRole('radio', { name: /Oscuro/ }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: /Sistema/ })).toBeChecked(),
+    )
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    expect(
+      screen.getByText('No se pudo guardar la preferencia.'),
+    ).toBeInTheDocument()
   })
 
   it('separa actualización de aplicación y sincronización de datos', async () => {

@@ -21,6 +21,7 @@ import { AuthGuard } from './components/AuthGuard'
 import { AuthEntryGuard } from './components/AuthEntryGuard'
 import { FirstTimeSetupResolver } from './components/FirstTimeSetupResolver'
 import { GuestDataDecisionDialog } from './components/GuestDataDecisionDialog'
+import { ThemeSettingsBridge } from './components/ThemeSettingsBridge'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { RouteLoadingBoundary } from './components/RouteLoadingBoundary'
 import { AppLayout } from './layouts/AppLayout'
@@ -36,6 +37,7 @@ import { InitialBalancePage } from './pages/setup/InitialBalancePage'
 import { InitialCategoriesPage } from './pages/setup/InitialCategoriesPage'
 import { InitialPeriodPage } from './pages/setup/InitialPeriodPage'
 import { WelcomePage } from './pages/setup/WelcomePage'
+import { ThemeProvider } from './context/ThemeContext'
 
 const MovementsPage = lazy(() =>
   import('./pages/MovementsPage').then(({ MovementsPage }) => ({
@@ -126,9 +128,11 @@ function LocalDataProviders({ services }: { services?: ApplicationServices }) {
   return (
     <ApplicationServicesProvider services={scopedServices}>
       <SyncProvider orchestrator={scopedServices.syncOrchestrator}>
-        <PeriodProvider key={scopedServices.ownerId}>
-          <Outlet />
-        </PeriodProvider>
+        <ThemeSettingsBridge key={scopedServices.ownerId}>
+          <PeriodProvider key={scopedServices.ownerId}>
+            <Outlet />
+          </PeriodProvider>
+        </ThemeSettingsBridge>
       </SyncProvider>
     </ApplicationServicesProvider>
   )
@@ -143,146 +147,151 @@ export function App({
 }) {
   const guestOwnerId = services?.ownerId ?? compositionRoot.ownerId
   return (
-    <ErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider runtime={authServices} guestOwnerId={guestOwnerId}>
-          <GuestDataDecisionDialog />
-          <Routes>
-            <Route path="/" element={<Navigate to="/inicio" replace />} />
-            <Route element={<AuthEntryGuard />}>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/verify-email" element={<VerifyEmailPage />} />
-            </Route>
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route element={<AuthGuard allowGuest />}>
-              <Route element={<LocalDataProviders services={services} />}>
-                <Route element={<FirstTimeSetupResolver />}>
-                  <Route
-                    path="configuracion-inicial"
-                    element={<WelcomePage />}
-                  />
-                  <Route
-                    path="configuracion-inicial/periodo"
-                    element={<InitialPeriodPage />}
-                  />
-                  <Route
-                    path="configuracion-inicial/categorias"
-                    element={<InitialCategoriesPage />}
-                  />
-                  <Route
-                    path="saldo/inicial"
-                    element={<InitialBalancePage />}
-                  />
-                  <Route element={<AppLayout />}>
-                    <Route path="inicio" element={<DashboardPage />} />
+    <ThemeProvider>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <AuthProvider runtime={authServices} guestOwnerId={guestOwnerId}>
+            <GuestDataDecisionDialog />
+            <Routes>
+              <Route path="/" element={<Navigate to="/inicio" replace />} />
+              <Route element={<AuthEntryGuard />}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route
+                  path="/forgot-password"
+                  element={<ForgotPasswordPage />}
+                />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
+              </Route>
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route element={<AuthGuard allowGuest />}>
+                <Route element={<LocalDataProviders services={services} />}>
+                  <Route element={<FirstTimeSetupResolver />}>
                     <Route
-                      path="dashboard"
-                      element={<Navigate to="/inicio" replace />}
+                      path="configuracion-inicial"
+                      element={<WelcomePage />}
                     />
                     <Route
-                      path="movimientos"
-                      element={lazyRoute(<MovementsPage />)}
+                      path="configuracion-inicial/periodo"
+                      element={<InitialPeriodPage />}
                     />
                     <Route
-                      path="movimientos/ingresos/nuevo"
-                      element={lazyRoute(<IncomeCreatePage />)}
+                      path="configuracion-inicial/categorias"
+                      element={<InitialCategoriesPage />}
                     />
                     <Route
-                      path="movimientos/ingresos/:id"
-                      element={lazyRoute(<ExpectedIncomeDetailPage />)}
+                      path="saldo/inicial"
+                      element={<InitialBalancePage />}
                     />
-                    <Route path="plan" element={<PlanningLandingPage />} />
-                    <Route path="mas" element={<MoreLandingPage />} />
-                    <Route
-                      path="insights"
-                      element={lazyRoute(<InsightsPage />)}
-                    />
-                    <Route
-                      path="periods"
-                      element={<Navigate to="/plan/periodos" replace />}
-                    />
-                    <Route
-                      path="plan/periodos"
-                      element={lazyRoute(<PeriodsPage />)}
-                    />
-                    <Route
-                      path="incomes"
-                      element={
-                        <Navigate to="/movimientos?tipo=ingresos" replace />
-                      }
-                    />
-                    <Route
-                      path="expenses"
-                      element={lazyRoute(<ExpensesPage />)}
-                    />
-                    <Route
-                      path="expenses/receipt"
-                      element={lazyRoute(<ReceiptCapturePage />)}
-                    />
-                    <Route
-                      path="categories"
-                      element={
-                        <Navigate to="/organizacion/categorias" replace />
-                      }
-                    />
-                    <Route
-                      path="organizacion/categorias"
-                      element={lazyRoute(<CategoriesPage />)}
-                    />
-                    <Route
-                      path="budgets"
-                      element={<Navigate to="/plan/presupuestos" replace />}
-                    />
-                    <Route
-                      path="plan/presupuestos"
-                      element={lazyRoute(<BudgetsPage />)}
-                    />
-                    <Route
-                      path="plan/proyeccion"
-                      element={lazyRoute(<ProjectionPage />)}
-                    />
-                    <Route
-                      path="recurring"
-                      element={<Navigate to="/plan/compromisos" replace />}
-                    />
-                    <Route
-                      path="plan/compromisos"
-                      element={lazyRoute(<RecurringPaymentsPage />)}
-                    />
-                    <Route
-                      path="plan/compromisos/planes/nuevo"
-                      element={lazyRoute(<RecurringPlanFormPage />)}
-                    />
-                    <Route
-                      path="plan/compromisos/planes/:id"
-                      element={lazyRoute(<RecurringPlanFormPage />)}
-                    />
-                    <Route
-                      path="plan/compromisos/:id"
-                      element={lazyRoute(<CommitmentDetailPage />)}
-                    />
-                    <Route
-                      path="simulator"
-                      element={<Navigate to="/simulador" replace />}
-                    />
-                    <Route
-                      path="simulador"
-                      element={lazyRoute(<PurchaseSimulatorPage />)}
-                    />
-                    <Route
-                      path="settings"
-                      element={lazyRoute(<SettingsPage />)}
-                    />
-                    <Route path="*" element={<NotFoundPage />} />
+                    <Route element={<AppLayout />}>
+                      <Route path="inicio" element={<DashboardPage />} />
+                      <Route
+                        path="dashboard"
+                        element={<Navigate to="/inicio" replace />}
+                      />
+                      <Route
+                        path="movimientos"
+                        element={lazyRoute(<MovementsPage />)}
+                      />
+                      <Route
+                        path="movimientos/ingresos/nuevo"
+                        element={lazyRoute(<IncomeCreatePage />)}
+                      />
+                      <Route
+                        path="movimientos/ingresos/:id"
+                        element={lazyRoute(<ExpectedIncomeDetailPage />)}
+                      />
+                      <Route path="plan" element={<PlanningLandingPage />} />
+                      <Route path="mas" element={<MoreLandingPage />} />
+                      <Route
+                        path="insights"
+                        element={lazyRoute(<InsightsPage />)}
+                      />
+                      <Route
+                        path="periods"
+                        element={<Navigate to="/plan/periodos" replace />}
+                      />
+                      <Route
+                        path="plan/periodos"
+                        element={lazyRoute(<PeriodsPage />)}
+                      />
+                      <Route
+                        path="incomes"
+                        element={
+                          <Navigate to="/movimientos?tipo=ingresos" replace />
+                        }
+                      />
+                      <Route
+                        path="expenses"
+                        element={lazyRoute(<ExpensesPage />)}
+                      />
+                      <Route
+                        path="expenses/receipt"
+                        element={lazyRoute(<ReceiptCapturePage />)}
+                      />
+                      <Route
+                        path="categories"
+                        element={
+                          <Navigate to="/organizacion/categorias" replace />
+                        }
+                      />
+                      <Route
+                        path="organizacion/categorias"
+                        element={lazyRoute(<CategoriesPage />)}
+                      />
+                      <Route
+                        path="budgets"
+                        element={<Navigate to="/plan/presupuestos" replace />}
+                      />
+                      <Route
+                        path="plan/presupuestos"
+                        element={lazyRoute(<BudgetsPage />)}
+                      />
+                      <Route
+                        path="plan/proyeccion"
+                        element={lazyRoute(<ProjectionPage />)}
+                      />
+                      <Route
+                        path="recurring"
+                        element={<Navigate to="/plan/compromisos" replace />}
+                      />
+                      <Route
+                        path="plan/compromisos"
+                        element={lazyRoute(<RecurringPaymentsPage />)}
+                      />
+                      <Route
+                        path="plan/compromisos/planes/nuevo"
+                        element={lazyRoute(<RecurringPlanFormPage />)}
+                      />
+                      <Route
+                        path="plan/compromisos/planes/:id"
+                        element={lazyRoute(<RecurringPlanFormPage />)}
+                      />
+                      <Route
+                        path="plan/compromisos/:id"
+                        element={lazyRoute(<CommitmentDetailPage />)}
+                      />
+                      <Route
+                        path="simulator"
+                        element={<Navigate to="/simulador" replace />}
+                      />
+                      <Route
+                        path="simulador"
+                        element={lazyRoute(<PurchaseSimulatorPage />)}
+                      />
+                      <Route
+                        path="settings"
+                        element={lazyRoute(<SettingsPage />)}
+                      />
+                      <Route path="*" element={<NotFoundPage />} />
+                    </Route>
                   </Route>
                 </Route>
               </Route>
-            </Route>
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </ErrorBoundary>
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
+    </ThemeProvider>
   )
 }

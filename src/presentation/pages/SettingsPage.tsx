@@ -8,6 +8,7 @@ import {
   UserCircle,
 } from 'lucide-react'
 import type { PreparedBackup } from '@application/services/BackupService'
+import type { ThemePreference } from '@domain/entities'
 import { MAX_BACKUP_FILE_SIZE_BYTES } from '@shared/constants'
 import { AccountControls } from '../components/AccountControls'
 import { Button } from '../components/Button'
@@ -22,6 +23,7 @@ import { useApplicationServices } from '../context/ApplicationServicesContext'
 import { useAuth } from '../context/AuthContext'
 import { usePeriod } from '../context/PeriodContext'
 import { useSync } from '../context/SyncContext'
+import { useTheme } from '../context/ThemeContext'
 
 const countLabels = {
   periods: 'Periodos',
@@ -34,6 +36,28 @@ const countLabels = {
   balanceAnchors: 'Registros de saldo',
   userSettings: 'Configuración',
 } as const
+
+const themeOptions: ReadonlyArray<{
+  value: ThemePreference
+  label: string
+  description: string
+}> = [
+  {
+    value: 'system',
+    label: 'Sistema',
+    description: 'Sigue la apariencia configurada en tu dispositivo.',
+  },
+  {
+    value: 'light',
+    label: 'Claro',
+    description: 'Mantiene Lunumia siempre en modo claro.',
+  },
+  {
+    value: 'dark',
+    label: 'Oscuro',
+    description: 'Mantiene Lunumia siempre en modo oscuro.',
+  },
+]
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error
@@ -55,11 +79,13 @@ export function SettingsPage() {
   const services = useApplicationServices()
   const auth = useAuth()
   const sync = useSync()
+  const theme = useTheme()
   const { refreshPeriods } = usePeriod()
   const inputRef = useRef<HTMLInputElement>(null)
   const [prepared, setPrepared] = useState<PreparedBackup | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [isSavingTheme, setIsSavingTheme] = useState(false)
   const [notice, setNotice] = useState<{
     tone: 'success' | 'error'
     message: string
@@ -125,6 +151,22 @@ export function SettingsPage() {
     }
   }
 
+  const selectTheme = async (preference: ThemePreference) => {
+    if (preference === theme.preference || isSavingTheme) return
+    const previous = theme.preference
+    theme.setPreference(preference)
+    setIsSavingTheme(true)
+    setNotice(null)
+    try {
+      await services.settings.setThemePreference.execute(preference)
+    } catch (reason) {
+      theme.setPreference(previous)
+      setNotice({ tone: 'error', message: errorMessage(reason) })
+    } finally {
+      setIsSavingTheme(false)
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -175,10 +217,39 @@ export function SettingsPage() {
                 podrás elegir otras monedas.
               </p>
             </Surface>
-            <Surface variant="subtle">
+            <Surface variant="subtle" className="ln-theme-settings">
               <h3>Apariencia</h3>
-              <strong>Modo claro</strong>
-              <p>El modo oscuro todavía no forma parte de esta versión.</p>
+              <p>Elige cómo quieres ver Lunumia.</p>
+              <fieldset
+                className="ln-choice-fieldset"
+                aria-busy={isSavingTheme}
+              >
+                <legend className="sr-only">Tema visual</legend>
+                <div className="ln-segmented-choice ln-theme-choice">
+                  {themeOptions.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="radio"
+                        name="theme-preference"
+                        value={option.value}
+                        checked={theme.preference === option.value}
+                        disabled={isSavingTheme}
+                        onChange={() => void selectTheme(option.value)}
+                      />
+                      <span>
+                        <strong>{option.label}</strong>
+                        <small>{option.description}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <p className="ln-theme-effective" role="status">
+                Tema aplicado:{' '}
+                <strong>
+                  {theme.effectiveTheme === 'dark' ? 'Oscuro' : 'Claro'}
+                </strong>
+              </p>
             </Surface>
           </div>
         </section>

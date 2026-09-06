@@ -5,6 +5,7 @@ import {
   DexieDeviceSyncStateRepository,
   DexieUserSettingsRepository,
 } from './DexieSettingsRepositories'
+import { SetThemePreference } from '@application/use-cases/settings/SetThemePreference'
 let database: GastoClaro | undefined
 type GastoClaro = GastoClaroDB
 afterEach(async () => {
@@ -38,6 +39,44 @@ describe('repositorios de configuración local', () => {
     })
     expect(updated.id).toBe('one')
     expect((await repository.get())?.currency).toBe('USD')
+  })
+  it('persiste el tema localmente y encola el cambio para un propietario autenticado', async () => {
+    const ownerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    database = new GastoClaroDB('authenticated-theme-settings-test')
+    await database.userSettings.add({
+      id: '88888888-8888-4888-8888-888888888888',
+      ownerId,
+      activePeriodId: null,
+      currency: 'MXN',
+      theme: 'system',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    const repository = new DexieUserSettingsRepository(database, ownerId, {
+      ids: {
+        generate: () => '99999999-9999-4999-8999-999999999999',
+      },
+      clock: { now: () => '2026-01-02T00:00:00.000Z' },
+    })
+    const setTheme = new SetThemePreference(repository, {
+      now: () => '2026-01-02T00:00:00.000Z',
+    })
+
+    const updated = await setTheme.execute('dark')
+    const queued = await database.syncOperations.toArray()
+
+    expect(updated.theme).toBe('dark')
+    expect((await repository.get())?.theme).toBe('dark')
+    expect(queued).toHaveLength(1)
+    const operation = queued[0]!
+    expect(operation).toMatchObject({
+      ownerId,
+      entityType: 'userSettings',
+      entityId: updated.id,
+      operationType: 'update',
+      status: 'pending',
+    })
+    expect(JSON.parse(operation.payload)).toMatchObject({ theme: 'dark' })
   })
   it('guarda cursores independientes por propietario y entidad', async () => {
     database = new GastoClaroDB('device-state-test')

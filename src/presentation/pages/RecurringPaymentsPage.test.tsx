@@ -51,6 +51,10 @@ function configureOverview(
 }
 
 describe('Compromisos UX 2.0', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-08-27T12:00:00.000Z')))
+
+  afterEach(() => vi.useRealTimers())
+
   it('redirige /recurring al destino canónico y mantiene Plan activo', async () => {
     renderPath('/recurring')
     expect(

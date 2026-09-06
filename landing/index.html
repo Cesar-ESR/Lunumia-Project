@@ -4,6 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1267d6" />
+    <script data-theme-bootstrap>
+      ;(function () {
+        var preference = 'system'
+        try {
+          var stored = localStorage.getItem('lunumia.landing.theme')
+          if (stored === 'light' || stored === 'dark' || stored === 'system')
+            preference = stored
+        } catch {}
+        var dark =
+          typeof matchMedia === 'function' &&
+          matchMedia('(prefers-color-scheme: dark)').matches
+        var effective =
+          preference === 'system' ? (dark ? 'dark' : 'light') : preference
+        var root = document.documentElement
+        root.dataset.themePreference = preference
+        root.dataset.theme = effective
+        root.style.colorScheme = effective
+        root.style.backgroundColor =
+          effective === 'dark' ? '#0c111b' : '#f6f8fc'
+        document.querySelector('meta[name="theme-color"]').content =
+          effective === 'dark' ? '#111c2b' : '#1267d6'
+      })()
+    </script>
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -47,6 +70,40 @@
         </nav>
 
         <div class="header-actions">
+          <details class="appearance-menu">
+            <summary aria-label="Apariencia">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8" />
+                <path d="M12 4v16M12 4a8 8 0 0 1 0 16" />
+              </svg>
+              <span>Apariencia</span>
+            </summary>
+            <fieldset class="appearance-options">
+              <legend>Tema visual</legend>
+              <label
+                ><input
+                  type="radio"
+                  name="landing-theme"
+                  value="system"
+                  checked
+                />Sistema</label
+              >
+              <label
+                ><input
+                  type="radio"
+                  name="landing-theme"
+                  value="light"
+                />Claro</label
+              >
+              <label
+                ><input
+                  type="radio"
+                  name="landing-theme"
+                  value="dark"
+                />Oscuro</label
+              >
+            </fieldset>
+          </details>
           <a class="header-login" href="{{APP_LOGIN_URL}}">Iniciar sesión</a>
           <a
             class="button button-primary button-compact"
