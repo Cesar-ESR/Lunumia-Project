@@ -1,6 +1,8 @@
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MovementActions } from './MovementActions'
+import { ThemeProvider } from '../context/ThemeContext'
+import { THEME_STORAGE_KEY } from '../theme/theme'
 import { ApplicationServicesProvider } from '../context/ApplicationServicesContext'
 import {
   createApplicationServicesMock,
@@ -17,15 +19,50 @@ function setup(expense = false) {
   const onChanged = vi.fn()
   render(
     <ApplicationServicesProvider services={services}>
-      <MovementActions
-        movement={movement}
-        categories={[createCategoryMock()]}
-        onChanged={onChanged}
-      />
+      <ThemeProvider>
+        <MovementActions
+          movement={movement}
+          categories={[createCategoryMock()]}
+          onChanged={onChanged}
+        />
+      </ThemeProvider>
     </ApplicationServicesProvider>,
   )
   return { services, movement, onChanged, user: userEvent.setup() }
 }
+
+it.each(['system', 'light', 'dark'])(
+  'usa icon button semántico y estado abierto en %s',
+  async (preference) => {
+    localStorage.setItem(THEME_STORAGE_KEY, preference)
+    const { user } = setup()
+    const trigger = screen.getByRole('button', { name: /Acciones de/ })
+    expect(trigger).toHaveClass(
+      'ln-button',
+      'ln-button--icon',
+      'ln-movement-actions',
+    )
+    expect(trigger).not.toHaveClass('ln-row-link')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(document.documentElement.dataset.themePreference).toBe(preference)
+    expect(trigger.querySelector('svg')).toHaveAttribute(
+      'stroke',
+      'currentColor',
+    )
+    await user.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Editar' })).toHaveClass(
+      'ln-button--primary',
+    )
+    expect(screen.getByRole('button', { name: 'Eliminar' })).toHaveClass(
+      'ln-button--danger',
+    )
+    await user.keyboard('{Escape}')
+    expect(trigger).toHaveFocus()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    localStorage.removeItem(THEME_STORAGE_KEY)
+  },
+)
 
 it.each([false, true])(
   'precarga y guarda sólo campos editables; expense=%s',

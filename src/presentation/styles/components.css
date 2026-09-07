@@ -533,6 +533,27 @@
   cursor: progress;
 }
 
+.ln-movement-actions {
+  min-width: 2.75rem;
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.ln-movement-actions:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+  background: var(--surface-hover);
+}
+
+.ln-movement-actions:active:not(:disabled),
+.ln-movement-actions[aria-expanded='true']:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-control-border);
+  background: var(--color-surface-selected);
+}
+
 .ln-quick-action {
   position: fixed;
   z-index: 25;

@@ -76,19 +76,21 @@ export function MovementActions({
   }
   return (
     <>
-      <button
+      <Button
         ref={trigger}
         type="button"
-        className="ln-row-link"
+        variant="icon"
+        className="ln-movement-actions"
         aria-label={`Acciones de ${movement.description}`}
         aria-haspopup="dialog"
+        aria-expanded={mode !== null}
         onClick={() => {
           changed.current = false
           setMode('actions')
         }}
       >
         <EllipsisVertical aria-hidden="true" />
-      </button>
+      </Button>
       <Dialog
         open={mode === 'actions'}
         title="Acciones del movimiento"

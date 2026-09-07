@@ -35,6 +35,27 @@ function contrast(foreground, background) {
 }
 
 describe('Lunumia brand palette', () => {
+  it('themes movement action states exclusively through existing semantic tokens', () => {
+    const rules = components.match(/\.ln-movement-actions[^{}]*\{[^}]+\}/g)
+    expect(rules).toHaveLength(3)
+    for (const rule of rules) {
+      for (const declaration of rule.matchAll(
+        /(?:color|background|border-color):\s*([^;]+);/g,
+      )) {
+        expect(declaration[1]).toMatch(/^var\(--[\w-]+\)$/)
+      }
+    }
+    expect(rules.join('\n')).toContain(':hover:not(:disabled)')
+    expect(rules.join('\n')).toContain(':active:not(:disabled)')
+    expect(rules.join('\n')).toContain("[aria-expanded='true']:not(:disabled)")
+    expect(rules[0]).toContain('min-width: 2.75rem')
+    expect(components).toMatch(
+      /\.ln-button:disabled,[^}]*var\(--color-disabled-bg\)/s,
+    )
+    const base = readFileSync(resolve(stylesDirectory, 'base.css'), 'utf8')
+    expect(base).toMatch(/:focus-visible\s*\{[^}]*var\(--color-focus\)/s)
+  })
+
   it('defines the approved blue, violet and restrained cyan identity', () => {
     expect(token('brand-primary')).toBe('#1267d6')
     expect(token('brand-primary-hover')).toBe('#0f56b5')
