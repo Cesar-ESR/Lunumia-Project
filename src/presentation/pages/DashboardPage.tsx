@@ -21,6 +21,7 @@ import { InteractiveRow } from '../components/InteractiveRow'
 import { LoadingState } from '../components/LoadingState'
 import { MetricBlock } from '../components/MetricBlock'
 import { MoneyDisplay } from '../components/MoneyDisplay'
+import { MovementActions } from '../components/MovementActions'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
 import { Surface } from '../components/Surface'
@@ -556,12 +557,34 @@ export function DashboardPage() {
         ) : null}
         {recentActivity.length ? (
           <Surface className="ln-home-activity-list">
-            {recentActivity.map((movement) => (
-              <HomeActivityRow
-                key={`${movement.kind}:${movement.id}`}
-                movement={movement}
-              />
-            ))}
+            {recentActivity.map((movement) => {
+              const record =
+                movement.kind === 'expense'
+                  ? expenses.data?.find(({ id }) => id === movement.id)
+                  : incomes.data?.find(({ id }) => id === movement.id)
+              return (
+                <HomeActivityRow
+                  key={`${movement.kind}:${movement.id}`}
+                  movement={movement}
+                  actions={
+                    record ? (
+                      <MovementActions
+                        movement={record}
+                        categories={categoryValues}
+                        onChanged={() => {
+                          snapshot.refresh()
+                          budget.refresh()
+                          categoryBudgets.refresh()
+                          incomes.refresh()
+                          expenses.refresh()
+                          recurring.refresh()
+                        }}
+                      />
+                    ) : null
+                  }
+                />
+              )
+            })}
           </Surface>
         ) : incomes.status === 'success' && expenses.status === 'success' ? (
           <Surface variant="subtle" className="ln-home-empty-inline">
@@ -800,11 +823,18 @@ function AttentionItem({
   )
 }
 
-function HomeActivityRow({ movement }: { movement: MovementListItem }) {
+function HomeActivityRow({
+  movement,
+  actions,
+}: {
+  movement: MovementListItem
+  actions: ReactNode
+}) {
   const expense = movement.kind === 'expense'
   return (
     <InteractiveRow
       leading={expense ? <BanknoteArrowDown /> : <BanknoteArrowUp />}
+      action={actions}
       className={`ln-home-activity-row ln-home-activity-row--${movement.kind}`}
     >
       <div className="ln-home-activity-row__main">

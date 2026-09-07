@@ -13,6 +13,7 @@ import { ErrorState } from '../components/ErrorState'
 import { InteractiveRow } from '../components/InteractiveRow'
 import { LoadingState } from '../components/LoadingState'
 import { MoneyDisplay } from '../components/MoneyDisplay'
+import { MovementActions } from '../components/MovementActions'
 import { Notice } from '../components/Notice'
 import { PageHeader } from '../components/PageHeader'
 import { Surface } from '../components/Surface'
@@ -325,19 +326,40 @@ export function MovementsPage() {
           className="ln-movement-list"
           aria-label="Movimientos del periodo"
         >
-          {filtered.map((movement) => (
-            <MovementRow
-              key={`${movement.kind}:${movement.id}`}
-              movement={movement}
-            />
-          ))}
+          {filtered.map((movement) => {
+            const record =
+              movement.kind === 'expense'
+                ? data.data?.expenses.find(({ id }) => id === movement.id)
+                : data.data?.incomes.find(({ id }) => id === movement.id)
+            return (
+              <MovementRow
+                key={`${movement.kind}:${movement.id}`}
+                movement={movement}
+                actions={
+                  record ? (
+                    <MovementActions
+                      movement={record}
+                      categories={categoryOptions}
+                      onChanged={data.refresh}
+                    />
+                  ) : null
+                }
+              />
+            )
+          })}
         </Surface>
       ) : null}
     </>
   )
 }
 
-function MovementRow({ movement }: { movement: MovementListItem }) {
+function MovementRow({
+  movement,
+  actions,
+}: {
+  movement: MovementListItem
+  actions: ReactNode
+}) {
   const context = [
     formatCompactDate(movement.date),
     movement.categoryOrOrigin,
@@ -358,7 +380,12 @@ function MovementRow({ movement }: { movement: MovementListItem }) {
   return (
     <InteractiveRow
       leading={kindIcon[movement.kind]}
-      action={action}
+      action={
+        <>
+          {actions}
+          {action}
+        </>
+      }
       className={`ln-movement-row ln-movement-row--${movement.kind}`}
     >
       <div className="ln-movement-row__main">
