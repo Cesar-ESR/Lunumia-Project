@@ -1478,6 +1478,14 @@ h4 {
     gap: 12px;
   }
 
+  .header-actions {
+    flex-shrink: 0;
+  }
+
+  .header-actions .button-compact {
+    white-space: nowrap;
+  }
+
   .header-login {
     display: none;
   }
@@ -1496,11 +1504,29 @@ h4 {
   }
 
   .hero {
-    padding: 54px 0 70px;
+    --hero-content-gap: 32px;
+    --hero-action-gap: 16px;
+    padding: 24px 0 70px;
+    align-items: flex-start;
+  }
+
+  .hero-copy {
+    display: grid;
+    gap: var(--hero-content-gap);
+  }
+
+  .hero-copy > * {
+    min-width: 0;
+    margin: 0;
+  }
+
+  .hero-actions {
+    gap: var(--hero-action-gap);
+    padding-top: calc(var(--hero-action-gap) / 2);
   }
 
   h1 {
-    font-size: clamp(2.35rem, 13vw, 3.3rem);
+    font-size: clamp(2.25rem, 11vw, 3rem);
   }
 
   h2 {
@@ -1737,6 +1763,17 @@ h4 {
 .appearance-menu summary svg {
   width: 20px;
   height: 20px;
+  flex: 0 0 20px;
+}
+/* Preference, not effective theme: system always depicts a monitor. */
+.appearance-menu [data-preference-icon] {
+  display: none;
+}
+:root:not([data-theme-preference]) [data-preference-icon='system'],
+:root[data-theme-preference='system'] [data-preference-icon='system'],
+:root[data-theme-preference='light'] [data-preference-icon='light'],
+:root[data-theme-preference='dark'] [data-preference-icon='dark'] {
+  display: inline;
 }
 .appearance-menu summary:hover {
   color: var(--primary);

@@ -2,6 +2,11 @@ export type ThemePreference = 'system' | 'light' | 'dark'
 export type EffectiveTheme = 'light' | 'dark'
 export const THEME_KEY = 'lunumia.landing.theme'
 export const SYSTEM_QUERY = '(prefers-color-scheme: dark)'
+const preferenceLabels: Record<ThemePreference, string> = {
+  system: 'Sistema',
+  light: 'Claro',
+  dark: 'Oscuro',
+}
 
 function isPreference(value: unknown): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark'
@@ -30,6 +35,12 @@ export function initializeTheme() {
     const effective: EffectiveTheme =
       preference === 'system' ? (media?.matches ? 'dark' : 'light') : preference
     root.dataset.themePreference = preference
+    menu
+      ?.querySelector('summary')
+      ?.setAttribute(
+        'aria-label',
+        `Apariencia: ${preferenceLabels[preference]}`,
+      )
     root.dataset.theme = effective
     root.style.colorScheme = effective
     root.style.backgroundColor = effective === 'dark' ? '#0c111b' : '#f6f8fc'

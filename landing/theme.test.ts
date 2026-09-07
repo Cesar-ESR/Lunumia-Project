@@ -52,6 +52,39 @@ afterEach(() => {
 })
 
 describe('landing theme', () => {
+  it.each([
+    ['system', 'Sistema'],
+    ['light', 'Claro'],
+    ['dark', 'Oscuro'],
+  ])(
+    'restores and immediately updates the icon preference and accessible name: %s',
+    (preference, label) => {
+      dark = true
+      localStorage.setItem(THEME_KEY, preference)
+      dispose = initializeTheme()
+      const summary = document.querySelector('.appearance-menu summary')!
+      const assertPreference = () => {
+        expect(document.documentElement.dataset.themePreference).toBe(
+          preference,
+        )
+        expect(summary.getAttribute('aria-label')).toBe(`Apariencia: ${label}`)
+        expect(summary.querySelector('span')?.textContent).toBe('Apariencia')
+        expect(
+          summary.querySelector(`[data-preference-icon="${preference}"]`),
+        ).not.toBeNull()
+      }
+      assertPreference()
+      select(preference === 'light' ? 'dark' : 'light')
+      select(preference)
+      assertPreference()
+      osChange(false)
+      osChange(true)
+      assertPreference()
+      if (preference === 'system')
+        expect(document.documentElement.dataset.theme).toBe('dark')
+    },
+  )
+
   it.each([false, true])(
     'defaults to system and resolves OS dark=%s',
     (osDark) => {
@@ -139,7 +172,7 @@ describe('landing theme', () => {
     dispose = initializeTheme()
     const menu = document.querySelector<HTMLDetailsElement>('.appearance-menu')!
     const summary = menu.querySelector('summary')!
-    expect(summary.getAttribute('aria-label')).toBe('Apariencia')
+    expect(summary.getAttribute('aria-label')).toBe('Apariencia: Sistema')
     expect(menu.querySelector('legend')?.textContent).toBe('Tema visual')
     expect(
       [...menu.querySelectorAll('label')].map((label) =>

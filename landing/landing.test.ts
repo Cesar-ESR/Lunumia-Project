@@ -23,16 +23,20 @@ const landingText = () =>
   (landingDocument.body.textContent ?? '').replace(/\s+/g, ' ').trim()
 
 describe('Lunumia Landing v1', () => {
-  it('integra el logo sin fondo añadido y un icono de apariencia de medio disco', () => {
+  it('integra el logo transparente e iconos decorativos de preferencia con tamaño estable', () => {
     expect(styles).not.toContain('--logo-backing')
     expect(styles).not.toMatch(/\.brand-logo\s*\{[^}]*background/s)
     const icon = landingDocument.querySelector('.appearance-menu summary svg')
     expect(icon?.getAttribute('aria-hidden')).toBe('true')
-    expect(icon?.querySelector('path')?.getAttribute('fill')).toBe(
-      'currentColor',
-    )
-    expect(icon?.querySelector('path')?.getAttribute('d')).toBe(
-      'M12 4a8 8 0 0 1 0 16Z',
+    expect(icon?.getAttribute('focusable')).toBe('false')
+    expect(icon?.querySelectorAll('[data-preference-icon]')).toHaveLength(3)
+    for (const preference of ['system', 'light', 'dark']) {
+      expect(styles).toContain(
+        `:root[data-theme-preference='${preference}'] [data-preference-icon='${preference}']`,
+      )
+    }
+    expect(styles).toMatch(
+      /\.appearance-menu summary svg\s*\{[^}]*width: 20px;[^}]*height: 20px;[^}]*flex: 0 0 20px;/s,
     )
   })
 
@@ -247,6 +251,23 @@ describe('Lunumia Landing v1', () => {
     )
     expect(text).toContain('Datos ilustrativos')
     expect(text).not.toMatch(/@|access_token|service_role/i)
+  })
+
+  it('organiza el hero móvil con gaps y conserva CTAs de ancho completo', () => {
+    expect(styles).toMatch(
+      /\.hero-copy\s*\{\s*display: grid;\s*gap: var\(--hero-content-gap\);/,
+    )
+    expect(styles).toMatch(/\.hero-copy > \*\s*\{\s*min-width: 0;\s*margin: 0;/)
+    expect(styles).toMatch(
+      /\.hero-actions\s*\{[^}]*gap: var\(--hero-action-gap\);/s,
+    )
+    expect(styles).toMatch(
+      /\.hero-actions \.button,\s*\.final-actions \.button\s*\{\s*width: 100%;/,
+    )
+    expect(styles).toMatch(/\.header-actions\s*\{\s*flex-shrink: 0;/)
+    expect(landingDocument.querySelectorAll('.hero-actions > a')).toHaveLength(
+      2,
+    )
   })
 
   it('mantiene una estructura responsive sin runtime pesado ni Service Worker', () => {
