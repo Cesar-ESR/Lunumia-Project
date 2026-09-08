@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
+import { StrictMode } from 'react'
 import type { ReceiptRecognitionProposal } from '@application/use-cases/receipts'
 import { ReceiptRecognitionError } from '@infrastructure/ocr'
 import {
@@ -122,7 +123,11 @@ function setup(
     onManagePeriods: vi.fn(),
     ...overrides,
   }
-  const view = render(<ReceiptCaptureFlow {...props} />)
+  const view = render(
+    <StrictMode>
+      <ReceiptCaptureFlow {...props} />
+    </StrictMode>,
+  )
   return {
     ...view,
     props,
@@ -132,7 +137,11 @@ function setup(
     createExpense,
     rerenderFlow(next: Partial<ReceiptCaptureFlowProps>) {
       Object.assign(props, next)
-      view.rerender(<ReceiptCaptureFlow {...props} />)
+      view.rerender(
+        <StrictMode>
+          <ReceiptCaptureFlow {...props} />
+        </StrictMode>,
+      )
     },
   }
 }
@@ -194,7 +203,9 @@ describe('ReceiptCaptureFlow - selección y vista previa', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Elegir de galería' }))
     expect(
-      await screen.findByText('Selecciona una imagen JPEG o PNG.'),
+      await screen.findByText(
+        'Selecciona una imagen JPEG, PNG o un PDF de una página.',
+      ),
     ).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Registrar manualmente' }),

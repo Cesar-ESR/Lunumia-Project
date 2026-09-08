@@ -18,7 +18,7 @@ interface RpcClient {
     parameters: {
       p_scope: RateLimitScope
     },
-  ): Promise<{ data: unknown; error: unknown }>
+  ): PromiseLike<{ data: unknown; error: unknown }>
 }
 
 const ResultSchema = z

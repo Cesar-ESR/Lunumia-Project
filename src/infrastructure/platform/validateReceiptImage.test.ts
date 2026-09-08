@@ -19,7 +19,7 @@ describe('validateReceiptImage', () => {
       expect(() => validateReceiptImage(invalid)).toThrowError(
         expect.objectContaining<Partial<ReceiptImageError>>({
           code: 'unsupported_type',
-          message: 'Selecciona una imagen JPEG o PNG.',
+          message: 'Selecciona una imagen JPEG, PNG o un PDF de una página.',
         }),
       )
     },

@@ -1,6 +1,7 @@
 import type { PlatformAdapter, SelectedReceiptImage } from './PlatformAdapter'
 import { ReceiptImageError } from './ReceiptImageError'
 import { validateReceiptImage } from './validateReceiptImage'
+import { prepareReceiptFile } from './prepareReceiptFile'
 
 type SelectionMode = 'camera' | 'gallery'
 
@@ -19,19 +20,19 @@ export class WebPlatformAdapter implements PlatformAdapter {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input')
       input.type = 'file'
-      input.accept = 'image/jpeg,image/png'
+      input.accept =
+        mode === 'camera'
+          ? 'image/jpeg,image/png'
+          : 'image/jpeg,image/png,application/pdf'
       input.multiple = false
       input.style.display = 'none'
       if (mode === 'camera') input.setAttribute('capture', 'environment')
 
       let settled = false
-      let focusTimer: ReturnType<typeof setTimeout> | undefined
 
       const cleanup = () => {
         input.removeEventListener('change', handleChange)
         input.removeEventListener('cancel', handleCancel)
-        window.removeEventListener('focus', handleWindowFocus)
-        if (focusTimer !== undefined) clearTimeout(focusTimer)
         input.remove()
       }
       const finish = (value: SelectedReceiptImage | null) => {
@@ -50,13 +51,15 @@ export class WebPlatformAdapter implements PlatformAdapter {
             : new ReceiptImageError('read_failed', { cause: reason }),
         )
       }
-      const handleChange = () => {
+      const handleChange = async () => {
         try {
           const file = input.files?.item(0) ?? null
           if (!file) return finish(null)
-          const mimeType = validateReceiptImage(file)
+          const prepared =
+            mode === 'gallery' ? await prepareReceiptFile(file) : file
+          const mimeType = validateReceiptImage(prepared)
           finish({
-            file,
+            file: prepared,
             fileName: file.name,
             mimeType,
             originalSizeBytes: file.size,
@@ -66,15 +69,9 @@ export class WebPlatformAdapter implements PlatformAdapter {
         }
       }
       const handleCancel = () => finish(null)
-      const handleWindowFocus = () => {
-        focusTimer = setTimeout(() => {
-          if (!settled && !input.files?.length) finish(null)
-        }, 0)
-      }
 
       input.addEventListener('change', handleChange)
       input.addEventListener('cancel', handleCancel)
-      window.addEventListener('focus', handleWindowFocus)
       document.body.append(input)
       try {
         input.click()

@@ -62,16 +62,20 @@ describe('WebPlatformAdapter', () => {
     expect(document.querySelector('input[type="file"]')).toBeNull()
   })
 
-  it('el foco posterior a cancelar resuelve null y limpia listeners/timer', async () => {
+  it('focus antes de change no descarta la selección como cancelación', async () => {
     vi.useFakeTimers()
-    const remove = vi.spyOn(window, 'removeEventListener')
-    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {
+    vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
       window.dispatchEvent(new Event('focus'))
     })
     const pending = new WebPlatformAdapter().pickFromGallery()
     await vi.runAllTimersAsync()
+    const input =
+      document.querySelector<HTMLInputElement>('input[type="file"]')!
+    expect(input).not.toBeNull()
+    input.dispatchEvent(new Event('cancel'))
     await expect(pending).resolves.toBeNull()
-    expect(remove).toHaveBeenCalledWith('focus', expect.any(Function))
     expect(vi.getTimerCount()).toBe(0)
     expect(document.querySelector('input[type="file"]')).toBeNull()
     vi.useRealTimers()

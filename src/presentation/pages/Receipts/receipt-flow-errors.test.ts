@@ -47,8 +47,11 @@ describe('receipt flow error privacy and retry policy', () => {
   })
 
   it.each([
-    ['unsupported_type', 'Selecciona una imagen JPEG o PNG.'],
-    ['file_too_large', 'La imagen debe pesar menos de 10 MB.'],
+    [
+      'unsupported_type',
+      'Selecciona una imagen JPEG, PNG o un PDF de una página.',
+    ],
+    ['file_too_large', 'El archivo debe pesar menos de 10 MB.'],
     ['empty_file', 'La imagen seleccionada está vacía.'],
     ['read_failed', 'No se pudo leer la imagen. Intenta con otro archivo.'],
     ['decode_failed', 'No se pudo abrir la imagen. Intenta con otro archivo.'],

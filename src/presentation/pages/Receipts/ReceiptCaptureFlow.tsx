@@ -71,6 +71,7 @@ export function ReceiptCaptureFlow({
   }
 
   useEffect(() => {
+    mountedRef.current = true
     return () => {
       mountedRef.current = false
       generationRef.current += 1

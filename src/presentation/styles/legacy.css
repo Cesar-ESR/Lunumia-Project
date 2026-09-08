@@ -336,7 +336,27 @@
 }
 .decision-actions {
   display: grid;
-  gap: 0.6rem;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+.guest-data-decision {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+.guest-data-decision .ln-button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.guest-data-decision .field-hint {
+  margin: 0;
+  color: var(--color-text-secondary);
 }
 .field-hint,
 .auth-help {

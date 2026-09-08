@@ -24,6 +24,32 @@ const augustPeriod: Period = {
 const periods = [julyPeriod, augustPeriod]
 
 describe('ReceiptFormMapper', () => {
+  it('golden: conserva importe de pago 803.00, no efectivo 850.00 ni cambio 47.00', () => {
+    const proposal = mapReceiptToExpenseDraft(
+      {
+        merchant: 'BBVA México',
+        date: '2026-05-19',
+        currency: 'MXN',
+        subtotal: null,
+        tax: null,
+        tip: null,
+        discount: null,
+        otherFees: null,
+        total: 80300,
+        amountPaid: 80300,
+        amountEvidence: 'Importe de pago: 803.00 MXN',
+        amountAmbiguous: false,
+        confidence: 0.95,
+        rawText:
+          'Importe de pago: 803.00 MXN; Efectivo depositado: 850.00 MXN; Cambio: 47.00 MXN',
+      },
+      [],
+      null,
+    )
+    expect(proposal.draft.date).toBe('2026-05-19')
+    expect(proposal.draft.amount).toBe(80300)
+    expect(proposal.amountValidation.status).toBe('valid')
+  })
   it('mapea centavos, DateOnly y el periodo que contiene la fecha', () => {
     const proposal = mapReceiptToExpenseDraft(
       {

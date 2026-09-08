@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { classifyMoneyFormat } from './money-format-diagnostic.ts'
+import { normalizeProviderMoneyFields } from './normalize-provider-money.ts'
 import { OCRFunctionError } from '../errors/OCRFunctionError.ts'
 import {
   MAX_RECEIPT_BYTES,
@@ -96,6 +98,52 @@ export class GroqVisionOCRProvider implements OCRProvider {
   }
 
   async recognize(input: OCRProviderInput, signal: AbortSignal) {
+    const startedAt = Date.now()
+    const diagnose = (
+      phase: string,
+      upstreamStatus: number | null,
+      issues: readonly z.core.$ZodIssue[] = [],
+    ) => {
+      const allowed = new Set([
+        'choices',
+        'message',
+        'content',
+        ...Object.keys(GroqReceiptSchema.shape),
+        'rawText',
+      ])
+      const structural = issues.slice(0, 8).map((issue) => ({
+        schemaField:
+          issue.path
+            .map((part) =>
+              typeof part === 'number'
+                ? 'index'
+                : allowed.has(String(part))
+                  ? String(part)
+                  : 'unknown',
+            )
+            .join('.') || 'root',
+        issue: issue.code,
+        ...('expected' in issue && typeof issue.expected === 'string'
+          ? { expected: issue.expected }
+          : {}),
+      }))
+      console.info(
+        '[ocr-provider]',
+        JSON.stringify({
+          provider: 'groq',
+          operation: 'recognize-receipt',
+          phase,
+          model: this.model
+            .replaceAll(this.apiKey, 'redacted')
+            .replace(/[^a-zA-Z0-9._:/-]/g, '_')
+            .slice(0, 100),
+          upstreamStatus,
+          durationMs: Math.max(0, Date.now() - startedAt),
+          internalType: phase,
+          ...(structural.length ? { issues: structural } : {}),
+        }),
+      )
+    }
     if (input.imageBytes.length >= MAX_RECEIPT_BYTES)
       throw new OCRFunctionError('payload_too_large')
     let response: Response
@@ -130,38 +178,139 @@ export class GroqVisionOCRProvider implements OCRProvider {
         signal,
       })
     } catch (reason) {
+      diagnose(
+        signal.aborted || isAbortError(reason)
+          ? 'provider_timeout'
+          : 'provider_network_failed',
+        null,
+      )
       if (signal.aborted || isAbortError(reason))
         throw new OCRFunctionError('provider_timeout')
       throw new OCRFunctionError('provider_unavailable')
     }
 
-    if (!response.ok) throw mapGroqStatus(response.status)
+    if (!response.ok) {
+      diagnose('provider_http_failed', response.status)
+      throw mapGroqStatus(response.status)
+    }
 
+    let body: unknown
     try {
-      const completion = GroqCompletionSchema.parse(await response.json())
-      const extracted = GroqReceiptSchema.parse(
-        JSON.parse(completion.choices[0]!.message.content),
-      )
-      return ReceiptRecognitionResponseSchema.parse({
-        merchant: extracted.merchant,
-        date: extracted.date,
-        currency: extracted.currency,
-        subtotal: parseOCRDecimalCents(extracted.subtotal),
-        tax: parseOCRDecimalCents(extracted.tax),
-        tip: parseOCRDecimalCents(extracted.tip),
-        discount: parseOCRDecimalCents(extracted.discount),
-        otherFees: parseOCRDecimalCents(extracted.otherFees),
-        total: parseOCRDecimalCents(extracted.total),
-        amountPaid: parseOCRDecimalCents(extracted.amountPaid),
-        amountEvidence: extracted.amountEvidence,
-        amountAmbiguous: extracted.amountAmbiguous,
-        confidence: extracted.confidence,
-        rawText: null,
-      })
+      body = await response.json()
     } catch {
+      diagnose('provider_json_parse_failed', response.status)
       throw new OCRFunctionError('invalid_provider_response')
     }
+    const completionResult = GroqCompletionSchema.safeParse(body)
+    if (!completionResult.success) {
+      const missingContent =
+        hasMissingContent(body) &&
+        completionResult.error.issues.some(
+          (issue) =>
+            issue.code === 'invalid_type' &&
+            issue.path.join('.') === 'choices.0.message.content',
+        )
+      diagnose(
+        missingContent ? 'missing_content' : 'completion_schema_failed',
+        response.status,
+        completionResult.error.issues,
+      )
+      throw new OCRFunctionError('invalid_provider_response')
+    }
+    const content = completionResult.data.choices[0]!.message.content
+    if (!content.trim()) {
+      diagnose('missing_content', response.status)
+      throw new OCRFunctionError('invalid_provider_response')
+    }
+    let receipt: unknown
+    try {
+      receipt = JSON.parse(content)
+    } catch {
+      diagnose('completion_content_json_failed', response.status)
+      throw new OCRFunctionError('invalid_provider_response')
+    }
+    const extractedResult = GroqReceiptSchema.safeParse(
+      normalizeProviderMoneyFields(receipt),
+    )
+    if (!extractedResult.success) {
+      if (receipt && typeof receipt === 'object' && !Array.isArray(receipt)) {
+        const fields = receipt as Record<string, unknown>
+        for (const schemaField of [
+          'subtotal',
+          'tax',
+          'tip',
+          'discount',
+          'otherFees',
+          'total',
+          'amountPaid',
+        ]) {
+          if (!normalizedMoneySchema.safeParse(fields[schemaField]).success) {
+            console.info(
+              '[ocr-money-format]',
+              JSON.stringify({
+                schemaField,
+                ...classifyMoneyFormat(fields[schemaField]),
+              }),
+            )
+          }
+        }
+      }
+      diagnose(
+        'receipt_schema_failed',
+        response.status,
+        extractedResult.error.issues,
+      )
+      throw new OCRFunctionError('invalid_provider_response')
+    }
+    const extracted = extractedResult.data
+    const canonical = ReceiptRecognitionResponseSchema.safeParse({
+      merchant: extracted.merchant,
+      date: extracted.date,
+      currency: extracted.currency,
+      subtotal: parseOCRDecimalCents(extracted.subtotal),
+      tax: parseOCRDecimalCents(extracted.tax),
+      tip: parseOCRDecimalCents(extracted.tip),
+      discount: parseOCRDecimalCents(extracted.discount),
+      otherFees: parseOCRDecimalCents(extracted.otherFees),
+      total: parseOCRDecimalCents(extracted.total),
+      amountPaid: parseOCRDecimalCents(extracted.amountPaid),
+      amountEvidence: extracted.amountEvidence,
+      amountAmbiguous: extracted.amountAmbiguous,
+      confidence: extracted.confidence,
+      rawText: null,
+    })
+    if (!canonical.success) {
+      diagnose(
+        'canonical_receipt_schema_failed',
+        response.status,
+        canonical.error.issues,
+      )
+      throw new OCRFunctionError('invalid_provider_response')
+    }
+    diagnose('success', response.status)
+    return canonical.data
   }
+}
+
+function hasMissingContent(body: unknown): boolean {
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !('choices' in body) ||
+    !Array.isArray(body.choices)
+  )
+    return false
+  const choice: unknown = body.choices[0]
+  if (!choice || typeof choice !== 'object' || !('message' in choice))
+    return false
+  const message = choice.message
+  return (
+    !!message &&
+    typeof message === 'object' &&
+    (!('content' in message) ||
+      message.content === null ||
+      message.content === undefined)
+  )
 }
 
 export function parseOCRDecimalCents(value: string | null): number | null {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { GuestDataDecision } from '../context/AuthContext'
 import { useAuth } from '../context/AuthContext'
 import { Button } from './Button'
@@ -7,6 +7,7 @@ import { Dialog } from './Dialog'
 export function GuestDataDecisionDialog() {
   const { pendingGuestData, resolveGuestData } = useAuth()
   const [isPending, setIsPending] = useState(false)
+  const helpId = useId()
   if (!pendingGuestData) return null
 
   const decide = async (decision: GuestDataDecision) => {
@@ -26,33 +27,52 @@ export function GuestDataDecisionDialog() {
     <Dialog
       open
       title="Datos guardados en este dispositivo"
-      description={`Encontramos ${count} registros del modo invitado. Elige explícitamente cómo manejarlos antes de continuar.`}
+      description={`Encontramos ${count} registros creados como invitado. Elige qué quieres hacer con ellos.`}
       className="guest-data-dialog"
       pending={isPending}
       closeOnEscape={!isPending}
       onClose={() => void decide('cancel')}
       actions={
         <div className="decision-actions">
-          <Button
-            disabled={isPending}
-            onClick={() => void decide('migrate-local')}
-          >
-            Migrar datos de este dispositivo
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={isPending}
-            onClick={() => void decide('keep-account')}
-          >
-            Conservar datos de la cuenta
-          </Button>
-          <Button
-            variant="danger"
-            disabled={isPending}
-            onClick={() => void decide('discard-local')}
-          >
-            Descartar datos locales
-          </Button>
+          <div className="guest-data-decision">
+            <Button
+              aria-describedby={`${helpId}-migrate`}
+              disabled={isPending}
+              onClick={() => void decide('migrate-local')}
+            >
+              Usar estos datos en mi cuenta
+            </Button>
+            <p id={`${helpId}-migrate`} className="field-hint">
+              Los {count} registros de este dispositivo se añadirán a tu cuenta.
+            </p>
+          </div>
+          <div className="guest-data-decision">
+            <Button
+              aria-describedby={`${helpId}-keep`}
+              variant="secondary"
+              disabled={isPending}
+              onClick={() => void decide('keep-account')}
+            >
+              Usar los datos de mi cuenta
+            </Button>
+            <p id={`${helpId}-keep`} className="field-hint">
+              Ignoraremos estos datos locales y mantendremos los datos que ya
+              tiene tu cuenta.
+            </p>
+          </div>
+          <div className="guest-data-decision">
+            <Button
+              aria-describedby={`${helpId}-discard`}
+              variant="danger"
+              disabled={isPending}
+              onClick={() => void decide('discard-local')}
+            >
+              Eliminar estos datos del dispositivo
+            </Button>
+            <p id={`${helpId}-discard`} className="field-hint">
+              Se eliminarán permanentemente los {count} registros locales.
+            </p>
+          </div>
           <Button
             variant="ghost"
             disabled={isPending}
@@ -64,8 +84,8 @@ export function GuestDataDecisionDialog() {
       }
     >
       <p className="field-hint">
-        La migración solo cambia el propietario local. Los datos todavía no se
-        han sincronizado con la nube.
+        Si eliges usar estos datos en tu cuenta, se prepararán para
+        sincronizarse con tus otros dispositivos.
       </p>
     </Dialog>
   )

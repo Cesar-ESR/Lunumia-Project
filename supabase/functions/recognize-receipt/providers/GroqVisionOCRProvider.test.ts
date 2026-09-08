@@ -49,6 +49,198 @@ function provider(response: Response = groqResponse()) {
 }
 
 describe('GroqVisionOCRProvider', () => {
+  it.each([
+    'subtotal',
+    'tax',
+    'tip',
+    'discount',
+    'otherFees',
+    'total',
+    'amountPaid',
+  ])(
+    'normaliza agrupación válida en %s y mantiene una llamada',
+    async (field) => {
+      const { instance, fetcher } = provider(
+        groqResponse({ ...extracted, [field]: '1,006.00' }),
+      )
+      await expect(
+        instance.recognize(input, new AbortController().signal),
+      ).resolves.toMatchObject({ [field]: 100600 })
+      expect(fetcher).toHaveBeenCalledOnce()
+    },
+  )
+
+  it.each([
+    '10,06.00',
+    '1,00,6.00',
+    '1,006.000',
+    '1,006.',
+    '$1,006.00',
+    'MXN 1,006.00',
+    '1 006.00',
+    '1.006,00',
+    '1006,00',
+    '1e3',
+    'NaN',
+    'Infinity',
+    1006,
+    ' 1,006.00',
+    '1,006.00 ',
+  ])('el schema sigue rechazando formato no autorizado %#', async (value) => {
+    await expect(
+      provider(groqResponse({ ...extracted, total: value })).instance.recognize(
+        input,
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: 'invalid_provider_response' })
+  })
+
+  it('golden agrupado: conserva fecha, pago y amountPaid tras normalizar', async () => {
+    const { instance } = provider(
+      groqResponse({
+        ...extracted,
+        date: '2026-05-19',
+        total: '1,006.00',
+        amountPaid: '1,006.00',
+      }),
+    )
+    await expect(
+      instance.recognize(input, new AbortController().signal),
+    ).resolves.toMatchObject({
+      date: '2026-05-19',
+      total: 100600,
+      amountPaid: 100600,
+    })
+  })
+  it.each([
+    [
+      'provider_json_parse_failed',
+      () => new Response('private-token raw OCR'),
+      undefined,
+    ],
+    [
+      'completion_schema_failed',
+      () => Response.json({ choices: [] }),
+      'choices',
+    ],
+    [
+      'missing_content',
+      () => Response.json({ choices: [{ message: {} }] }),
+      'choices.index.message.content',
+    ],
+    [
+      'completion_content_json_failed',
+      () =>
+        Response.json({
+          choices: [{ message: { content: 'private-token raw OCR' } }],
+        }),
+      undefined,
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, total: undefined }),
+      'total',
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, 'private-token': 'bank-reference' }),
+      'root',
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, total: '$1,006.00' }),
+      'total',
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, total: 1006 }),
+      'total',
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, amountAmbiguous: 'false' }),
+      'amountAmbiguous',
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, confidence: 95 }),
+      'confidence',
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, date: '19/05/2026' }),
+      'date',
+    ],
+    [
+      'receipt_schema_failed',
+      () => groqResponse({ ...extracted, currency: 'pesos' }),
+      'currency',
+    ],
+    [
+      'canonical_receipt_schema_failed',
+      () => groqResponse({ ...extracted, date: '2026-02-30' }),
+      'date',
+    ],
+  ] as const)(
+    'diagnóstico %s, campo %s sin contenido sensible',
+    async (phase, response, field) => {
+      const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+      try {
+        const { instance, fetcher } = provider(response())
+        await expect(
+          instance.recognize(input, new AbortController().signal),
+        ).rejects.toMatchObject({ code: 'invalid_provider_response' })
+        expect(fetcher).toHaveBeenCalledOnce()
+        const diagnostic = JSON.parse(String(log.mock.calls.at(-1)?.[1]))
+        expect(diagnostic).toMatchObject({
+          provider: 'groq',
+          operation: 'recognize-receipt',
+          phase,
+          upstreamStatus: 200,
+          durationMs: expect.any(Number),
+        })
+        if (field)
+          expect(diagnostic.issues).toContainEqual(
+            expect.objectContaining({ schemaField: field }),
+          )
+        const logs = JSON.stringify(log.mock.calls)
+        for (const secret of [
+          'server-secret',
+          'private-token',
+          'raw OCR',
+          'bank-reference',
+          '/9j/2Q==',
+          'Authorization',
+          'TOTAL $189.90',
+        ])
+          expect(logs).not.toContain(secret)
+      } finally {
+        log.mockRestore()
+      }
+    },
+  )
+
+  it('golden: preserva pago 1006.00 sin seleccionar efectivo 1050.00 ni cambio 44.00', async () => {
+    const { instance } = provider(
+      groqResponse({
+        ...extracted,
+        date: '2026-05-19',
+        total: '1006.00',
+        amountPaid: '1006.00',
+        subtotal: null,
+        tax: null,
+        tip: null,
+        amountEvidence: 'IMPORTE DE PAGO $1,006.00',
+      }),
+    )
+    await expect(
+      instance.recognize(input, new AbortController().signal),
+    ).resolves.toMatchObject({
+      date: '2026-05-19',
+      total: 100600,
+      amountPaid: 100600,
+    })
+  })
   it('envía una imagen multimodal y convierte decimales a centavos exactos', async () => {
     const { instance, fetcher } = provider()
     await expect(

@@ -33,6 +33,7 @@
     "dexie": "^4.4.4",
     "fast-check": "^4.9.0",
     "lucide-react": "^1.33.0",
+    "pdfjs-dist": "6.3.289",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-router-dom": "^7.18.2",

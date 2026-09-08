@@ -20,11 +20,11 @@ export function ReceiptSourceSelector({
         <p className="eyebrow">Elige una opción</p>
         <h2 id="receipt-source-title">¿Cómo quieres registrar el gasto?</h2>
         <p>
-          Puedes fotografiar el recibo, elegir una imagen existente o capturar
-          los datos manualmente.
+          Puedes fotografiar el recibo, elegir una imagen o un PDF de una página
+          (menos de 10 MB), o capturar los datos manualmente.
         </p>
       </div>
-      {isSelecting ? <LoadingState message="Preparando imagen…" /> : null}
+      {isSelecting ? <LoadingState message="Procesando comprobante…" /> : null}
       <div className="ln-receipt-actions">
         <Button disabled={isSelecting} onClick={onCamera}>
           Tomar foto
