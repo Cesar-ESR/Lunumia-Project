@@ -4,6 +4,7 @@ export type MovementKind =
   'expense' | 'income-received' | 'income-expected' | 'income-cancelled'
 
 export interface MovementListItem {
+  source?: Expense['source']
   id: string
   kind: MovementKind
   description: string
@@ -70,6 +71,7 @@ export function expenseToMovementViewModel(
   return {
     id: expense.id,
     kind: 'expense',
+    source: expense.source,
     description: expense.description,
     amountCents: -expense.amount,
     date: expense.date,

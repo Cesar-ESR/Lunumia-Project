@@ -7,6 +7,7 @@ import type {
 } from '@domain/rules'
 
 export interface ReceiptFormContext {
+  expenseSource: 'manual' | 'receipt'
   image: CapturedImage | null
   draft: ReceiptExpenseDraft
   detectedCurrency: string | null

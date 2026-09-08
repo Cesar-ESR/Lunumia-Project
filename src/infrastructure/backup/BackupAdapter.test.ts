@@ -22,6 +22,21 @@ afterEach(async () => {
 })
 
 describe('BackupAdapter', () => {
+  it.each(['receipt', 'manual', null, undefined] as const)(
+    'export/import preserva provenance %s sin inferir datos legacy',
+    async (source) => {
+      const first = new BackupAdapter(createDatabase())
+      const second = new BackupAdapter(createDatabase())
+      const data = createBackupData()
+      if (source !== undefined) data.expenses[0]!.source = source
+      await first.replace('guest:first', data)
+      const exported = await first.readActive('guest:first')
+      await second.replace('guest:second', JSON.parse(JSON.stringify(exported)))
+      const imported = await second.readActive('guest:second')
+      expect(imported.expenses[0]?.source).toBe(source)
+      expect(imported.expenses[0]?.amount).toBe(data.expenses[0]?.amount)
+    },
+  )
   it('lee todas las entidades activas del propietario en orden determinista', async () => {
     const database = createDatabase()
     const adapter = new BackupAdapter(database)

@@ -28,6 +28,7 @@ export const remoteRowSchemas = {
     balance_effective_at: timestampSchema.nullable(),
   }),
   expense: remoteBaseSchema.extend({
+    source: z.enum(['manual', 'receipt']).nullish(),
     period_id: uuidSchema,
     category_id: uuidSchema,
     amount: z.number().int().nonnegative().safe(),

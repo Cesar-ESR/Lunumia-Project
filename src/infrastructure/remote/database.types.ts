@@ -147,6 +147,7 @@ export type Database = {
           id: string
           period_id: string
           recurring_occurrence_id: string | null
+          source: string | null
           updated_at: string
           user_id: string
         }
@@ -162,6 +163,7 @@ export type Database = {
           id: string
           period_id: string
           recurring_occurrence_id?: string | null
+          source?: string | null
           updated_at?: string
           user_id: string
         }
@@ -177,6 +179,7 @@ export type Database = {
           id?: string
           period_id?: string
           recurring_occurrence_id?: string | null
+          source?: string | null
           updated_at?: string
           user_id?: string
         }

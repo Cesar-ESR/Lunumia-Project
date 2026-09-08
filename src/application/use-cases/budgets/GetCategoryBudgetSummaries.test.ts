@@ -97,6 +97,21 @@ function setup(
 }
 
 describe('GetCategoryBudgetSummaries', () => {
+  it.each(['receipt', 'manual', null, undefined] as const)(
+    'source %s no altera el presupuesto',
+    async (source) => {
+      const plain = expense('food', 80_000)
+      const expected = await setup(
+        [budget('food', 100_000)],
+        [plain],
+      ).query.execute({ ownerId: OWNER_ID, periodId: PERIOD_ID })
+      const actual = await setup(
+        [budget('food', 100_000)],
+        [{ ...plain, source }],
+      ).query.execute({ ownerId: OWNER_ID, periodId: PERIOD_ID })
+      expect(actual).toEqual(expected)
+    },
+  )
   it('expone budget, spent, remaining y status para una categoría', async () => {
     const { query, budgetRepository, expenseRepository, categoryRepository } =
       setup([budget('food', 100_000)], [expense('food', 80_000)])

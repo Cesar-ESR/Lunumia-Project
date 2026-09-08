@@ -332,6 +332,50 @@ describe('D7 income writers', () => {
 })
 
 describe('D7 expense writers', () => {
+  it.each(['receipt', 'manual', null, undefined] as const)(
+    'preserva provenance %s al editar sin aceptar el origen del formulario',
+    async (source) => {
+      await seedReferenceData()
+      const values = repositories()
+      const create = new CreateExpense(
+        values.expenses,
+        values.periods,
+        values.categories,
+        values.ids,
+        clock,
+      )
+      const input = {
+        ownerId,
+        periodId: periodOneId,
+        categoryId,
+        amount: 1000,
+        description: 'Prueba',
+        date: '2026-08-10',
+      }
+      const created = await create.execute({ ...input, source: 'receipt' })
+      expect(created.source).toBe('receipt')
+      await database.expenses.put({ ...created, source })
+      const edited = await new UpdateExpense(
+        values.expenses,
+        values.periods,
+        values.categories,
+        clock,
+      ).execute(created.id, {
+        ...input,
+        amount: 2000,
+        source: 'manual',
+      })
+      expect(edited.source).toBe(source)
+      expect(edited.amount).toBe(2000)
+      expect(edited).toMatchObject({ balanceEffectiveAt: now })
+      expect((await database.expenses.get(created.id))?.source).toBe(source)
+      await new DeleteExpense(values.expenses, values.transaction).execute(
+        created.id,
+      )
+      expect(await values.expenses.findById(created.id)).toBeNull()
+      expect((await database.expenses.get(created.id))?.source).toBe(source)
+    },
+  )
   it('CreateExpense crea V2 y permite histórico sin impacto de balance', async () => {
     await seedReferenceData()
     const values = repositories()
@@ -360,6 +404,7 @@ describe('D7 expense writers', () => {
       affectsBalance: false,
     })
     expect(normal).toMatchObject({
+      source: 'manual',
       affectsBalance: true,
       balanceEffectiveAt: now,
     })

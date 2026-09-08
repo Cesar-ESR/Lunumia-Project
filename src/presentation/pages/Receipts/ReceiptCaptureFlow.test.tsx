@@ -473,6 +473,24 @@ describe('ReceiptCaptureFlow - OCR y resultados tardíos', () => {
 })
 
 describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
+  it('la captura manual dentro del flujo envía source manual', async () => {
+    const user = userEvent.setup()
+    const { createExpense } = setup()
+    await user.click(
+      screen.getByRole('button', { name: 'Registrar manualmente' }),
+    )
+    await user.type(screen.getByLabelText('Descripción'), 'Manual')
+    await user.type(screen.getByLabelText('Monto (MXN)'), '10')
+    await user.clear(screen.getByLabelText('Fecha'))
+    await user.type(screen.getByLabelText('Fecha'), '2026-07-10')
+    await user.selectOptions(screen.getByLabelText('Categoría'), CATEGORY_ID)
+    await user.click(
+      screen.getByRole('button', { name: 'Confirmar monto y guardar gasto' }),
+    )
+    expect(createExpense).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'manual' }),
+    )
+  })
   it('permite editar todos los valores propuestos y exige categoría', async () => {
     const user = userEvent.setup()
     const { createExpense } = setup()
@@ -493,6 +511,7 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
     expect(createExpense).toHaveBeenCalledWith(
       expect.objectContaining({
         description: 'Comercio corregido',
+        source: 'receipt',
         amount: 15025,
         date: '2026-07-12',
         categoryId: CATEGORY_ID,
@@ -681,6 +700,7 @@ describe('ReceiptCaptureFlow - formulario y creación local-first', () => {
       categoryId: CATEGORY_ID,
       amount: 12345,
       description: 'Mercado local',
+      source: 'receipt',
       date: '2026-07-10',
       affectsBalance: true,
     })

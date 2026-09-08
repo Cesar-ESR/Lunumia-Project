@@ -291,6 +291,24 @@
   line-height: var(--text-caption-line);
 }
 
+.ln-movement-labels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ln-receipt-label {
+  gap: var(--space-1);
+}
+
+.ln-receipt-label svg {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
 .ln-income-form-surface {
   width: min(100%, var(--form-max));
   margin-inline: auto;
@@ -2737,6 +2755,10 @@
   .ln-home-event__main > strong,
   .ln-home-activity-row__main > div:last-child {
     text-align: left;
+  }
+
+  .ln-home-activity-row__main .ln-movement-labels {
+    justify-content: flex-start;
   }
 
   .ln-movement-filters {

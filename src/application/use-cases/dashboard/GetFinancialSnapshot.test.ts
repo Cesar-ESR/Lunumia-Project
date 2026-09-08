@@ -183,6 +183,19 @@ function createHarness(
 }
 
 describe('GetFinancialSnapshot', () => {
+  it.each(['receipt', 'manual', null, undefined] as const)(
+    'source %s no altera el snapshot financiero',
+    async (source) => {
+      const plain = expense(50)
+      const expected = await createHarness({
+        expenses: [plain],
+      }).useCase.execute()
+      const actual = await createHarness({
+        expenses: [{ ...plain, source }],
+      }).useCase.execute()
+      expect(actual).toEqual(expected)
+    },
+  )
   it('orchestrates a complete happy path through the real D8 engine', async () => {
     const received = income(100)
     const expected = income(200, {

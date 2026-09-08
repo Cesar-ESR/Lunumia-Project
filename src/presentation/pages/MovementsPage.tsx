@@ -1,4 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from 'react'
+import { MovementLabels } from '../components/MovementLabels'
 import {
   BanknoteArrowDown,
   BanknoteArrowUp,
@@ -395,9 +396,7 @@ function MovementRow({
         </div>
         <div className="ln-movement-row__amount">
           <MoneyDisplay amount={movement.amountCents} />
-          <span className={`ln-status-label ln-status-label--${movement.kind}`}>
-            {movement.statusLabel}
-          </span>
+          <MovementLabels movement={movement} />
         </div>
       </div>
     </InteractiveRow>

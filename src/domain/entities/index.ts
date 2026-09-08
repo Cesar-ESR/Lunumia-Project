@@ -60,6 +60,8 @@ export type LegacyIncome = IncomeBase
 export type Income = IncomeV2 | LegacyIncome
 export type PersistedIncome = Income
 interface ExpenseBase extends SyncableEntity {
+  /** Absent/null means unknown provenance for legacy records. */
+  source?: 'manual' | 'receipt' | null
   periodId: string
   categoryId: string
   amount: AmountCents

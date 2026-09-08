@@ -169,6 +169,7 @@ export function ReceiptCaptureFlow({
         status: 'editing',
         image,
         ...proposal,
+        expenseSource: 'receipt',
       })
     } catch (reason) {
       if (!mountedRef.current || generation !== generationRef.current) return
@@ -194,6 +195,7 @@ export function ReceiptCaptureFlow({
         periods,
         activePeriodId,
       ),
+      expenseSource: 'manual',
       detectedCurrency: null,
       confidence: null,
       amountProposal: null,
@@ -217,7 +219,7 @@ export function ReceiptCaptureFlow({
     submittingRef.current = true
     setState({ status: 'submitting', ...context })
     try {
-      await createExpense.execute(value)
+      await createExpense.execute({ ...value, source: context.expenseSource })
     } catch (reason) {
       if (mountedRef.current && ownerRef.current === ownerId)
         setState({ status: 'editing', ...context })

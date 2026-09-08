@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { dateOnlySchema, idSchema, positiveCentsSchema } from './common.schema'
 export const createExpenseSchema = z.object({
+  source: z.enum(['manual', 'receipt']).nullish(),
   ownerId: z.string().min(1),
   periodId: idSchema,
   categoryId: idSchema,

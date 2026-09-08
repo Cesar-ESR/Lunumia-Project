@@ -29,6 +29,7 @@ export class UpdateExpense {
     return this.expenses.update({
       ...current,
       ...value,
+      source: current.source,
       ownerId: current.ownerId,
       periodId: period.id,
       recurringOccurrenceId: current.recurringOccurrenceId,

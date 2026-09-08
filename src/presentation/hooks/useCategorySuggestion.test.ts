@@ -52,13 +52,78 @@ async function advanceDebounce() {
   })
 }
 
+// A deadline belongs to the last effective (trimmed) value change, not every
+// renderHook.rerender. Repeating a value can let an existing deadline expire.
+async function expectDebounceTimeline(
+  descriptions: string[],
+  intervals: number[],
+  reactStrictMode = false,
+) {
+  expect(vi.getTimerCount()).toBe(0)
+  let currentDescription = descriptions[0]!.trim()
+  let elapsed = 0
+  let deadline: number | null = 500
+  const expectedRequests: string[] = []
+  const setup = props({ description: descriptions[0] })
+  const { rerender, unmount } = renderHook(
+    ({ description }) => useCategorySuggestion({ ...setup, description }),
+    { initialProps: { description: descriptions[0]! }, reactStrictMode },
+  )
+  const requestedDescriptions = () =>
+    vi
+      .mocked(setup.action!.execute)
+      .mock.calls.map(([description]) => description)
+  const advance = async (milliseconds: number) => {
+    elapsed += milliseconds
+    if (deadline !== null && elapsed >= deadline) {
+      expectedRequests.push(currentDescription)
+      deadline = null
+    }
+    await act(async () => {
+      vi.advanceTimersByTime(milliseconds)
+      await Promise.resolve()
+    })
+    expect(requestedDescriptions()).toEqual(expectedRequests)
+  }
+  try {
+    for (let index = 1; index < descriptions.length; index += 1) {
+      await advance(intervals[index % intervals.length] ?? 0)
+      const description = descriptions[index]!
+      if (description.trim() !== currentDescription) {
+        currentDescription = description.trim()
+        deadline = elapsed + 500
+      }
+      rerender({ description })
+      expect(requestedDescriptions()).toEqual(expectedRequests)
+      expect(vi.getTimerCount()).toBe(deadline === null ? 0 : 1)
+    }
+    const beforeFinalWait = requestedDescriptions()
+    await advance(500)
+    expectedRequests.forEach((description, index) => {
+      expect(setup.action!.execute).toHaveBeenNthCalledWith(
+        index + 1,
+        description,
+        [category],
+        ownerId,
+      )
+    })
+    return { beforeFinalWait, afterFinalWait: requestedDescriptions() }
+  } finally {
+    // A failed sample must also unmount before fast-check retries/shrinks it.
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  }
+}
+
 describe('useCategorySuggestion', () => {
-  beforeAll(() => vi.useFakeTimers())
+  beforeEach(() => vi.useFakeTimers())
   afterEach(() => {
     cleanup()
+    const remainingTimers = vi.getTimerCount()
     vi.clearAllTimers()
+    vi.useRealTimers()
+    expect(remainingTimers).toBe(0)
   })
-  afterAll(() => vi.useRealTimers())
 
   it('1. no llama IA con descripción vacía', async () => {
     const setup = props({ description: ' ' })
@@ -108,7 +173,7 @@ describe('useCategorySuggestion', () => {
     expect(setup.action!.execute).toHaveBeenCalledOnce()
   })
 
-  it('Feature: gasto-claro-app, Property AI-7: una ráfaga bajo el debounce produce una sola solicitud vigente', async () => {
+  it('Feature: gasto-claro-app, Property AI-7: debounce desde el último cambio efectivo sin duplicar solicitudes', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.array(fc.stringMatching(/^[a-z]{3,30}$/), {
@@ -120,32 +185,57 @@ describe('useCategorySuggestion', () => {
           maxLength: 12,
         }),
         async (descriptions, intervals) => {
-          const setup = props({ description: descriptions[0] })
-          const { rerender, unmount } = renderHook(
-            ({ description }) =>
-              useCategorySuggestion({ ...setup, description }),
-            { initialProps: { description: descriptions[0] ?? 'abc' } },
-          )
-          for (let index = 1; index < descriptions.length; index += 1) {
-            await act(async () => {
-              vi.advanceTimersByTime(intervals[index % intervals.length] ?? 0)
-            })
-            rerender({ description: descriptions[index] ?? 'abc' })
-          }
-          expect(setup.action!.execute).not.toHaveBeenCalled()
-          await advanceDebounce()
-          expect(setup.action!.execute).toHaveBeenCalledTimes(1)
-          expect(setup.action!.execute).toHaveBeenLastCalledWith(
-            descriptions.at(-1)?.trim(),
-            [category],
-            ownerId,
-          )
-          unmount()
-          expect(vi.getTimerCount()).toBe(0)
+          await expectDebounceTimeline(descriptions, intervals)
         },
       ),
       { numRuns: 100 },
     )
+  })
+
+  // Original failure: seed 964193022, numRuns 100, 18 shrinks.
+  // path: 2:3:2:2:30:26:26:26:26:29:31:36:33:33:33:33:33:45:43
+  it.each([false, true])(
+    'AI-7 seed 964193022: conserva el contraejemplo exacto (StrictMode=%s)',
+    async (strictMode) => {
+      await expect(
+        expectDebounceTimeline(
+          ['aaa', 'ref', 'ref', 'aaa'],
+          [0, 0, 212, 288, 0],
+          strictMode,
+        ),
+      ).resolves.toEqual({
+        beforeFinalWait: ['ref'],
+        afterFinalWait: ['ref', 'aaa'],
+      })
+    },
+  )
+
+  it.each([false, true])(
+    'AI-7: repetir un valor no reinicia el plazo de 500 ms (StrictMode=%s)',
+    async (strictMode) => {
+      await expect(
+        expectDebounceTimeline(
+          ['same', 'same', 'same'],
+          [0, 212, 288],
+          strictMode,
+        ),
+      ).resolves.toEqual({
+        beforeFinalWait: ['same'],
+        afterFinalWait: ['same'],
+      })
+    },
+  )
+
+  it('AI-7: una ráfaga de cambios efectivos bajo 500 ms solicita sólo el último', async () => {
+    await expect(
+      expectDebounceTimeline(['aaa', 'bbb', 'ccc'], [0, 499, 499]),
+    ).resolves.toEqual({ beforeFinalWait: [], afterFinalWait: ['ccc'] })
+  })
+
+  it('AI-7: variaciones de espacios con el mismo valor normalizado no reinician el plazo', async () => {
+    await expect(
+      expectDebounceTimeline([' same ', 'same', 'same  '], [0, 212, 288]),
+    ).resolves.toEqual({ beforeFinalWait: ['same'], afterFinalWait: ['same'] })
   })
 
   it('7. realiza una llamada tras el debounce', async () => {

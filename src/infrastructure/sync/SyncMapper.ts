@@ -43,6 +43,7 @@ const localIncomeV2Schema = localIncomeLegacySchema.extend({
   balanceEffectiveAt: instantSchema.nullable(),
 })
 const localExpenseLegacySchema = localBaseSchema.extend({
+  source: z.enum(['manual', 'receipt']).nullish(),
   periodId: uuidSchema,
   categoryId: uuidSchema,
   amount: z.number().int().nonnegative().safe(),
@@ -197,6 +198,7 @@ export function deserializeRemoteChange(
           description: row.description,
           date: row.date,
           recurringOccurrenceId: row.recurring_occurrence_id,
+          ...(row.source !== undefined ? { source: row.source } : {}),
           affectsBalance: row.affects_balance,
           balanceEffectiveAt: normalizeInstant(row.balance_effective_at),
           createdAt: normalizeInstant(row.created_at),
@@ -352,6 +354,7 @@ function toRemoteRecord(
         description: entity.description,
         date: entity.date,
         recurring_occurrence_id: entity.recurringOccurrenceId,
+        ...(entity.source !== undefined ? { source: entity.source } : {}),
       }
       if ('affectsBalance' in entity) {
         remote.affects_balance = entity.affectsBalance

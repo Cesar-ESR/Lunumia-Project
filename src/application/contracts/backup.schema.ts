@@ -75,6 +75,7 @@ export const backupIncomeSchema = z
 
 export const backupExpenseSchema = z
   .object({
+    source: z.enum(['manual', 'receipt']).nullish(),
     ...syncableShape,
     periodId: uuidSchema,
     categoryId: uuidSchema,

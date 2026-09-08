@@ -18,6 +18,17 @@ function createSource(data = createBackupData()): BackupDataSource {
 }
 
 describe('BackupService', () => {
+  it.each(['receipt', 'manual', null, undefined] as const)(
+    'preserva source %s en exportación serializada e importación',
+    async (source) => {
+      const data = createBackupData()
+      if (source !== undefined) data.expenses[0]!.source = source
+      const service = new BackupService(createSource(data), () => BACKUP_NOW)
+      const file = await service.exportBackup('guest:source')
+      const restored = service.prepareImport(service.serialize(file)).file
+      expect(restored.data.expenses[0]?.source).toBe(source)
+    },
+  )
   it('exporta un archivo actual, validado y serializado de forma legible', async () => {
     const service = new BackupService(createSource(), () => BACKUP_NOW)
     const file = await service.exportBackup('guest:source')
@@ -92,6 +103,7 @@ describe('BackupService', () => {
       affectsBalance: true,
       balanceEffectiveAt: BACKUP_NOW,
     })
+    expect(prepared.file.data.expenses[0]?.source).toBeUndefined()
     expect(prepared.file.data.recurringPaymentOccurrences[0]?.amount).toBe(
       legacy.data.recurringPayments[0]?.amount,
     )

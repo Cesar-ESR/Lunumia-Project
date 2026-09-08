@@ -31,6 +31,23 @@ afterEach(async () => {
   }
 })
 describe('DexieExpenseRepository', () => {
+  it.each(['guest:local', '10000000-0000-4000-8000-000000000001'])(
+    'conserva receipt tras cerrar y reabrir Dexie para %s',
+    async (owner) => {
+      const name = `expense-source-${crypto.randomUUID()}`
+      database = new GastoClaroDB(name)
+      await new DexieExpenseRepository(database, owner).create({
+        ...expense('receipt', 'category', owner),
+        source: 'receipt',
+      })
+      database.close()
+      database = new GastoClaroDB(name)
+      expect(
+        (await new DexieExpenseRepository(database, owner).findById('receipt'))
+          ?.source,
+      ).toBe('receipt')
+    },
+  )
   it('filtra consultas por periodo, categoría y propietario', async () => {
     database = new GastoClaroDB('expenses-list-test')
     const repository = new DexieExpenseRepository(database, 'owner')

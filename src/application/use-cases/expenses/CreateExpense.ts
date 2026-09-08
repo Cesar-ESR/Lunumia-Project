@@ -31,6 +31,7 @@ export class CreateExpense {
     return this.expenses.create({
       id: this.ids.generate(),
       ...value,
+      source: value.source ?? 'manual',
       recurringOccurrenceId: null,
       affectsBalance: value.affectsBalance ?? true,
       balanceEffectiveAt: now,
