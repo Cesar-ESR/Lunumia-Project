@@ -222,13 +222,34 @@ jobs:
       - name: Smoke App production
         if: ${{ needs.changes.outputs.app == 'true' }}
         shell: bash
+        env:
+          CI_BYPASS_TOKEN: ${{ secrets.CI_BYPASS_TOKEN }}
         run: |
           set -euo pipefail
+          bypass_header=()
+          if [[ -n "${CI_BYPASS_TOKEN:-}" ]]; then
+            bypass_header=(-H "X-CI-Bypass: $CI_BYPASS_TOKEN")
+          fi
+
           for path in / /login /verify-email /reset-password /manifest.webmanifest; do
-            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "https://app.lunumia.com$path")"
+            status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              --user-agent "Lunumia-CI-Smoke/1.0" \
+              --retry 3 \
+              --retry-delay 2 \
+              --retry-connrefused \
+              --max-time 15 \
+              "${bypass_header[@]}" \
+              "https://app.lunumia.com$path")"
             [[ "$status" == "200" ]] || { echo "App smoke failed for $path: HTTP $status" >&2; exit 1; }
           done
-          curl --silent --show-error --dump-header - --output /dev/null https://app.lunumia.com/ \
+          curl --silent --show-error --dump-header - --output /dev/null \
+            --user-agent "Lunumia-CI-Smoke/1.0" \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --max-time 15 \
+            "${bypass_header[@]}" \
+            https://app.lunumia.com/ \
             | tr -d '\r' \
             | grep -Eiq '^strict-transport-security:[[:space:]]*max-age=86400([;[:space:]]|$)'
 
@@ -270,15 +291,43 @@ jobs:
       - name: Smoke Landing production
         if: ${{ needs.changes.outputs.landing == 'true' }}
         shell: bash
+        env:
+          CI_BYPASS_TOKEN: ${{ secrets.CI_BYPASS_TOKEN }}
         run: |
           set -euo pipefail
-          landing_body="$(curl --fail --silent --show-error https://lunumia.com/)"
+          bypass_header=()
+          if [[ -n "${CI_BYPASS_TOKEN:-}" ]]; then
+            bypass_header=(-H "X-CI-Bypass: $CI_BYPASS_TOKEN")
+          fi
+
+          landing_body="$(curl --fail --silent --show-error \
+            --user-agent "Lunumia-CI-Smoke/1.0" \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --max-time 15 \
+            "${bypass_header[@]}" \
+            https://lunumia.com/)"
           grep -Fq 'Entiende tu dinero con más claridad.' <<< "$landing_body"
 
-          apex_headers="$(curl --silent --show-error --dump-header - --output /dev/null https://lunumia.com/ | tr -d '\r')"
+          apex_headers="$(curl --silent --show-error --dump-header - --output /dev/null \
+            --user-agent "Lunumia-CI-Smoke/1.0" \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --max-time 15 \
+            "${bypass_header[@]}" \
+            https://lunumia.com/ | tr -d '\r')"
           grep -Eiq '^strict-transport-security:[[:space:]]*max-age=86400([;[:space:]]|$)' <<< "$apex_headers"
 
-          www_headers="$(curl --silent --show-error --dump-header - --output /dev/null --max-redirs 0 'https://www.lunumia.com/path-check?source=github-actions' | tr -d '\r')"
+          www_headers="$(curl --silent --show-error --dump-header - --output /dev/null --max-redirs 0 \
+            --user-agent "Lunumia-CI-Smoke/1.0" \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            --max-time 15 \
+            "${bypass_header[@]}" \
+            'https://www.lunumia.com/path-check?source=github-actions' | tr -d '\r')"
           grep -Eq '^HTTP/[^ ]+ 301([[:space:]]|$)' <<< "$www_headers"
           grep -Eiq '^location:[[:space:]]*https://lunumia\.com/path-check\?source=github-actions[[:space:]]*$' <<< "$www_headers"
           grep -Eiq '^strict-transport-security:[[:space:]]*max-age=86400([;[:space:]]|$)' <<< "$www_headers"
