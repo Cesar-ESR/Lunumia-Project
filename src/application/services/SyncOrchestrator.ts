@@ -1,7 +1,14 @@
 import type { SyncError, SyncErrorKind, SyncResult } from './SyncCoordinator'
+import type { PeriodResolutionChoice } from './PeriodResolutionPort'
 
 export type SyncStatus =
-  'idle' | 'offline' | 'pending' | 'syncing' | 'up_to_date' | 'error'
+  | 'idle'
+  | 'offline'
+  | 'pending'
+  | 'syncing'
+  | 'up_to_date'
+  | 'error'
+  | 'requiresPeriodResolution'
 
 export interface PublicSyncError {
   kind: SyncErrorKind
@@ -26,6 +33,11 @@ export interface SyncState {
 }
 
 export interface SyncExecutor {
+  resolvePeriodOverlap?(
+    ownerId: string,
+    operationId: string,
+    choice: PeriodResolutionChoice,
+  ): Promise<void>
   sync(ownerId: string): Promise<SyncResult>
 }
 
@@ -195,7 +207,38 @@ export class SyncOrchestrator {
     return this.runSync('manual')
   }
 
+  async resolvePeriodOverlap(
+    operationId: string,
+    choice: PeriodResolutionChoice,
+  ): Promise<void> {
+    const ownerId = this.state.ownerId
+    if (
+      !ownerId ||
+      !this.executor.resolvePeriodOverlap ||
+      this.activePromise ||
+      !this.state.isOnline
+    )
+      throw new Error('La resolución no está disponible ahora.')
+    const generation = this.ownerGeneration
+    this.paused = true
+    try {
+      await this.executor.resolvePeriodOverlap(ownerId, operationId, choice)
+      if (generation !== this.ownerGeneration) return
+      this.publish({
+        ...this.state,
+        lastResult: null,
+        error: null,
+        status: 'pending',
+      })
+    } finally {
+      this.paused = false
+    }
+    if (generation === this.ownerGeneration) await this.syncNow()
+  }
+
   private runSync(trigger: 'automatic' | 'manual'): Promise<SyncResult | null> {
+    if (trigger === 'automatic' && this.state.lastResult?.periodResolution)
+      return Promise.resolve(null)
     if (this.paused) {
       this.rerunRequested = true
       return Promise.resolve(null)
@@ -266,6 +309,20 @@ export class SyncOrchestrator {
       }
 
       const failure = result.errors[0]
+      if (result.periodResolution) {
+        this.rerunRequested = false
+        this.cancelRetry()
+        this.publish({
+          ...this.state,
+          status: 'requiresPeriodResolution',
+          isSyncing: false,
+          pendingCount,
+          lastResult: result,
+          error: null,
+          canRetryManually: false,
+        })
+        return result
+      }
       if (result.failed > 0 || failure) {
         this.handleFailure(
           failure ?? unknownResultFailure(),
@@ -396,6 +453,10 @@ export class SyncOrchestrator {
   }
 
   private handleQueueCount(count: number): void {
+    if (this.state.lastResult?.periodResolution) {
+      this.publish({ ...this.state, pendingCount: count })
+      return
+    }
     if (count === 0) this.cancelRetry()
     const increased = count > this.state.pendingCount
     const status = this.state.isSyncing

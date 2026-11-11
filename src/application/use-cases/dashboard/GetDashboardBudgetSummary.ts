@@ -1,9 +1,6 @@
-import {
-  computeBudgetRemaining,
-  computeSpendingPace,
-  type SpendingPace,
-} from '@domain/calculations'
+import { computeSpendingPace, type SpendingPace } from '@domain/calculations'
 import type { Period } from '@domain/entities'
+import { assertUniqueActiveCategoryBudgets } from '@domain/rules/category-budget-uniqueness'
 import type {
   ICategoryBudgetRepository,
   IExpenseRepository,
@@ -36,24 +33,35 @@ export class GetDashboardBudgetSummary {
       this.budgets.findByPeriod(period.id),
       this.expenses.findByPeriod(period.id),
     ])
-    const totalBudget = budgets.reduce(
+    const scopedBudgets = budgets.filter(
+      (budget) =>
+        budget.ownerId === period.ownerId &&
+        budget.periodId === period.id &&
+        budget.deletedAt === null,
+    )
+    assertUniqueActiveCategoryBudgets(scopedBudgets)
+    const categoryIds = new Set(
+      scopedBudgets.map((budget) => budget.categoryId),
+    )
+    const totalBudget = scopedBudgets.reduce(
       (total, budget) => total + budget.amount,
       0,
     )
-    const budgetRemaining = budgets.reduce(
-      (total, budget) => total + computeBudgetRemaining(budget, expenses),
-      0,
-    )
-    const totalSpent = expenses.reduce(
-      (total, expense) => total + expense.amount,
-      0,
-    )
+    const totalSpent = expenses
+      .filter(
+        (expense) =>
+          expense.ownerId === period.ownerId &&
+          expense.periodId === period.id &&
+          expense.deletedAt === null &&
+          categoryIds.has(expense.categoryId),
+      )
+      .reduce((total, expense) => total + expense.amount, 0)
 
     return {
       totalBudget,
       spentCents: totalSpent,
-      budgetRemaining,
-      configuredBudgetCount: budgets.length,
+      budgetRemaining: totalBudget - totalSpent,
+      configuredBudgetCount: scopedBudgets.length,
       spendingPace: computeSpendingPace(
         totalBudget,
         totalSpent,

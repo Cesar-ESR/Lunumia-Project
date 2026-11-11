@@ -9,6 +9,7 @@ android/**/build/
 # Internal product planning
 .kiro/
 docs/Lunumia_2.0_Plan_Maestro.md
+.docs/
 
 # Local configuration and secrets
 .env
@@ -25,3 +26,9 @@ supabase/.temp/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Agent skills
+.agents/skills/
+
+tmp/
+t(domain)*

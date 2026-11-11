@@ -7,6 +7,7 @@ import { PWA_SCOPE, PWA_START_URL } from './src/shared/constants/web-origins'
 
 export default defineConfig({
   build: {
+    sourcemap: false,
     rolldownOptions: {
       output: {
         codeSplitting: {
@@ -82,6 +83,12 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [
+          /^\/\..*/, // Bloquea archivos y directorios ocultos (ej. /.git, /.env)
+          /^\/api(\/.*)?$/, // Bloquea endpoints bajo /api
+          /^\/server-info(\/.*)?$/, // Bloquea rutas de servidor reservadas
+          /^\/.*\/backup.*/,
+        ],
         globPatterns: ['**/*.{js,mjs,css,html,ico,png,svg,woff2}'],
         globIgnores: ['**/*backup*'],
         runtimeCaching: [

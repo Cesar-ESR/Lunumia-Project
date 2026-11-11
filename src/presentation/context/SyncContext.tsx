@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { SyncResult } from '@application/services/SyncCoordinator'
+import type { PeriodResolutionChoice } from '@application/services/PeriodResolutionPort'
 import type {
   SyncOrchestrator,
   SyncState,
@@ -16,6 +17,10 @@ import type {
 import { useAuth } from './AuthContext'
 
 export interface SyncContextValue extends SyncState {
+  resolvePeriodOverlap?(
+    operationId: string,
+    choice: PeriodResolutionChoice,
+  ): Promise<void>
   isAvailable: boolean
   syncNow(): Promise<SyncResult | null>
 }
@@ -110,7 +115,15 @@ export function SyncProvider({
     [orchestrator],
   )
   const value = useMemo<SyncContextValue>(
-    () => ({ ...state, isAvailable: orchestrator !== null, syncNow }),
+    () => ({
+      ...state,
+      isAvailable: orchestrator !== null,
+      syncNow,
+      resolvePeriodOverlap: async (operationId, choice) => {
+        if (!orchestrator) throw new Error('Sincronización no disponible.')
+        await orchestrator.resolvePeriodOverlap(operationId, choice)
+      },
+    }),
     [orchestrator, state, syncNow],
   )
 

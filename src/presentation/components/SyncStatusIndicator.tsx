@@ -1,11 +1,14 @@
 import type { SyncContextValue } from '../context/SyncContext'
 import { useSync } from '../context/SyncContext'
+import { PeriodResolutionNotice } from './PeriodResolutionNotice'
 
 export function SyncStatusIndicator() {
   return <SyncStatusView sync={useSync()} />
 }
 
 export function SyncStatusView({ sync }: { sync: SyncContextValue }) {
+  if (sync.lastResult?.periodResolution)
+    return <PeriodResolutionNotice sync={sync} />
   if (!sync.isAvailable || !sync.ownerId || sync.status === 'idle') return null
 
   const message = getStatusMessage(sync)
@@ -39,6 +42,8 @@ export function SyncStatusView({ sync }: { sync: SyncContextValue }) {
 
 function getStatusMessage(sync: SyncContextValue): string {
   switch (sync.status) {
+    case 'requiresPeriodResolution':
+      return 'Hay un conflicto entre tus periodos.'
     case 'offline':
       return 'Sin conexión. Los cambios se guardan en este dispositivo.'
     case 'pending':

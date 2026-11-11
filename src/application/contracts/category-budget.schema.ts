@@ -6,3 +6,11 @@ export const upsertCategoryBudgetSchema = z.object({
   categoryId: idSchema,
   amount: nonNegativeCentsSchema,
 })
+
+export const persistedCategoryBudgetSchema = upsertCategoryBudgetSchema.extend({
+  id: idSchema,
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
+  deletedAt: z.string().datetime({ offset: true }).nullable(),
+  syncStatus: z.enum(['pending', 'synced', 'error']),
+})

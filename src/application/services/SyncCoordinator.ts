@@ -1,3 +1,11 @@
+import { persistedCategoryBudgetSchema } from '@application/contracts/category-budget.schema'
+import type { CanonicalPeriodMetadata } from './PeriodNavigationCandidate'
+import {
+  PERIOD_RESOLUTION_REQUIRED,
+  type PeriodResolutionPort,
+  type PeriodResolutionPreview,
+  type PeriodResolutionChoice,
+} from './PeriodResolutionPort'
 import type {
   BalanceAnchor,
   Category,
@@ -61,19 +69,22 @@ export type SyncErrorKind =
   | 'unknown'
 
 export class SyncFailure extends Error {
+  readonly constraintName: string | null
   constructor(
     readonly kind: SyncErrorKind,
     message: string,
     readonly code: string | null = null,
     readonly retryable = false,
-    options?: ErrorOptions,
+    options?: ErrorOptions & { constraintName?: string },
   ) {
     super(message, options)
     this.name = 'SyncFailure'
+    this.constraintName = options?.constraintName ?? null
   }
 }
 
 export interface SyncResult {
+  periodResolution?: PeriodResolutionPreview
   uploaded: number
   downloaded: number
   skipped: number
@@ -85,6 +96,10 @@ export interface SyncResult {
 }
 
 export interface RemoteSyncGateway {
+  findEquivalentCategoryBudget?(
+    ownerId: string,
+    candidate: CategoryBudget,
+  ): Promise<CategoryBudget | null>
   verifyAuthenticatedOwner(ownerId: string): Promise<void>
   fetchCanonicalDefaults?(ownerId: string): Promise<RemoteDefaultSnapshot>
   findEquivalentPeriod(
@@ -107,11 +122,16 @@ export interface RemoteApplySummary {
 }
 
 export interface RemoteDefaultSnapshot {
+  periods: CanonicalPeriodMetadata[]
   categories: Category[]
   userSettings: UserSettings | null
 }
 
 export interface LocalSyncStore {
+  reconcileEquivalentCategoryBudget?(
+    operation: SyncOperation,
+    canonical: CategoryBudget,
+  ): Promise<void>
   findUploadable(ownerId: string): Promise<SyncOperation[]>
   markProcessing(operation: SyncOperation): Promise<void>
   markUploadError(operation: SyncOperation, message: string): Promise<void>
@@ -165,6 +185,7 @@ export class SyncCoordinator {
     private readonly local: LocalSyncStore,
     private readonly remote: RemoteSyncGateway,
     private readonly now: () => string = () => new Date().toISOString(),
+    private readonly periodResolution?: PeriodResolutionPort,
   ) {}
 
   sync(ownerId: string): Promise<SyncResult> {
@@ -174,6 +195,7 @@ export class SyncCoordinator {
   async fullSync(ownerId: string): Promise<SyncResult> {
     return this.runExclusive(ownerId, async (result) => {
       await this.remote.verifyAuthenticatedOwner(ownerId)
+      if (await this.restorePeriodResolution(ownerId, result)) return
       await this.reconcileDefaults(ownerId)
       const uploadSucceeded = await this.upload(ownerId, result)
       if (!uploadSucceeded) return
@@ -224,7 +246,10 @@ export class SyncCoordinator {
         } catch (error) {
           let failure: unknown = error
           try {
-            if (await this.recoverEquivalentPeriod(operation, error)) {
+            if (
+              (await this.recoverEquivalentPeriod(operation, error)) ||
+              (await this.recoverEquivalentCategoryBudget(operation, error))
+            ) {
               result.conflicts += 1
               result.skipped += 1
               restartAfterReconciliation = true
@@ -232,6 +257,28 @@ export class SyncCoordinator {
             }
           } catch (recoveryError) {
             failure = recoveryError
+          }
+
+          if (
+            this.periodResolution &&
+            failure === error &&
+            error instanceof SyncFailure &&
+            error.code === '23P01' &&
+            error.constraintName === 'periods_no_overlap_per_user' &&
+            operation.entityType === 'period' &&
+            operation.operationType === 'create'
+          ) {
+            await this.local.markUploadError(
+              operation,
+              PERIOD_RESOLUTION_REQUIRED,
+            )
+            const marked = (await this.local.findUploadable(ownerId)).find(
+              (item) => item.operationId === operation.operationId,
+            )
+            if (marked)
+              result.periodResolution =
+                await this.periodResolution.prepare(marked)
+            return false
           }
 
           const syncError = toSyncError(
@@ -307,6 +354,78 @@ export class SyncCoordinator {
     }
 
     await this.local.reconcileEquivalentPeriod(operation, canonical, this.now())
+    return true
+  }
+
+  private async restorePeriodResolution(
+    ownerId: string,
+    result: SyncResult,
+  ): Promise<boolean> {
+    if (!this.periodResolution) return false
+    const operation = (await this.local.findUploadable(ownerId)).find(
+      (item) => item.errorMessage === PERIOD_RESOLUTION_REQUIRED,
+    )
+    if (!operation) return false
+    result.periodResolution = await this.periodResolution.prepare(operation)
+    return true
+  }
+
+  async resolvePeriodOverlap(
+    ownerId: string,
+    operationId: string,
+    choice: PeriodResolutionChoice,
+  ): Promise<void> {
+    if (!this.periodResolution || SyncCoordinator.activeOwners.has(ownerId))
+      throw new Error(
+        'La sincronización no está disponible para resolver el conflicto.',
+      )
+    SyncCoordinator.activeOwners.add(ownerId)
+    try {
+      await this.remote.verifyAuthenticatedOwner(ownerId)
+      await this.periodResolution.apply(ownerId, operationId, choice)
+    } finally {
+      SyncCoordinator.activeOwners.delete(ownerId)
+    }
+  }
+
+  private async recoverEquivalentCategoryBudget(
+    operation: SyncOperation,
+    error: unknown,
+  ): Promise<boolean> {
+    if (
+      !(error instanceof SyncFailure) ||
+      error.kind !== 'conflict' ||
+      error.code !== '23505' ||
+      error.constraintName !== 'category_budgets_active_unique' ||
+      operation.entityType !== 'categoryBudget' ||
+      !['create', 'update'].includes(operation.operationType) ||
+      !this.remote.findEquivalentCategoryBudget ||
+      !this.local.reconcileEquivalentCategoryBudget
+    )
+      return false
+    const candidate = persistedCategoryBudgetSchema.parse(
+      JSON.parse(operation.payload),
+    )
+    if (
+      candidate.id !== operation.entityId ||
+      candidate.ownerId !== operation.ownerId ||
+      candidate.deletedAt !== null
+    )
+      return false
+    const canonical = await this.remote.findEquivalentCategoryBudget(
+      operation.ownerId,
+      candidate,
+    )
+    if (
+      !canonical ||
+      canonical.id === candidate.id ||
+      canonical.ownerId !== candidate.ownerId ||
+      canonical.periodId !== candidate.periodId ||
+      canonical.categoryId !== candidate.categoryId ||
+      canonical.deletedAt !== null
+    )
+      return false
+    await this.local.reconcileEquivalentCategoryBudget(operation, canonical)
     return true
   }
 

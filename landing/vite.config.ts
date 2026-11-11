@@ -17,6 +17,7 @@ export default defineConfig({
     },
   ],
   build: {
+    sourcemap: false,
     outDir: landingOutput,
     emptyOutDir: true,
     assetsDir: 'assets',

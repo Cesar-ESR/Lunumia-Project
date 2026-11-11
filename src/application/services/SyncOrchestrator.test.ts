@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SyncErrorKind, SyncResult } from './SyncCoordinator'
+import type { PeriodResolutionPreview } from './PeriodResolutionPort'
 import {
   DEFAULT_SYNC_RETRY_CONFIG,
   SyncOrchestrator,
@@ -154,6 +155,162 @@ function setup({
 }
 
 describe('SyncOrchestrator', () => {
+  it.each([false, true])(
+    'resumes the committed resolution and converges, including upload failure=%s',
+    async (failAfterApply) => {
+      const preview: PeriodResolutionPreview = {
+        operationId: 'operation',
+        revision: 'revision',
+        navigationPeriods: [],
+        existingBudgets: [],
+        plan: {
+          classification: 'TRUE_OVERLAP',
+          localPeriod: {
+            id: 'legacy',
+            ownerId: OWNER_A,
+            type: 'monthly',
+            startDate: '2026-07-31',
+            endDate: '2026-08-31',
+            createdAt: new Date(NOW).toISOString(),
+            updatedAt: new Date(NOW).toISOString(),
+            deletedAt: null,
+            syncStatus: 'pending',
+          },
+          remotePeriods: [],
+          dependencies: [],
+        },
+        navigation: {
+          kind: 'REQUIRES_SELECTION',
+          currency: 'MXN',
+          theme: 'system',
+        },
+      }
+      const network = new FakeNetwork(true)
+      const queue = new FakeQueue()
+      const scheduler = new FakeScheduler()
+      const periods = new Set(['legacy', 'august'])
+      const pending = new Map(
+        Array.from({ length: 5 }, (_, index) => [
+          `operation-${index}`,
+          { periodId: 'legacy' },
+        ]),
+      )
+      const confirmed: string[] = []
+      const download = vi.fn(async () => undefined)
+      let shouldFail = failAfterApply
+      const resolvePeriodOverlap = vi.fn(async () => {
+        // Simulate the committed resolution. Real atomicity is covered by Apply tests.
+        for (const operation of pending.values()) operation.periodId = 'august'
+        periods.delete('legacy')
+      })
+      const sync = vi
+        .fn()
+        .mockResolvedValueOnce(success({ periodResolution: preview }))
+        .mockImplementation(async () => {
+          expect(periods.has('legacy')).toBe(false)
+          if (shouldFail) return failure('validation', false)
+          for (const [id, operation] of pending) {
+            expect(operation.periodId).toBe('august')
+            confirmed.push(id)
+            pending.delete(id)
+            queue.emit(OWNER_A, pending.size)
+          }
+          await download()
+          return success({ uploaded: confirmed.length, downloaded: 1 })
+        })
+      queue.emit(OWNER_A, pending.size)
+      const orchestrator = new SyncOrchestrator(
+        { sync, resolvePeriodOverlap },
+        queue,
+        network,
+        scheduler,
+      )
+      orchestrator.start(OWNER_A)
+      await settle()
+      expect(orchestrator.getState().status).toBe('requiresPeriodResolution')
+      scheduler.advance(60_000)
+      queue.emit(OWNER_A, 5)
+      await settle()
+      expect(sync).toHaveBeenCalledTimes(1)
+      const choice = {
+        revision: 'revision',
+        destinations: {},
+        selectedPeriodId: 'august',
+      }
+      await orchestrator.resolvePeriodOverlap('operation', choice)
+      expect(resolvePeriodOverlap).toHaveBeenCalledExactlyOnceWith(
+        OWNER_A,
+        'operation',
+        choice,
+      )
+      expect(sync).toHaveBeenCalledTimes(2)
+      expect(periods.has('legacy')).toBe(false)
+      if (failAfterApply) {
+        expect(orchestrator.getState()).toMatchObject({
+          status: 'error',
+          canRetryManually: true,
+          pendingCount: 5,
+        })
+        expect(
+          orchestrator.getState().lastResult?.periodResolution,
+        ).toBeUndefined()
+        expect(download).not.toHaveBeenCalled()
+        expect(await queue.count(OWNER_A)).toBe(5)
+        shouldFail = false
+        await orchestrator.syncNow()
+        expect(resolvePeriodOverlap).toHaveBeenCalledTimes(1)
+      }
+      expect(confirmed).toHaveLength(5)
+      expect(new Set(confirmed).size).toBe(5)
+      expect(pending.size).toBe(0)
+      expect(await queue.count(OWNER_A)).toBe(0)
+      expect(download).toHaveBeenCalledTimes(1)
+      expect(orchestrator.getState().status).toBe('up_to_date')
+      scheduler.advance(60_000)
+      await settle()
+      expect(sync).toHaveBeenCalledTimes(failAfterApply ? 3 : 2)
+      orchestrator.stop()
+    },
+  )
+  it('reruns once when initial queue discovery changes the count, then settles with pending work', async () => {
+    const first = deferred<SyncResult>()
+    const second = deferred<SyncResult>()
+    const execute = vi
+      .fn<(ownerId: string) => Promise<SyncResult>>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockResolvedValue(success())
+    const { orchestrator, queue, scheduler } = setup({ execute })
+    queue.emit(OWNER_A, 5)
+    orchestrator.start(OWNER_A)
+    expect(execute).toHaveBeenCalledTimes(1)
+    await settle()
+    expect(orchestrator.getState()).toMatchObject({
+      isSyncing: true,
+      pendingCount: 5,
+    })
+    first.resolve(success())
+    await settle()
+    expect(execute).toHaveBeenCalledTimes(2)
+    // The rerun sees the same count, not a fresh increase.
+    queue.emit(OWNER_A, 5)
+    second.resolve(success())
+    await settle()
+    await settle()
+    expect(await queue.count(OWNER_A)).toBe(5)
+    expect(orchestrator.getState()).toMatchObject({
+      status: 'pending',
+      pendingCount: 5,
+    })
+    const stableCallCount = execute.mock.calls.length
+    expect(stableCallCount).toBe(2)
+    scheduler.advance(60_000)
+    await settle()
+    await settle()
+    expect(execute).toHaveBeenCalledTimes(stableCallCount)
+    expect(scheduler.tasks.size).toBe(0)
+    orchestrator.stop()
+  })
   it('ignora propietarios invitados y no llama al motor remoto', async () => {
     const { orchestrator, execute, network } = setup()
     orchestrator.start('guest:local')
@@ -164,12 +321,20 @@ describe('SyncOrchestrator', () => {
   })
 
   it('sincroniza una vez al restaurar una sesión autenticada', async () => {
-    const { orchestrator, execute } = setup()
+    const { orchestrator, execute, queue, scheduler } = setup()
     orchestrator.start(OWNER_A)
     await settle()
     expect(execute).toHaveBeenCalledTimes(1)
     expect(execute).toHaveBeenCalledWith(OWNER_A)
     expect(orchestrator.getState().status).toBe('up_to_date')
+    expect(await queue.count(OWNER_A)).toBe(0)
+    queue.emit(OWNER_A, 0)
+    scheduler.advance(60_000)
+    await settle()
+    await settle()
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(scheduler.tasks.size).toBe(0)
+    orchestrator.stop()
   })
 
   it('pausa nuevas peticiones hasta que Auth complete la revalidación', async () => {

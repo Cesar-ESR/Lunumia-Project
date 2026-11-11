@@ -9,6 +9,7 @@ import {
   Settings,
   UserCircle,
   WalletCards,
+  Tags,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -70,6 +71,12 @@ const tools: NavigationItem[] = [
     label: 'Simulador',
     icon: Calculator,
     activePrefixes: ['/simulador', '/simulator'],
+  },
+  {
+    to: '/categories',
+    label: 'Categorías',
+    icon: Tags,
+    activePrefixes: ['/categories', '/organizacion/categorias'],
   },
 ]
 

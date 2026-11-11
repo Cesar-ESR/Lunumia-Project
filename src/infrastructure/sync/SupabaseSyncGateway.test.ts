@@ -62,6 +62,34 @@ function clientFor(response: {
 }
 
 describe('SupabaseSyncGateway.findEquivalentPeriod', () => {
+  it('fetches only canonical period metadata and rejects failed or incomplete snapshots', async () => {
+    const periodsResponse = { data: [remoteRow()], error: null as null | { code: string; message: string }, status: 200, count: 1 }
+    const chainFor = (response: unknown) => {
+      const chain = {
+        select: vi.fn(), eq: vi.fn(), is: vi.fn(),
+        maybeSingle: vi.fn().mockResolvedValue(response),
+        then: (resolve: (value: unknown) => unknown) => Promise.resolve(response).then(resolve),
+      }
+      chain.select.mockReturnValue(chain)
+      chain.eq.mockReturnValue(chain)
+      chain.is.mockReturnValue(chain)
+      return chain
+    }
+    const periods = chainFor(periodsResponse)
+    const from = vi.fn((table: string) => table === 'periods' ? periods : chainFor({ data: table === 'user_settings' ? null : [], error: null, status: 200 }))
+    const client = { from } as unknown as SupabaseClient<Database>
+    const gateway = new SupabaseSyncGateway(client)
+    const snapshot = await gateway.fetchCanonicalDefaults(ownerId)
+    expect(snapshot.periods).toEqual([{ id: canonicalId, ownerId, type: 'monthly', startDate: '2026-08-01', endDate: '2026-08-31', deletedAt: null }])
+    expect(periods.select).toHaveBeenCalledWith('id,user_id,type,start_date,end_date,deleted_at', { count: 'exact' })
+    expect(periods.eq).toHaveBeenCalledWith('user_id', ownerId)
+    expect(periods.is).toHaveBeenCalledWith('deleted_at', null)
+    periodsResponse.count = 2
+    await expect(gateway.fetchCanonicalDefaults(ownerId)).rejects.toMatchObject({ code: 'incomplete_period_snapshot' })
+    periodsResponse.error = { code: '503', message: 'unavailable' }
+    periodsResponse.status = 503
+    await expect(gateway.fetchCanonicalDefaults(ownerId)).rejects.toThrow()
+  })
   it('consulta por propietario y equivalencia exacta bajo la sesión autenticada', async () => {
     const { client, chain } = clientFor({
       data: remoteRow(),

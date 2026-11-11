@@ -21,6 +21,9 @@ import type {
   UserSettings,
 } from '@domain/entities'
 import { resolveLastWriteWins } from '@domain/rules'
+import { classifyPeriodNavigationCandidate, type CanonicalPeriodMetadata } from '@application/services/PeriodNavigationCandidate'
+import { assertUniqueActiveCategoryBudgets } from '@domain/rules/category-budget-uniqueness'
+import { persistedCategoryBudgetSchema } from '@application/contracts/category-budget.schema'
 import { GastoClaroDB } from '@infrastructure/local/database'
 import {
   createSyncOperation,
@@ -241,6 +244,7 @@ export class DexieSyncStore implements LocalSyncStore {
           ownerId,
           snapshot.userSettings,
           reconciledAt,
+          snapshot.periods,
         )
       }
 
@@ -422,6 +426,128 @@ export class DexieSyncStore implements LocalSyncStore {
     })
   }
 
+  async reconcileEquivalentCategoryBudget(
+    operation: SyncOperation,
+    canonical: CategoryBudget,
+  ): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      this.db.categoryBudgets,
+      this.db.syncOperations,
+      async () => {
+        const current = await this.ownedOperation(operation)
+        const candidate = persistedCategoryBudgetSchema.parse(
+          JSON.parse(current.payload),
+        )
+        const remote = persistedCategoryBudgetSchema.parse(canonical)
+        const alias = await this.db.categoryBudgets.get(current.entityId)
+        if (
+          current.entityType !== 'categoryBudget' ||
+          !['create', 'update'].includes(current.operationType) ||
+          candidate.id !== current.entityId ||
+          candidate.ownerId !== current.ownerId ||
+          candidate.deletedAt !== null ||
+          !alias ||
+          alias.ownerId !== current.ownerId ||
+          alias.periodId !== candidate.periodId ||
+          alias.categoryId !== candidate.categoryId ||
+          remote.id === alias.id ||
+          remote.ownerId !== alias.ownerId ||
+          remote.deletedAt !== null ||
+          remote.periodId !== alias.periodId ||
+          remote.categoryId !== alias.categoryId
+        )
+          throw new Error(
+            'El presupuesto remoto no es equivalente a la creación local.',
+          )
+
+        const sameKey = await this.db.categoryBudgets
+          .where('[ownerId+periodId+categoryId]')
+          .equals([alias.ownerId, alias.periodId, alias.categoryId])
+          .toArray()
+        assertUniqueActiveCategoryBudgets(sameKey)
+        // Never merge another local intent or rewrite a historical tombstone.
+        if (
+          (alias.deletedAt === null &&
+            sameKey.some(
+              (budget) => budget.deletedAt === null && budget.id !== alias.id,
+            )) ||
+          (await this.db.categoryBudgets.get(remote.id))
+        )
+          throw new Error(
+            'La canonicalización requiere revisar presupuestos locales existentes.',
+          )
+
+        const queued = (await this.findUploadable(current.ownerId)).filter(
+          (item) =>
+            item.entityType === 'categoryBudget' && item.entityId === alias.id,
+        )
+        for (const item of queued) {
+          const payload = persistedCategoryBudgetSchema.parse(
+            JSON.parse(item.payload),
+          )
+          if (
+            payload.id !== alias.id ||
+            payload.ownerId !== alias.ownerId ||
+            payload.periodId !== alias.periodId ||
+            payload.categoryId !== alias.categoryId ||
+            !['create', 'update', 'delete'].includes(item.operationType)
+          )
+            throw new Error(
+              'La cola contiene una intención de presupuesto incompatible.',
+            )
+          // The current local tombstone is the final intent, even when its delete
+          // was already uploaded under the alias ID before this failed create.
+          if (alias.deletedAt !== null) continue
+          // The failed RPC rolled back processed_operations. Keep queue identity/order
+          // and original versions; no successful operation is replayed or re-versioned.
+          await this.db.syncOperations.put({
+            ...item,
+            entityId: remote.id,
+            operationType:
+              item.operationType === 'delete' ? 'delete' : 'update',
+            payload: JSON.stringify({
+              ...payload,
+              id: remote.id,
+              createdAt: remote.createdAt,
+            }),
+            status: 'pending',
+            errorMessage: null,
+          })
+        }
+        if (alias.deletedAt !== null) {
+          const tombstone = persistedCategoryBudgetSchema.parse(alias)
+          // Coalesce only this alias. A legitimate recreation has a different ID.
+          // Reuse the known rolled-back 23505 operation, not a possibly committed
+          // delete ID. Preserve the deletion version for normal remote LWW/retry.
+          await this.db.syncOperations.bulkDelete(
+            queued.map((item) => item.operationId),
+          )
+          await this.db.syncOperations.put({
+            ...current,
+            entityId: remote.id,
+            operationType: 'delete',
+            payload: JSON.stringify({
+              ...tombstone,
+              id: remote.id,
+              createdAt: remote.createdAt,
+            }),
+            status: 'pending',
+            errorMessage: null,
+          })
+        }
+        this.onReconciliationStep(`budget:${alias.id}:queue-rewritten`)
+        await this.db.categoryBudgets.delete(alias.id)
+        await this.db.categoryBudgets.put({
+          ...alias,
+          id: remote.id,
+          createdAt: remote.createdAt,
+          syncStatus: 'pending',
+        })
+      },
+    )
+  }
+
   async getCursor(
     ownerId: string,
     entityType: SyncEntityType,
@@ -585,26 +711,44 @@ export class DexieSyncStore implements LocalSyncStore {
     ownerId: string,
     remote: UserSettings,
     reconciledAt: string,
+    remotePeriods: readonly CanonicalPeriodMetadata[],
   ): Promise<void> {
+    if (!Array.isArray(remotePeriods) || remotePeriods.some((period) => period.ownerId !== ownerId || period.deletedAt !== null))
+      throw new Error('El snapshot canónico de periodos no es válido.')
     const localSettings = (
       await this.db.userSettings.where('ownerId').equals(ownerId).toArray()
     ).sort(compareSettingsCandidates)
     if (localSettings.length === 0) return
 
     const candidatesWithValidPeriod: UserSettings[] = []
+    const candidatesWithCompatiblePeriod: UserSettings[] = []
     for (const settings of localSettings) {
       if (!settings.activePeriodId) continue
       const period = await this.db.periods.get(settings.activePeriodId)
-      if (period?.ownerId === ownerId && period.deletedAt === null)
+      if (period?.ownerId === ownerId && period.deletedAt === null) {
         candidatesWithValidPeriod.push(settings)
+        const classification = classifyPeriodNavigationCandidate(ownerId, period, remotePeriods)
+        if (classification !== 'TRUE_OVERLAP' && classification !== 'INVALID_LOCAL_REFERENCE')
+          candidatesWithCompatiblePeriod.push(settings)
+      }
     }
     const source =
       candidatesWithValidPeriod.sort(compareSettingsCandidates)[0] ??
       localSettings[0]
     if (!source) return
 
+    // Resolve navigation authority before synthesizing a merged-document timestamp.
+    // Match the RPC's strict LWW comparison: remote wins ties. A remote period
+    // need not have been downloaded into Dexie yet.
+    const localNavigation = candidatesWithCompatiblePeriod[0]
+    const remoteActivePeriodId = remotePeriods.some((period) => period.id === remote.activePeriodId)
+      ? remote.activePeriodId
+      : null
     const activePeriodId =
-      candidatesWithValidPeriod[0]?.activePeriodId ?? remote.activePeriodId
+      localNavigation &&
+      (remoteActivePeriodId === null || Date.parse(localNavigation.updatedAt) > Date.parse(remote.updatedAt))
+        ? localNavigation.activePeriodId
+        : remoteActivePeriodId
     const differsRemotely =
       activePeriodId !== remote.activePeriodId ||
       source.currency !== remote.currency ||

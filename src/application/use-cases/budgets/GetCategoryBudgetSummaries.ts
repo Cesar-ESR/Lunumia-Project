@@ -1,4 +1,5 @@
 import { computeBudgetRemaining } from '@domain/calculations'
+import { assertUniqueActiveCategoryBudgets } from '@domain/rules/category-budget-uniqueness'
 import type { Category, CategoryBudget, Expense } from '@domain/entities'
 import type {
   ICategoryBudgetRepository,
@@ -55,6 +56,7 @@ export class GetCategoryBudgetSummaries {
     const scopedBudgets = budgets.filter((budget) =>
       belongsToScope(budget, input),
     )
+    assertUniqueActiveCategoryBudgets(scopedBudgets)
 
     return categories
       .filter((category) => belongsToOwner(category, input.ownerId))

@@ -18,6 +18,15 @@ function createSource(data = createBackupData()): BackupDataSource {
 }
 
 describe('BackupService', () => {
+  it('rejects active budgets with different IDs but the same period/category', () => {
+    const file = createBackupFile()
+    file.data.categoryBudgets.push({
+      ...file.data.categoryBudgets[0]!,
+      id: '99999999-0000-4000-8000-000000000099',
+    })
+    const service = new BackupService(createSource(), () => BACKUP_NOW)
+    expect(() => service.prepareImport(JSON.stringify(file))).toThrow()
+  })
   it.each(['receipt', 'manual', null, undefined] as const)(
     'preserva source %s en exportación serializada e importación',
     async (source) => {

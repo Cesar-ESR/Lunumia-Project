@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   remoteMutationResultSchema,
   remotePageSchema,
+  remoteRowSchemas,
 } from '@application/contracts/sync.schema'
 import {
   SyncFailure,
@@ -11,12 +12,14 @@ import {
   type RemoteSyncGateway,
 } from '@application/services/SyncCoordinator'
 import type {
+  CategoryBudget,
   Period,
   SyncCursor,
   SyncEntityType,
   SyncOperation,
 } from '@domain/entities'
 import type { Database } from '@infrastructure/remote/database.types'
+import type { PeriodResolutionRemoteSnapshot } from '@application/services/PeriodResolutionPort'
 import {
   deserializeRemoteChange,
   serializeOperationPayload,
@@ -24,6 +27,67 @@ import {
 
 export class SupabaseSyncGateway implements RemoteSyncGateway {
   constructor(private readonly client: SupabaseClient<Database>) {}
+
+  async readPeriodResolutionContext(
+    operation: SyncOperation,
+  ): Promise<PeriodResolutionRemoteSnapshot> {
+    await this.verifyAuthenticatedOwner(operation.ownerId)
+    const [periods, processed, settings, budgets] = await Promise.all([
+      this.client.from('periods').select('*').eq('user_id', operation.ownerId),
+      this.client
+        .from('processed_operations')
+        .select('operation_id')
+        .eq('user_id', operation.ownerId)
+        .eq('operation_id', operation.operationId),
+      this.client
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', operation.ownerId)
+        .maybeSingle(),
+      this.client
+        .from('category_budgets')
+        .select('id,user_id,period_id,category_id,deleted_at')
+        .eq('user_id', operation.ownerId)
+        .is('deleted_at', null),
+    ])
+    for (const response of [periods, processed, settings, budgets]) {
+      if (response.error)
+        throw classifyRemoteFailure(
+          { ...response.error, status: response.status },
+          'No se pudo verificar el conflicto de periodos.',
+        )
+    }
+    if (
+      processed.data?.length ||
+      periods.data?.some((row) => row.id === operation.entityId)
+    )
+      throw new Error(
+        'El periodo u operación existe remotamente. Requiere una nueva revisión.',
+      )
+    const settingsChange = settings.data
+      ? deserializeRemoteChange('userSettings', settings.data)
+      : null
+    if (settingsChange && settingsChange.entityType !== 'userSettings')
+      throw new Error('Configuración remota inválida.')
+    return {
+      periods: (periods.data ?? [])
+        .filter((row) => row.deleted_at === null)
+        .map((row) => {
+          const change = deserializeRemoteChange('period', row)
+          if (change.entityType !== 'period')
+            throw new Error('Periodo remoto inválido.')
+          return change.record
+        }),
+      settings: settingsChange?.record ?? null,
+      budgets: (budgets.data ?? []).map((row) => ({
+        id: row.id,
+        ownerId: row.user_id,
+        periodId: row.period_id,
+        categoryId: row.category_id,
+        deletedAt: row.deleted_at,
+      })),
+    }
+  }
 
   async verifyAuthenticatedOwner(ownerId: string): Promise<void> {
     let response: Awaited<ReturnType<typeof this.client.auth.getUser>>
@@ -54,8 +118,9 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
   ): Promise<RemoteDefaultSnapshot> {
     let categoriesResponse
     let settingsResponse
+    let periodsResponse
     try {
-      ;[categoriesResponse, settingsResponse] = await Promise.all([
+      ;[categoriesResponse, settingsResponse, periodsResponse] = await Promise.all([
         this.client
           .from('categories')
           .select('*')
@@ -66,6 +131,11 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
           .select('*')
           .eq('user_id', ownerId)
           .maybeSingle(),
+        this.client
+          .from('periods')
+          .select('id,user_id,type,start_date,end_date,deleted_at', { count: 'exact' })
+          .eq('user_id', ownerId)
+          .is('deleted_at', null),
       ])
     } catch (error) {
       throw classifyRemoteFailure(
@@ -85,6 +155,24 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
         'No se pudo consultar la configuraciÃ³n remota.',
       )
 
+    if (periodsResponse.error)
+      throw classifyRemoteFailure(
+        { ...periodsResponse.error, status: periodsResponse.status },
+        'No se pudieron consultar los periodos canónicos.',
+      )
+    // Never infer absence of overlap from a truncated or missing snapshot.
+    if (!periodsResponse.data || periodsResponse.count !== periodsResponse.data.length)
+      throw new SyncFailure('validation', 'El snapshot de periodos canónicos está incompleto.', 'incomplete_period_snapshot')
+    const periodMetadataSchema = remoteRowSchemas.period.pick({
+      id: true, user_id: true, type: true, start_date: true, end_date: true, deleted_at: true,
+    })
+    const periods = periodsResponse.data.map((input) => {
+      const row = periodMetadataSchema.parse(input)
+      if (row.user_id !== ownerId || row.deleted_at !== null)
+        throw new SyncFailure('validation', 'Periodo canónico inválido.', 'invalid_period_snapshot')
+      return { id: row.id, ownerId: row.user_id, type: row.type, startDate: row.start_date, endDate: row.end_date, deletedAt: row.deleted_at }
+    })
+
     const categories = (categoriesResponse.data ?? []).map((row) => {
       const change = deserializeRemoteChange('category', row)
       if (change.entityType !== 'category')
@@ -99,6 +187,7 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
 
     return {
       categories,
+      periods,
       userSettings: settingsChange?.record ?? null,
     }
   }
@@ -202,6 +291,56 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
     }
   }
 
+  async findEquivalentCategoryBudget(
+    ownerId: string,
+    candidate: CategoryBudget,
+  ): Promise<CategoryBudget | null> {
+    await this.verifyAuthenticatedOwner(ownerId)
+    if (candidate.ownerId !== ownerId || candidate.deletedAt !== null)
+      throw new SyncFailure(
+        'permission_denied',
+        'El presupuesto no pertenece al usuario autenticado.',
+        'cross_owner_record',
+      )
+    let response
+    try {
+      response = await this.client
+        .from('category_budgets')
+        .select('*')
+        .eq('user_id', ownerId)
+        .eq('period_id', candidate.periodId)
+        .eq('category_id', candidate.categoryId)
+        .is('deleted_at', null)
+        .maybeSingle()
+    } catch (error) {
+      throw classifyRemoteFailure(
+        error,
+        'No se pudo buscar el presupuesto remoto equivalente.',
+      )
+    }
+    if (response.error)
+      throw classifyRemoteFailure(
+        { ...response.error, status: response.status },
+        'No se pudo buscar el presupuesto remoto equivalente.',
+      )
+    if (!response.data) return null
+    const change = deserializeRemoteChange('categoryBudget', response.data)
+    if (change.entityType !== 'categoryBudget')
+      throw new Error('Presupuesto remoto inválido.')
+    const budget = change.record
+    if (budget.ownerId !== ownerId)
+      throw new SyncFailure(
+        'permission_denied',
+        'El presupuesto remoto pertenece a otro usuario.',
+        'cross_owner_record',
+      )
+    return budget.deletedAt === null &&
+      budget.periodId === candidate.periodId &&
+      budget.categoryId === candidate.categoryId
+      ? budget
+      : null
+  }
+
   async downloadPage(
     ownerId: string,
     entityType: SyncEntityType,
@@ -274,7 +413,19 @@ export function classifyRemoteFailure(
       cause: error,
     })
   if (status === 409 || code === '23505' || code === '23P01')
-    return new SyncFailure('conflict', fallback, code, false, { cause: error })
+    return new SyncFailure('conflict', fallback, code, false, {
+      cause: error,
+      ...(code === '23P01' &&
+      message ===
+        'conflicting key value violates exclusion constraint "periods_no_overlap_per_user"'
+        ? { constraintName: 'periods_no_overlap_per_user' }
+        : {}),
+      ...(code === '23505' &&
+      message ===
+        'duplicate key value violates unique constraint "category_budgets_active_unique"'
+        ? { constraintName: 'category_budgets_active_unique' }
+        : {}),
+    })
   if (status === 400)
     return new SyncFailure('validation', fallback, code, false, {
       cause: error,

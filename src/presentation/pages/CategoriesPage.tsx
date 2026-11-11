@@ -122,6 +122,8 @@ export function CategoriesPage() {
             <FormField id="category-name" label="Nombre" error={errors.name}>
               <input
                 id="category-name"
+                name="name"
+                placeholder="Ej. Alimentación, Transporte, etc."
                 value={form.name}
                 maxLength={80}
                 aria-describedby={

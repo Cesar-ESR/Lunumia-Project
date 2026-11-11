@@ -8,6 +8,7 @@ export function ConfirmDialog({
   description,
   confirmLabel = 'Confirmar',
   isPending = false,
+  confirmDisabled = false,
   destructive = true,
   children,
   onConfirm,
@@ -19,6 +20,7 @@ export function ConfirmDialog({
   description: string
   confirmLabel?: string
   isPending?: boolean
+  confirmDisabled?: boolean
   destructive?: boolean
   children?: ReactNode
   onConfirm(): void
@@ -48,6 +50,7 @@ export function ConfirmDialog({
           <Button
             variant={destructive ? 'danger' : 'primary'}
             loading={isPending}
+            disabled={confirmDisabled}
             loadingLabel="Procesando…"
             onClick={onConfirm}
           >

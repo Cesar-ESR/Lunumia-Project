@@ -77,6 +77,7 @@ import { SessionManager } from '@infrastructure/auth/SessionManager'
 import { getSupabaseClient } from '@infrastructure/remote/SupabaseClient'
 import { DexieSyncStore } from '@infrastructure/sync/DexieSyncStore'
 import { SupabaseSyncGateway } from '@infrastructure/sync/SupabaseSyncGateway'
+import { ApplyPeriodOverlapResolution } from '@infrastructure/sync/ApplyPeriodOverlapResolution'
 import { BrowserSyncScheduler } from '@infrastructure/sync/BrowserSyncScheduler'
 import { DexieSyncQueueObserver } from '@infrastructure/sync/DexieSyncQueueObserver'
 import { WebNetworkStatusProvider } from '@infrastructure/sync/WebNetworkStatusProvider'
@@ -354,12 +355,16 @@ export function createApplicationServices(
         explainPlanning: new ExplainPlanning(aiProvider),
       }
     : null
-  const sync = supabase
-    ? new SyncCoordinator(
-        new DexieSyncStore(database),
-        new SupabaseSyncGateway(supabase),
-      )
-    : null
+  const resolutionGateway = supabase ? new SupabaseSyncGateway(supabase) : null
+  const sync =
+    supabase && resolutionGateway
+      ? new SyncCoordinator(
+          new DexieSyncStore(database),
+          resolutionGateway,
+          undefined,
+          new ApplyPeriodOverlapResolution(database, resolutionGateway),
+        )
+      : null
   const syncOrchestrator = sync
     ? new SyncOrchestrator(
         sync,

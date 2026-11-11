@@ -1,5 +1,6 @@
 import type { ICategoryBudgetRepository } from '@domain/repositories'
 import type { CategoryBudget } from '@domain/entities'
+import { assertUniqueActiveCategoryBudgets } from '@domain/rules/category-budget-uniqueness'
 import { GastoClaroDB } from '../database'
 import {
   persistLocalMutation,
@@ -27,10 +28,13 @@ export class DexieCategoryBudgetRepository implements ICategoryBudgetRepository 
       () => operationType,
       this.sync,
       async () => {
-        const existing = await this.db.categoryBudgets
+        const active = await this.db.categoryBudgets
           .where('[ownerId+periodId+categoryId]')
           .equals([this.ownerId, value.periodId, value.categoryId])
-          .first()
+          .and((budget) => budget.deletedAt === null)
+          .toArray()
+        assertUniqueActiveCategoryBudgets(active)
+        const existing = active[0]
         operationType =
           existing && existing.deletedAt === null ? 'update' : 'create'
         const result =
@@ -82,7 +86,7 @@ export class DexieCategoryBudgetRepository implements ICategoryBudgetRepository 
       : null
   }
   async findByPeriod(periodId: string): Promise<CategoryBudget[]> {
-    return (
+    const active = (
       await this.db.categoryBudgets
         .where('[ownerId+periodId]')
         .equals([this.ownerId, periodId])
@@ -93,6 +97,8 @@ export class DexieCategoryBudgetRepository implements ICategoryBudgetRepository 
         (a, b) =>
           a.categoryId.localeCompare(b.categoryId) || a.id.localeCompare(b.id),
       )
+    assertUniqueActiveCategoryBudgets(active)
+    return active
   }
   async findByPeriodAndCategory(
     periodId: string,
