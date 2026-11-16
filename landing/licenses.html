@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1267d6" />
+    <script data-theme-bootstrap>
+      ;(function () {
+        var preference = 'system'
+        try {
+          var stored = localStorage.getItem('lunumia.landing.theme')
+          if (stored === 'light' || stored === 'dark' || stored === 'system')
+            preference = stored
+        } catch {}
+        var dark =
+          typeof matchMedia === 'function' &&
+          matchMedia('(prefers-color-scheme: dark)').matches
+        var effective =
+          preference === 'system' ? (dark ? 'dark' : 'light') : preference
+        var root = document.documentElement
+        root.dataset.themePreference = preference
+        root.dataset.theme = effective
+        root.style.colorScheme = effective
+        root.style.backgroundColor =
+          effective === 'dark' ? '#0c111b' : '#f6f8fc'
+        document.querySelector('meta[name="theme-color"]').content =
+          effective === 'dark' ? '#111c2b' : '#1267d6'
+      })()
+    </script>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <title>Licencias de Código Abierto — Lunumia</title>
+    <meta
+      name="description"
+      content="Avisos y licencias de las bibliotecas de código abierto utilizadas en producción por Lunumia."
+    />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="Lunumia" />
+    <meta
+      property="og:title"
+      content="Licencias de Código Abierto — Lunumia"
+    />
+    <meta
+      property="og:description"
+      content="Avisos legales y reconocimiento a las dependencias de código abierto de terceros utilizadas en Lunumia."
+    />
+    <meta property="og:url" content="{{LANDING_ORIGIN}}licenses" />
+    <link rel="canonical" href="{{LANDING_ORIGIN}}licenses" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Ir al contenido principal</a>
+
+    <header class="site-header">
+      <div class="shell header-bar">
+        <a class="brand" href="/" aria-label="Lunumia — Volver al inicio">
+          <img
+            class="brand-logo"
+            src="/lunumia-logo-horizontal.png"
+            alt="Lunumia"
+          />
+        </a>
+
+        <div class="header-actions">
+          <details class="appearance-menu">
+            <summary aria-label="Apariencia: Sistema">
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <g data-preference-icon="system">
+                  <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                </g>
+                <g data-preference-icon="light">
+                  <circle cx="12" cy="12" r="4"></circle>
+                  <path d="M12 2v2"></path>
+                  <path d="M12 20v2"></path>
+                  <path d="m4.93 4.93 1.41 1.41"></path>
+                  <path d="m17.66 17.66 1.41 1.41"></path>
+                  <path d="M2 12h2"></path>
+                  <path d="M20 12h2"></path>
+                  <path d="m6.34 17.66-1.41 1.41"></path>
+                  <path d="m19.07 4.93-1.41 1.41"></path>
+                </g>
+                <g data-preference-icon="dark">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+                </g>
+              </svg>
+              <span>Tema</span>
+            </summary>
+            <fieldset class="appearance-options">
+              <legend>Apariencia</legend>
+              <label>
+                <input type="radio" name="landing-theme" value="system" />
+                <span>Sistema</span>
+              </label>
+              <label>
+                <input type="radio" name="landing-theme" value="light" />
+                <span>Claro</span>
+              </label>
+              <label>
+                <input type="radio" name="landing-theme" value="dark" />
+                <span>Oscuro</span>
+              </label>
+            </fieldset>
+          </details>
+
+          <a class="button button-secondary" href="{{APP_LOGIN_URL}}">
+            Iniciar sesión
+          </a>
+          <a class="button button-primary" href="{{APP_OPEN_URL}}">
+            Abrir app
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="section licenses-page-section" aria-labelledby="licenses-title">
+        <div class="shell">
+          <div class="section-heading">
+            <p class="eyebrow">Avisos legales</p>
+            <h1 id="licenses-title">Licencias de Código Abierto</h1>
+            <p>
+              Lunumia se construye sobre los hombros de una vibrante comunidad de código abierto.
+              Agradecemos a todos los autores y mantenedores de las bibliotecas de terceros que
+              hacen posible esta plataforma.
+            </p>
+          </div>
+
+          <div class="landing-licenses-container">
+            <div class="landing-licenses-filter">
+              <input
+                type="search"
+                id="licenses-search"
+                class="landing-licenses-search"
+                placeholder="Buscar por paquete, licencia o autor..."
+                aria-label="Buscar paquete o licencia"
+              />
+              <span id="licenses-count" class="landing-licenses-count" aria-live="polite">Cargando paquetes...</span>
+            </div>
+
+            <div id="licenses-list" class="landing-licenses-list" role="feed" aria-label="Lista de licencias de terceros">
+              <div class="landing-licenses-loading" role="status">
+                <p>Cargando información de licencias...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-grid">
+        <div>
+          <a class="brand footer-brand" href="/">
+            <img
+              class="brand-logo"
+              src="/lunumia-logo-horizontal.png"
+              alt="Lunumia"
+            />
+          </a>
+          <p>Claridad para entender tu dinero y planear lo que sigue.</p>
+        </div>
+        <nav aria-label="Navegación del pie">
+          <a href="/#privacidad">Privacidad</a>
+          <a href="/licenses" aria-current="page">Licencias de terceros</a>
+          <a href="{{APP_LOGIN_URL}}">Iniciar sesión</a>
+          <a href="{{APP_OPEN_URL}}">Abrir Lunumia</a>
+          <a href="https://organizame.lunumia.com/" target="_blank" rel="noopener noreferrer">Otros productos de la marca: OrganizaMe</a>
+        </nav>
+        <p class="copyright">© <span data-current-year>2026</span> Lunumia</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/licenses.ts"></script>
+  </body>
+</html>

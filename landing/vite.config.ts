@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import { renderLandingHtml } from './site-contract'
@@ -21,5 +22,11 @@ export default defineConfig({
     outDir: landingOutput,
     emptyOutDir: true,
     assetsDir: 'assets',
+    rollupOptions: {
+      input: {
+        main: resolve(landingRoot, 'index.html'),
+        licenses: resolve(landingRoot, 'licenses.html'),
+      },
+    },
   },
 })

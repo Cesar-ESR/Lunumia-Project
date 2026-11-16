@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import {
   Database,
   Download,
+  FileCode2,
   LockKeyhole,
   MonitorSmartphone,
   SlidersHorizontal,
@@ -16,6 +17,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DeleteAccountSection } from '../components/DeleteAccountSection'
 import { InstallAppButton } from '../components/InstallAppButton'
 import { Notice } from '../components/Notice'
+import { OpenSourceNoticesDialog } from '../components/OpenSourceNoticesDialog'
 import { PageHeader } from '../components/PageHeader'
 import { Surface } from '../components/Surface'
 import { SyncStatusView } from '../components/SyncStatusIndicator'
@@ -85,6 +87,7 @@ export function SettingsPage() {
   const [prepared, setPrepared] = useState<PreparedBackup | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [showLicenses, setShowLicenses] = useState(false)
   const [isSavingTheme, setIsSavingTheme] = useState(false)
   const [notice, setNotice] = useState<{
     tone: 'success' | 'error'
@@ -363,6 +366,30 @@ export function SettingsPage() {
           </Surface>
         </section>
 
+        <section aria-labelledby="settings-about-title">
+          <SettingsHeading
+            icon={FileCode2}
+            eyebrow="Acerca de"
+            id="settings-about-title"
+            title="Software y licencias"
+            description="Transparencia y reconocimiento a los componentes de código abierto que hacen posible Lunumia."
+          />
+          <Surface className="ln-settings-application">
+            <div>
+              <h3>Licencias de código abierto</h3>
+              <p>
+                Consulta el listado completo de bibliotecas de terceros
+                utilizadas en producción y sus términos legales.
+              </p>
+            </div>
+            <div>
+              <Button variant="secondary" onClick={() => setShowLicenses(true)}>
+                Ver licencias de terceros
+              </Button>
+            </div>
+          </Surface>
+        </section>
+
         <section aria-labelledby="settings-privacy-title">
           <SettingsHeading
             icon={LockKeyhole}
@@ -420,6 +447,11 @@ export function SettingsPage() {
           </div>
         ) : null}
       </ConfirmDialog>
+
+      <OpenSourceNoticesDialog
+        open={showLicenses}
+        onClose={() => setShowLicenses(false)}
+      />
     </>
   )
 }
