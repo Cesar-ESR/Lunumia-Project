@@ -25,7 +25,11 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(landingRoot, 'index.html'),
-        'third-party-licenses': resolve(landingRoot, 'third-party-licenses.html'),
+        terms: resolve(landingRoot, 'terms.html'),
+        'third-party-licenses': resolve(
+          landingRoot,
+          'third-party-licenses.html',
+        ),
       },
     },
   },

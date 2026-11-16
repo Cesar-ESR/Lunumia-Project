@@ -2903,6 +2903,53 @@
   }
 }
 
+/* Legal Dialog Styles (Terms & Privacy) */
+.ln-legal-dialog {
+  max-width: 48rem;
+  width: 100%;
+}
+
+.ln-legal-content {
+  display: grid;
+  gap: var(--space-3);
+  max-height: 65vh;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.ln-legal-content h3 {
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+}
+
+.ln-legal-content p {
+  margin: 0;
+}
+
+.ln-legal-content ul,
+.ln-legal-content ol {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.ln-legal-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.ln-legal-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-2) 0;
+}
+
 /* Open Source Licenses Dialog */
 .ln-licenses-dialog {
   max-width: 48rem;

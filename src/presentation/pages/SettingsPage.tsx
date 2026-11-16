@@ -18,6 +18,7 @@ import { DeleteAccountSection } from '../components/DeleteAccountSection'
 import { InstallAppButton } from '../components/InstallAppButton'
 import { Notice } from '../components/Notice'
 import { OpenSourceNoticesDialog } from '../components/OpenSourceNoticesDialog'
+import { TermsAndConditionsDialog } from '../components/TermsAndConditionsDialog'
 import { PageHeader } from '../components/PageHeader'
 import { Surface } from '../components/Surface'
 import { SyncStatusView } from '../components/SyncStatusIndicator'
@@ -88,6 +89,7 @@ export function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [showLicenses, setShowLicenses] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
   const [isSavingTheme, setIsSavingTheme] = useState(false)
   const [notice, setNotice] = useState<{
     tone: 'success' | 'error'
@@ -371,10 +373,29 @@ export function SettingsPage() {
             icon={FileCode2}
             eyebrow="Acerca de"
             id="settings-about-title"
-            title="Software y licencias"
-            description="Transparencia y reconocimiento a los componentes de código abierto que hacen posible Lunumia."
+            title="Software, términos y licencias"
+            description="Transparencia legal y reconocimiento a los componentes de código abierto que hacen posible Lunumia."
           />
           <Surface className="ln-settings-application">
+            <div>
+              <h3>Términos y condiciones de uso</h3>
+              <p>
+                Revisa los términos de servicio, alcance de la herramienta y
+                acuerdos legales que regulan el uso de Lunumia.
+              </p>
+            </div>
+            <div>
+              <Button variant="secondary" onClick={() => setShowTerms(true)}>
+                Ver términos y condiciones
+              </Button>
+            </div>
+            <hr
+              style={{
+                border: 'none',
+                borderTop: '1px solid var(--color-border)',
+                margin: 'var(--space-2) 0',
+              }}
+            />
             <div>
               <h3>Licencias de código abierto</h3>
               <p>
@@ -451,6 +472,11 @@ export function SettingsPage() {
       <OpenSourceNoticesDialog
         open={showLicenses}
         onClose={() => setShowLicenses(false)}
+      />
+
+      <TermsAndConditionsDialog
+        open={showTerms}
+        onClose={() => setShowTerms(false)}
       />
     </>
   )

@@ -1834,6 +1834,73 @@ h4 {
   }
 }
 
+/* Legal Page Section (Terms, Privacy, etc.) */
+.legal-page-section {
+  padding-top: calc(var(--header-height, 70px) + 40px);
+  padding-bottom: 80px;
+}
+
+.legal-date {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.legal-document-card {
+  margin-top: 32px;
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  display: grid;
+  gap: 20px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.legal-document-card p {
+  margin: 0;
+}
+
+.legal-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+
+.legal-section {
+  display: grid;
+  gap: 12px;
+}
+
+.legal-section h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 8px 0 0;
+}
+
+.legal-section ul,
+.legal-section ol {
+  margin: 0;
+  padding-inline-start: 24px;
+  display: grid;
+  gap: 8px;
+}
+
+.legal-document-card a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .legal-document-card {
+    padding: 20px;
+  }
+}
+
 /* Landing Licenses Page */
 .licenses-page-section {
   padding-top: calc(var(--header-height, 70px) + 40px);
@@ -1864,7 +1931,9 @@ h4 {
   color: var(--text);
   font-size: 15px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .landing-licenses-search:focus {
@@ -2006,4 +2075,3 @@ h4 {
   border-radius: 16px;
   color: var(--text-secondary);
 }
-
