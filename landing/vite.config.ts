@@ -28,7 +28,7 @@ export default defineConfig({
         terms: resolve(landingRoot, 'terms.html'),
         'third-party-licenses': resolve(
           landingRoot,
-          'third-party-licenses.html',
+          'third-party-licenses/index.html',
         ),
       },
     },

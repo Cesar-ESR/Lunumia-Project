@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import source from './third-party-licenses.html?raw'
+import source from './third-party-licenses/index.html?raw'
 import { APP_DESTINATIONS, renderLandingHtml } from './site-contract'
 
 let licensesDocument: Document
