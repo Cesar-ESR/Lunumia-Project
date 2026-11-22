@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import source from './terms.html?raw'
+import source from './terms/index.html?raw'
 import { APP_DESTINATIONS, renderLandingHtml } from './site-contract'
 
 let termsDocument: Document
