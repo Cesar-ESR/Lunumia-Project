@@ -1181,6 +1181,11 @@ h4 {
   font-weight: 800;
 }
 
+.assistance-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
 .assistance-icon-cyan {
   background: var(--accent-soft);
   color: var(--accent-text);

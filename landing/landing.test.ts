@@ -301,4 +301,12 @@ describe('Lunumia Landing v1', () => {
       )?.textContent,
     ).toContain('Aviso de Privacidad integral')
   })
+
+  it('usa el icono ReceiptText de Lucide para reconocimiento de recibos', () => {
+    const icon = landingDocument.querySelector(
+      '.assistance-icon-cyan svg[data-icon="receipt-text"]',
+    )
+    expect(icon).not.toBeNull()
+    expect(icon?.getAttribute('aria-hidden')).toBe('true')
+  })
 })
