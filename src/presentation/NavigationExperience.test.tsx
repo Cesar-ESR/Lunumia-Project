@@ -23,7 +23,7 @@ describe('navegación UX 2.0', () => {
     ).toBeInTheDocument()
   })
 
-  it('expone los cuatro destinos persistentes móviles con icono y etiqueta', async () => {
+  it('expone los cinco destinos persistentes móviles con icono y etiqueta', async () => {
     renderPath('/movimientos')
     await screen.findByRole('heading', { name: 'Movimientos' })
     const navigation = screen.getByRole('navigation', {
@@ -35,10 +35,14 @@ describe('navegación UX 2.0', () => {
       'Movimientos',
       'Plan',
       'Más',
+      'Perfil',
     ])
     expect(
       within(navigation).getByRole('link', { name: 'Movimientos' }),
     ).toHaveAttribute('aria-current', 'page')
+    expect(
+      within(navigation).getByRole('link', { name: 'Perfil' }),
+    ).toHaveAttribute('href', '/settings#settings-account-title')
     for (const link of links)
       expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
@@ -60,7 +64,7 @@ describe('navegación UX 2.0', () => {
     ['/simulador', 'Más'],
     ['/categories', 'Más'],
     ['/organizacion/categorias', 'Más'],
-    ['/settings', 'Más'],
+    ['/settings', 'Perfil'],
   ])('mantiene %s dentro del grupo móvil %s', async (path, activeLabel) => {
     renderPath(path)
     const navigation = await screen.findByRole('navigation', {

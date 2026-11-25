@@ -104,8 +104,13 @@ const mobileNavigation: NavigationItem[] = [
       '/simulator',
       '/organizacion',
       '/categories',
-      '/settings',
     ],
+  },
+  {
+    to: '/settings#settings-account-title',
+    label: 'Perfil',
+    icon: UserCircle,
+    activePrefixes: ['/settings'],
   },
 ]
 
