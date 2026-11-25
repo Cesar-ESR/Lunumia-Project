@@ -1627,7 +1627,7 @@
   height: 0.75rem;
   overflow: hidden;
   border: 0;
-  accent-color: var(--color-brand);
+  accent-color: var(--budget-category-color, var(--color-brand));
   border-radius: var(--radius-pill);
   appearance: none;
   background: var(--color-surface-subtle);
@@ -1640,12 +1640,12 @@
 
 .ln-budget-progress progress::-webkit-progress-value {
   border-radius: var(--radius-pill);
-  background: var(--color-brand);
+  background: var(--budget-category-color, var(--color-brand));
 }
 
 .ln-budget-progress progress::-moz-progress-bar {
   border-radius: var(--radius-pill);
-  background: var(--color-brand);
+  background: var(--budget-category-color, var(--color-brand));
 }
 
 .ln-budget-row--over .ln-budget-progress progress {

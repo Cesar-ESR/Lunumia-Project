@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+} from 'react'
 import { CircleAlert, CircleCheck, CircleDashed } from 'lucide-react'
 import type { CategoryBudgetSummary } from '@application/use-cases/budgets/GetCategoryBudgetSummaries'
 import type { Category } from '@domain/entities'
@@ -119,6 +125,11 @@ export function BudgetRow({
             aria-valuenow={progressValue}
             max={100}
             value={progressValue}
+            style={
+              {
+                '--budget-category-color': category.color,
+              } as CSSProperties
+            }
           />
         )}
         <p>

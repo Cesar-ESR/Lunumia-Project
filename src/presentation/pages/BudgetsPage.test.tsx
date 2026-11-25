@@ -52,7 +52,9 @@ describe('BudgetsPage U7B', () => {
     expect(within(row).getAllByLabelText('$1,000.00').length).toBeGreaterThan(0)
     expect(within(row).getAllByLabelText('$700.00').length).toBeGreaterThan(0)
     expect(within(row).getAllByLabelText('$123.45').length).toBeGreaterThan(0)
-    expect(within(row).getByRole('progressbar')).toHaveValue(70)
+    const progress = within(row).getByRole('progressbar')
+    expect(progress).toHaveValue(70)
+    expect(progress).toHaveStyle({ '--budget-category-color': '#2f6fed' })
     expect(within(row).getByRole('progressbar')).toHaveAttribute(
       'aria-valuenow',
       '70',

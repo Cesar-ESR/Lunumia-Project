@@ -88,10 +88,10 @@ describe('Lunumia brand palette', () => {
       /\.ln-status-label--upcoming[^}]+var\(--color-brand\)/s,
     )
     expect(components).toMatch(
-      /\.ln-budget-progress progress[^}]+var\(--color-brand\)/s,
+      /\.ln-budget-progress progress[^}]+var\(--budget-category-color, var\(--color-brand\)\)/s,
     )
     expect(components).toMatch(
-      /\.ln-budget-progress progress::-webkit-progress-value[^}]+var\(--color-brand\)/s,
+      /\.ln-budget-progress progress::-webkit-progress-value[^}]+var\(--budget-category-color, var\(--color-brand\)\)/s,
     )
     expect(components).toMatch(
       /\.ln-budget-row--over \.ln-budget-progress progress::-webkit-progress-value[^}]+var\(--color-danger\)/s,
