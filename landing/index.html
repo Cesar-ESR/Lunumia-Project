@@ -382,7 +382,10 @@
           </div>
 
           <div class="capability-grid">
-            <article class="capability-panel capability-main">
+            <article
+              class="capability-panel capability-main capability-interactive"
+              data-capability-card
+            >
               <div class="capability-copy">
                 <span class="capability-tag">Organiza y planea</span>
                 <h3>Un solo lugar para tu panorama y tu plan</h3>
@@ -392,14 +395,90 @@
                   próximo.
                 </p>
               </div>
-              <div
-                class="capability-list"
-                aria-label="Capacidades de planificación"
-              >
-                <span>Movimientos</span>
-                <span>Presupuestos</span>
-                <span>Compromisos</span>
-                <span>Proyección</span>
+              <div class="capability-experience">
+                <div
+                  class="capability-list"
+                  role="tablist"
+                  aria-label="Capacidades de planificación"
+                  aria-orientation="vertical"
+                >
+                  <button
+                    class="capability-tab"
+                    id="capability-tab-movimientos"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="capability-preview"
+                    tabindex="0"
+                    data-capability-tab="movimientos"
+                    data-description="Revisa tus ingresos y gastos en un solo lugar."
+                  >
+                    Movimientos
+                  </button>
+                  <button
+                    class="capability-tab"
+                    id="capability-tab-presupuestos"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="capability-preview"
+                    tabindex="-1"
+                    data-capability-tab="presupuestos"
+                    data-description="Da seguimiento a tus límites y al ritmo del mes."
+                  >
+                    Presupuestos
+                  </button>
+                  <button
+                    class="capability-tab"
+                    id="capability-tab-compromisos"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="capability-preview"
+                    tabindex="-1"
+                    data-capability-tab="compromisos"
+                    data-description="Ten a la vista tus pagos y compromisos próximos."
+                  >
+                    Compromisos
+                  </button>
+                  <button
+                    class="capability-tab"
+                    id="capability-tab-proyeccion"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="capability-preview"
+                    tabindex="-1"
+                    data-capability-tab="proyeccion"
+                    data-description="Anticipa cómo podrían evolucionar tus finanzas."
+                  >
+                    Proyección
+                  </button>
+                </div>
+                <div
+                  class="capability-window"
+                  aria-label="Vista previa de Lunumia"
+                >
+                  <div class="capability-window-bar" aria-hidden="true">
+                    <span class="capability-window-dots"
+                      ><i></i><i></i><i></i></span
+                    ><span data-capability-window-title>movimientos</span
+                    ><span class="capability-window-spacer"></span>
+                  </div>
+                  <div
+                    class="capability-preview"
+                    id="capability-preview"
+                    role="tabpanel"
+                    aria-labelledby="capability-tab-movimientos"
+                  >
+                    <img
+                      data-capability-image
+                      alt="Vista de movimientos en Lunumia"
+                      src="/images/light/movimientos-light.webp"
+                      fetchpriority="low"
+                    />
+                  </div>
+                </div>
               </div>
             </article>
 
