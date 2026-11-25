@@ -94,6 +94,12 @@ const mobileNavigation: NavigationItem[] = [
   principal[1]!,
   { ...principal[2]!, label: 'Plan' },
   {
+    to: '/settings#settings-account-title',
+    label: 'Perfil',
+    icon: UserCircle,
+    activePrefixes: ['/settings'],
+  },
+  {
     to: '/mas',
     label: 'Más',
     icon: MoreHorizontal,
@@ -105,12 +111,6 @@ const mobileNavigation: NavigationItem[] = [
       '/organizacion',
       '/categories',
     ],
-  },
-  {
-    to: '/settings#settings-account-title',
-    label: 'Perfil',
-    icon: UserCircle,
-    activePrefixes: ['/settings'],
   },
 ]
 

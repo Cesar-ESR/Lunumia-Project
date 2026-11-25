@@ -34,8 +34,8 @@ describe('navegación UX 2.0', () => {
       'Inicio',
       'Movimientos',
       'Plan',
-      'Más',
       'Perfil',
+      'Más',
     ])
     expect(
       within(navigation).getByRole('link', { name: 'Movimientos' }),
