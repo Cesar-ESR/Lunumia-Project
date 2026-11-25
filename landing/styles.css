@@ -1293,6 +1293,12 @@ h4 {
   color: var(--primary-hover);
   font-size: 1.25rem;
 }
+.privacy-node-icon img {
+  display: block;
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+}
 .privacy-node-icon i {
   position: absolute;
   right: -3px;
