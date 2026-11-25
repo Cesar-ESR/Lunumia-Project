@@ -47,7 +47,9 @@ describe('InitializeLocalOwner con historial Dexie', () => {
 
     expect(await categories.findByNormalizedName('Alimentación')).toBeNull()
     expect(await categories.findByNormalizedName('Comida')).toBeDefined()
-    expect((await categories.findAll()).filter(({ isSystem }) => !isSystem)).toHaveLength(9)
+    expect(
+      (await categories.findAll()).filter(({ isSystem }) => !isSystem),
+    ).toHaveLength(9)
   })
 
   it('conserva el tombstone y no recrea un starter eliminado', async () => {
@@ -61,7 +63,9 @@ describe('InitializeLocalOwner con historial Dexie', () => {
     await initialize.execute()
 
     expect(await categories.findByNormalizedName('Alimentación')).toBeNull()
-    expect((await categories.findAll()).filter(({ isSystem }) => !isSystem)).toHaveLength(8)
+    expect(
+      (await categories.findAll()).filter(({ isSystem }) => !isSystem),
+    ).toHaveLength(8)
     expect(await categories.findAllIncludingDeleted()).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: food.id, deletedAt: instant }),

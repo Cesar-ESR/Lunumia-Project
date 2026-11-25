@@ -81,8 +81,9 @@ export class DexieCategoryRepository implements ICategoryRepository {
       : null
   }
   async findAll(): Promise<Category[]> {
-    return (await this.findAllIncludingDeleted())
-      .filter((value) => value.deletedAt === null)
+    return (await this.findAllIncludingDeleted()).filter(
+      (value) => value.deletedAt === null,
+    )
   }
   async findAllIncludingDeleted(): Promise<Category[]> {
     return (

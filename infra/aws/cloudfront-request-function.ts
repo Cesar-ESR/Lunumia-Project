@@ -27,9 +27,7 @@ interface CloudFrontRequest {
 interface CloudFrontResponse {
   readonly statusCode: number
   readonly statusDescription: string
-  readonly headers: Readonly<
-    Record<string, { readonly value: string }>
-  >
+  readonly headers: Readonly<Record<string, { readonly value: string }>>
   readonly body: {
     readonly encoding: 'text'
     readonly data: string

@@ -10,7 +10,10 @@ function loadHandler(): (event: {
   request: {
     uri: string
     method: string
-    querystring: Record<string, { value: string; multiValue?: Array<{ value: string }> }>
+    querystring: Record<
+      string,
+      { value: string; multiValue?: Array<{ value: string }> }
+    >
     headers: Record<string, { value: string }>
   }
 }) =>
@@ -31,7 +34,10 @@ function loadHandler(): (event: {
 function makeEvent(
   uri: string,
   host: string = 'lunumia.com',
-  querystring: Record<string, { value: string; multiValue?: Array<{ value: string }> }> = {},
+  querystring: Record<
+    string,
+    { value: string; multiValue?: Array<{ value: string }> }
+  > = {},
 ) {
   return {
     request: {
@@ -52,7 +58,10 @@ describe('lunumia-prod-landing-www-redirect CloudFront function', () => {
     it('redirects www.lunumia.com root to https://lunumia.com/ with 301', () => {
       const result = handler(makeEvent('/', 'www.lunumia.com'))
       expect(result).toHaveProperty('statusCode', 301)
-      expect(result).toHaveProperty('headers.location.value', 'https://lunumia.com/')
+      expect(result).toHaveProperty(
+        'headers.location.value',
+        'https://lunumia.com/',
+      )
     })
 
     it('preserves paths and query parameters on www redirect', () => {

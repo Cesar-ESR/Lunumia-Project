@@ -30,6 +30,7 @@ export default defineConfig({
           landingRoot,
           'third-party-licenses/index.html',
         ),
+        privacy: resolve(landingRoot, 'privacy/index.html'),
       },
     },
   },

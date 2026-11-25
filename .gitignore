@@ -31,4 +31,5 @@ Thumbs.db
 .agents/skills/
 
 tmp/
+.tmp/
 t(domain)*

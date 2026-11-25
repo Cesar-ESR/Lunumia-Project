@@ -17,18 +17,26 @@ describe('Landing Terms Page', () => {
     expect(heading?.textContent).toContain('Términos y Condiciones de Uso')
 
     const date = termsDocument.querySelector('.legal-date')
-    expect(date?.textContent).toContain('16 de noviembre de 2026')
+    expect(date?.textContent).toContain('24 de noviembre de 2026')
   })
 
-  it('contiene las 10 secciones estipuladas', () => {
+  it('contiene las 11 secciones de los términos', () => {
     const sections = termsDocument.querySelectorAll('.legal-section h2')
-    expect(sections).toHaveLength(10)
-    expect(sections[0]?.textContent).toContain(
-      '1. Objeto y Descripción del Servicio',
+    expect(sections).toHaveLength(11)
+    expect(sections[0]?.textContent).toContain('1. Servicio y alcance')
+    expect(sections[10]?.textContent).toContain(
+      '11. Ley aplicable y atención de controversias',
     )
-    expect(sections[9]?.textContent).toContain(
-      '10. Legislación Aplicable y Jurisdicción',
+  })
+
+  it('aclara derechos del consumidor, pagos y eliminación de cuenta', () => {
+    const content = termsDocument.body.textContent ?? ''
+    expect(content).toContain(
+      'No se realizará un cobro sin la aceptación expresa',
     )
+    expect(content).toContain('PROFECO')
+    expect(content).toContain('solicitar el cierre de su cuenta')
+    expect(content).toContain('no excluye o limita responsabilidad')
   })
 
   it('resuelve los tokens de contrato en enlaces a la app', () => {

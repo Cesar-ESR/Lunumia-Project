@@ -68,7 +68,10 @@ describe('DexieCategoryRepository', () => {
 
     expect(await repository.findAll()).toEqual([])
     expect(await repository.findAllIncludingDeleted()).toEqual([
-      expect.objectContaining({ id: 'food', deletedAt: '2026-01-02T00:00:00.000Z' }),
+      expect.objectContaining({
+        id: 'food',
+        deletedAt: '2026-01-02T00:00:00.000Z',
+      }),
     ])
   })
 })

@@ -31,16 +31,20 @@ interface CloudFrontRequest {
   readonly method: string
   readonly querystring: Readonly<Record<string, CloudFrontQueryParam>>
   readonly headers: Readonly<
-    Record<string, { readonly value: string; readonly multiValue?: ReadonlyArray<{ readonly value: string }> }>
+    Record<
+      string,
+      {
+        readonly value: string
+        readonly multiValue?: ReadonlyArray<{ readonly value: string }>
+      }
+    >
   >
 }
 
 interface CloudFrontResponse {
   readonly statusCode: number
   readonly statusDescription: string
-  readonly headers: Readonly<
-    Record<string, { readonly value: string }>
-  >
+  readonly headers: Readonly<Record<string, { readonly value: string }>>
 }
 
 function buildQueryString(
@@ -61,11 +65,15 @@ function buildQueryString(
       for (let j = 0; j < param.multiValue.length; j++) {
         const item = param.multiValue[j]
         if (item) {
-          parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(item.value))
+          parts.push(
+            encodeURIComponent(key) + '=' + encodeURIComponent(item.value),
+          )
         }
       }
     } else if (param.value !== undefined) {
-      parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(param.value))
+      parts.push(
+        encodeURIComponent(key) + '=' + encodeURIComponent(param.value),
+      )
     }
   }
 

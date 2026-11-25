@@ -120,23 +120,26 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
     let settingsResponse
     let periodsResponse
     try {
-      ;[categoriesResponse, settingsResponse, periodsResponse] = await Promise.all([
-        this.client
-          .from('categories')
-          .select('*')
-          .eq('user_id', ownerId)
-          .is('deleted_at', null),
-        this.client
-          .from('user_settings')
-          .select('*')
-          .eq('user_id', ownerId)
-          .maybeSingle(),
-        this.client
-          .from('periods')
-          .select('id,user_id,type,start_date,end_date,deleted_at', { count: 'exact' })
-          .eq('user_id', ownerId)
-          .is('deleted_at', null),
-      ])
+      ;[categoriesResponse, settingsResponse, periodsResponse] =
+        await Promise.all([
+          this.client
+            .from('categories')
+            .select('*')
+            .eq('user_id', ownerId)
+            .is('deleted_at', null),
+          this.client
+            .from('user_settings')
+            .select('*')
+            .eq('user_id', ownerId)
+            .maybeSingle(),
+          this.client
+            .from('periods')
+            .select('id,user_id,type,start_date,end_date,deleted_at', {
+              count: 'exact',
+            })
+            .eq('user_id', ownerId)
+            .is('deleted_at', null),
+        ])
     } catch (error) {
       throw classifyRemoteFailure(
         error,
@@ -161,16 +164,39 @@ export class SupabaseSyncGateway implements RemoteSyncGateway {
         'No se pudieron consultar los periodos canónicos.',
       )
     // Never infer absence of overlap from a truncated or missing snapshot.
-    if (!periodsResponse.data || periodsResponse.count !== periodsResponse.data.length)
-      throw new SyncFailure('validation', 'El snapshot de periodos canónicos está incompleto.', 'incomplete_period_snapshot')
+    if (
+      !periodsResponse.data ||
+      periodsResponse.count !== periodsResponse.data.length
+    )
+      throw new SyncFailure(
+        'validation',
+        'El snapshot de periodos canónicos está incompleto.',
+        'incomplete_period_snapshot',
+      )
     const periodMetadataSchema = remoteRowSchemas.period.pick({
-      id: true, user_id: true, type: true, start_date: true, end_date: true, deleted_at: true,
+      id: true,
+      user_id: true,
+      type: true,
+      start_date: true,
+      end_date: true,
+      deleted_at: true,
     })
     const periods = periodsResponse.data.map((input) => {
       const row = periodMetadataSchema.parse(input)
       if (row.user_id !== ownerId || row.deleted_at !== null)
-        throw new SyncFailure('validation', 'Periodo canónico inválido.', 'invalid_period_snapshot')
-      return { id: row.id, ownerId: row.user_id, type: row.type, startDate: row.start_date, endDate: row.end_date, deletedAt: row.deleted_at }
+        throw new SyncFailure(
+          'validation',
+          'Periodo canónico inválido.',
+          'invalid_period_snapshot',
+        )
+      return {
+        id: row.id,
+        ownerId: row.user_id,
+        type: row.type,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        deletedAt: row.deleted_at,
+      }
     })
 
     const categories = (categoriesResponse.data ?? []).map((row) => {

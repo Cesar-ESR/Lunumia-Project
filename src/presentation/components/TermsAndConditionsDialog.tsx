@@ -216,11 +216,11 @@ export function TermsAndConditionsDialog({
           rige por nuestro <strong>Aviso de Privacidad</strong>, disponible
           dentro de la Plataforma y en{' '}
           <a
-            href="https://lunumia.com/privacidad"
+            href="https://lunumia.com/privacy/"
             target="_blank"
             rel="noopener noreferrer"
           >
-            https://lunumia.com/privacidad
+            https://lunumia.com/privacy/
           </a>
           , el cual forma parte integral de estos Términos.
         </p>

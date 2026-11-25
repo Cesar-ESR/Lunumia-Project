@@ -85,7 +85,9 @@ class ForeignKeyRemote implements RemoteSyncGateway {
 
   async fetchCanonicalDefaults(): Promise<RemoteDefaultSnapshot> {
     return {
-      periods: [...this.periods.values()].filter((period) => period.deletedAt === null),
+      periods: [...this.periods.values()].filter(
+        (period) => period.deletedAt === null,
+      ),
       categories: [...this.categories.values()].filter(
         (category) => category.deletedAt === null,
       ),

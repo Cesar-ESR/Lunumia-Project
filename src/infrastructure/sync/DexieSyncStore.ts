@@ -21,7 +21,10 @@ import type {
   UserSettings,
 } from '@domain/entities'
 import { resolveLastWriteWins } from '@domain/rules'
-import { classifyPeriodNavigationCandidate, type CanonicalPeriodMetadata } from '@application/services/PeriodNavigationCandidate'
+import {
+  classifyPeriodNavigationCandidate,
+  type CanonicalPeriodMetadata,
+} from '@application/services/PeriodNavigationCandidate'
 import { assertUniqueActiveCategoryBudgets } from '@domain/rules/category-budget-uniqueness'
 import { persistedCategoryBudgetSchema } from '@application/contracts/category-budget.schema'
 import { GastoClaroDB } from '@infrastructure/local/database'
@@ -713,7 +716,12 @@ export class DexieSyncStore implements LocalSyncStore {
     reconciledAt: string,
     remotePeriods: readonly CanonicalPeriodMetadata[],
   ): Promise<void> {
-    if (!Array.isArray(remotePeriods) || remotePeriods.some((period) => period.ownerId !== ownerId || period.deletedAt !== null))
+    if (
+      !Array.isArray(remotePeriods) ||
+      remotePeriods.some(
+        (period) => period.ownerId !== ownerId || period.deletedAt !== null,
+      )
+    )
       throw new Error('El snapshot canónico de periodos no es válido.')
     const localSettings = (
       await this.db.userSettings.where('ownerId').equals(ownerId).toArray()
@@ -727,8 +735,15 @@ export class DexieSyncStore implements LocalSyncStore {
       const period = await this.db.periods.get(settings.activePeriodId)
       if (period?.ownerId === ownerId && period.deletedAt === null) {
         candidatesWithValidPeriod.push(settings)
-        const classification = classifyPeriodNavigationCandidate(ownerId, period, remotePeriods)
-        if (classification !== 'TRUE_OVERLAP' && classification !== 'INVALID_LOCAL_REFERENCE')
+        const classification = classifyPeriodNavigationCandidate(
+          ownerId,
+          period,
+          remotePeriods,
+        )
+        if (
+          classification !== 'TRUE_OVERLAP' &&
+          classification !== 'INVALID_LOCAL_REFERENCE'
+        )
           candidatesWithCompatiblePeriod.push(settings)
       }
     }
@@ -741,12 +756,15 @@ export class DexieSyncStore implements LocalSyncStore {
     // Match the RPC's strict LWW comparison: remote wins ties. A remote period
     // need not have been downloaded into Dexie yet.
     const localNavigation = candidatesWithCompatiblePeriod[0]
-    const remoteActivePeriodId = remotePeriods.some((period) => period.id === remote.activePeriodId)
+    const remoteActivePeriodId = remotePeriods.some(
+      (period) => period.id === remote.activePeriodId,
+    )
       ? remote.activePeriodId
       : null
     const activePeriodId =
       localNavigation &&
-      (remoteActivePeriodId === null || Date.parse(localNavigation.updatedAt) > Date.parse(remote.updatedAt))
+      (remoteActivePeriodId === null ||
+        Date.parse(localNavigation.updatedAt) > Date.parse(remote.updatedAt))
         ? localNavigation.activePeriodId
         : remoteActivePeriodId
     const differsRemotely =

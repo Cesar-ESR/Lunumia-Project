@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1267d6" />
+    <script data-theme-bootstrap>
+      ;(function () {
+        var preference = 'system'
+        try {
+          var stored = localStorage.getItem('lunumia.landing.theme')
+          if (stored === 'light' || stored === 'dark' || stored === 'system') preference = stored
+        } catch {}
+        var dark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches
+        var effective = preference === 'system' ? (dark ? 'dark' : 'light') : preference
+        var root = document.documentElement
+        root.dataset.themePreference = preference
+        root.dataset.theme = effective
+        root.style.colorScheme = effective
+        root.style.backgroundColor = effective === 'dark' ? '#0c111b' : '#f6f8fc'
+        document.querySelector('meta[name="theme-color"]').content = effective === 'dark' ? '#111c2b' : '#1267d6'
+      })()
+    </script>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <title>Aviso de Privacidad — Lunumia</title>
+    <meta name="description" content="Aviso de Privacidad integral de Lunumia." />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="Lunumia" />
+    <meta property="og:title" content="Aviso de Privacidad — Lunumia" />
+    <meta property="og:description" content="Consulta el Aviso de Privacidad de Lunumia." />
+    <meta property="og:url" content="{{LANDING_ORIGIN}}privacy/" />
+    <link rel="canonical" href="{{LANDING_ORIGIN}}privacy/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Ir al contenido principal</a>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="Lunumia — Volver al inicio"><img class="brand-logo" src="/lunumia-logo-horizontal.png" alt="Lunumia" /></a>
+        <div class="header-actions">
+          <details class="appearance-menu">
+            <summary aria-label="Apariencia: Sistema"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g data-preference-icon="system"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></g><g data-preference-icon="light"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41-1.41"></path></g><g data-preference-icon="dark"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></g></svg><span>Tema</span></summary>
+            <fieldset class="appearance-options"><legend>Apariencia</legend><label><input type="radio" name="landing-theme" value="system" /><span>Sistema</span></label><label><input type="radio" name="landing-theme" value="light" /><span>Claro</span></label><label><input type="radio" name="landing-theme" value="dark" /><span>Oscuro</span></label></fieldset>
+          </details>
+          <a class="button button-secondary" href="{{APP_LOGIN_URL}}">Iniciar sesión</a><a class="button button-primary" href="{{APP_OPEN_URL}}">Abrir app</a>
+        </div>
+      </div>
+    </header>
+    <main id="main-content">
+      <section class="section legal-page-section" aria-labelledby="privacy-title">
+        <div class="shell">
+          <div class="section-heading"><p class="eyebrow">Aviso legal</p><h1 id="privacy-title">Aviso de Privacidad Integral de Lunumia</h1><p class="legal-date"><strong>Última actualización:</strong> 24 de noviembre de 2026</p></div>
+          <article class="legal-document-card">
+            <p>Este Aviso de Privacidad describe cómo se tratan los datos personales en la aplicación móvil, aplicación web progresiva y servicios relacionados ofrecidos bajo la marca <strong>Lunumia</strong> (la “Plataforma”).</p>
+            <section class="legal-section"><h2>1. Responsable y contacto</h2>
+              <p><strong>César Emmanuel Santiago Rodríguez</strong>, persona física con domicilio en el Estado de México, México (el “Responsable”), decide sobre el tratamiento de los datos personales descritos en este Aviso. Para asuntos de privacidad, solicitudes de derechos o dudas, escribe a <a href="mailto:legal@lunumia.com">legal@lunumia.com</a>.</p>
+              <p><strong>Domicilio completo del Responsable:</strong> [COMPLETAR CALLE, NÚMERO, COLONIA, MUNICIPIO, CÓDIGO POSTAL, ESTADO Y PAÍS ANTES DE PUBLICAR].</p>
+            </section>
+            <section class="legal-section"><h2>2. Datos personales que podemos tratar</h2>
+              <ul>
+                <li><strong>Cuenta:</strong> correo electrónico, identificador de cuenta y, si se proporciona, nombre o datos de perfil administrados mediante el servicio de autenticación.</li>
+                <li><strong>Información financiera ingresada:</strong> ingresos, gastos, categorías, fechas, presupuestos, compromisos de pago, saldos, metas y preferencias relacionadas con la organización financiera. No solicitamos acceso a cuentas bancarias ni credenciales bancarias.</li>
+                <li><strong>Recibos:</strong> imagen seleccionada para lectura automatizada y datos visibles que pueden extraerse, como comercio, fecha, moneda y monto. La imagen comprimida se procesa durante la solicitud; la aplicación no la conserva como parte del gasto ni del respaldo, y el texto OCR crudo no se persiste por Lunumia.</li>
+                <li><strong>Datos técnicos necesarios:</strong> información de sesión, identificadores técnicos, registros mínimos de operación, seguridad, límites de uso y errores. No introduzcas en campos libres datos personales de terceros que no sean necesarios.</li>
+                <li><strong>Datos de contacto que envíes voluntariamente:</strong> contenido de mensajes de soporte y datos que incluyas en ellos.</li>
+              </ul>
+              <p>Los datos financieros o patrimoniales pueden tener protección especial conforme a la legislación aplicable. Lunumia no solicita deliberadamente datos personales sensibles. Si el Usuario los incluye en recibos, texto o mensajes, se tratarán incidentalmente para prestar la función solicitada; evita incluirlos cuando no sean necesarios.</p>
+            </section>
+            <section class="legal-section"><h2>3. Datos locales, cuenta y sincronización</h2>
+              <p>La aplicación puede utilizarse como invitado. En ese modo, los registros principales se almacenan en el navegador o dispositivo mediante almacenamiento local, incluido IndexedDB. Lunumia no recibe esos registros por sincronización mientras esta no se habilite; el proveedor de alojamiento de la aplicación puede recibir los datos técnicos de conexión necesarios para entregar la página.</p>
+              <p>Al crear una cuenta y utilizar las funciones de sincronización, los datos financieros que el Usuario elija mantener en su cuenta se transmiten a la infraestructura de Supabase configurada por Lunumia para autenticación, almacenamiento y sincronización. Los registros también pueden permanecer en el dispositivo para que las funciones locales y offline sigan disponibles. La sincronización puede requerir conexión a Internet.</p>
+              <p>El almacenamiento local de la aplicación no está cifrado por Lunumia como una base cifrada independiente. El acceso a ese almacenamiento puede ser posible para alguien con acceso al perfil del navegador o al dispositivo. Se recomienda proteger el dispositivo, cerrar sesiones en equipos compartidos y conservar respaldos propios.</p>
+            </section>
+            <section class="legal-section"><h2>4. Finalidades del tratamiento</h2>
+              <p><strong>Finalidades necesarias para el servicio:</strong></p>
+              <ul>
+                <li>Crear y autenticar cuentas, mantener sesiones y proteger el acceso.</li>
+                <li>Guardar, organizar, calcular, mostrar, respaldar y sincronizar los registros que el Usuario ingrese.</li>
+                <li>Procesar, cuando el Usuario lo solicita, imágenes de recibos para proponer datos editables, y generar resúmenes, clasificaciones o análisis automatizados.</li>
+                <li>Atender solicitudes de soporte, gestionar exportaciones y tramitar el cierre de cuenta y solicitudes de privacidad.</li>
+                <li>Prevenir abuso, investigar incidentes, mantener la seguridad y disponibilidad, aplicar límites de uso y cumplir obligaciones legales.</li>
+              </ul>
+              <p><strong>Finalidades secundarias:</strong> Lunumia no usa actualmente los datos financieros personales para publicidad comportamental ni para entrenar modelos de inteligencia artificial. No se realizan finalidades secundarias con los datos financieros bajo este Aviso. Si se propone una nueva finalidad secundaria, se actualizará este Aviso y se obtendrá el consentimiento correspondiente cuando la ley lo requiera.</p>
+            </section>
+            <section class="legal-section"><h2>5. Procesamiento mediante inteligencia artificial y recibos</h2>
+              <p>Las funciones de IA y OCR son opcionales y se ejecutan cuando el Usuario las solicita. Para generar sugerencias o resúmenes, se envía a una función de servidor de Supabase el contexto estrictamente necesario de los registros seleccionados para esa solicitud. La función puede transmitir ese contexto al proveedor Groq y al modelo configurado para generar una respuesta. Lunumia valida la respuesta y la devuelve a la aplicación.</p>
+              <p>Para leer un recibo, la imagen comprimida se envía desde el dispositivo a una función de Supabase y de ahí al proveedor de IA multimodal configurado (actualmente Groq con un modelo compatible con Qwen). Lunumia no persiste la imagen, el prompt completo, la respuesta cruda ni el texto OCR crudo. La imagen permanece temporalmente en memoria durante el flujo de captura y revisión; el resultado sugerido se muestra para que el Usuario lo corrija y confirme. Al confirmar, los campos financieros aceptados se guardan como parte del registro de gasto.</p>
+              <p>Los proveedores externos procesan datos conforme a sus propias condiciones y políticas. Antes de habilitar estas funciones en producción, el Responsable debe verificar y documentar contractualmente las condiciones de uso, ubicación, transferencias, subencargados y retención aplicables de Supabase y Groq, y mantener esta información actualizada. Las respuestas automatizadas pueden ser inexactas y requieren revisión del Usuario.</p>
+            </section>
+            <section class="legal-section"><h2>6. Transferencias y encargados</h2>
+              <p>Para prestar el servicio, el Responsable utiliza proveedores que tratan datos por cuenta de Lunumia o reciben datos necesarios para ejecutar la función solicitada, entre ellos:</p>
+              <ul>
+                <li><strong>Supabase:</strong> autenticación, infraestructura de base de datos, funciones de servidor y sincronización de la cuenta.</li>
+                <li><strong>Groq:</strong> procesamiento de solicitudes de IA y reconocimiento de recibos cuando el Usuario solicita esas funciones.</li>
+                <li><strong>Proveedor de alojamiento y distribución de la aplicación:</strong> entrega de la página y seguridad técnica del servicio.</li>
+              </ul>
+              <p>Estos proveedores pueden operar infraestructura fuera de México. El Responsable deberá mantener disponible la lista y ubicación aplicable de proveedores y subencargados, así como identificar en el Aviso cualquier transferencia a terceros que no actúen como encargados y obtener el consentimiento requerido. Los datos no se venden. También podrán comunicarse a autoridades cuando exista requerimiento legal válido.</p>
+              <p><strong>Detalle operativo pendiente de confirmar antes de publicar:</strong> razón social, país o región de tratamiento y enlaces a los avisos/condiciones vigentes de cada proveedor; identificar si existe algún proveedor publicitario, analítico, de correo o de soporte que reciba datos personales. No incluir proveedores que no se utilicen realmente.</p>
+            </section>
+            <section class="legal-section"><h2>7. Consentimiento para datos financieros</h2>
+              <p>Cuando la legislación lo requiera, el Responsable solicitará consentimiento expreso para tratar datos financieros o patrimoniales, mediante una acción afirmativa e informada separada de la mera navegación. La solicitud indicará qué datos se tratarán y para qué finalidades. El consentimiento podrá revocarse siguiendo el procedimiento de la sección 9; la revocación no tendrá efectos retroactivos y puede impedir funciones que dependan del tratamiento.</p>
+              <p>Este texto no sustituye el mecanismo visible de consentimiento en el registro o antes de sincronizar y usar IA. El Responsable debe implementar y conservar evidencia de esa aceptación antes de habilitar el tratamiento correspondiente.</p>
+            </section>
+            <section class="legal-section"><h2>8. Conservación y eliminación</h2>
+              <p>Los datos se conservan mientras sean necesarios para las finalidades descritas, exista una cuenta activa o haya una obligación legal aplicable. Al solicitar el cierre, Lunumia elimina los datos de cuenta y registros remotos mediante el flujo de eliminación disponible; los datos locales guardados en el dispositivo pueden requerir eliminación separada desde la aplicación o el dispositivo.</p>
+              <p>Copias de seguridad técnicas pueden permanecer durante el ciclo normal de rotación y se sobrescriben o eliminan de acuerdo con los controles del proveedor. Datos mínimos pueden conservarse bloqueados cuando sean necesarios para cumplir obligaciones o atender responsabilidades legales, y después se eliminan o disocian.</p>
+              <p><strong>Plazos exactos de conservación y rotación de respaldos:</strong> [COMPLETAR Y VERIFICAR CON LA CONFIGURACIÓN Y LOS CONTRATOS DE SUPABASE, GROQ Y ALOJAMIENTO ANTES DE PUBLICAR]. No se debe publicar un plazo estimado como compromiso hasta confirmarlo.</p>
+            </section>
+            <section class="legal-section"><h2>9. Derechos ARCO y revocación del consentimiento</h2>
+              <p>El Usuario puede solicitar acceso, rectificación, cancelación u oposición (derechos ARCO), así como revocar su consentimiento o solicitar limitación del uso o divulgación cuando proceda, enviando un correo a <a href="mailto:legal@lunumia.com">legal@lunumia.com</a> con el asunto “Privacidad — derechos ARCO”.</p>
+              <p>La solicitud debe incluir: nombre del titular y medio para comunicar la respuesta; documentos que acrediten identidad y, en su caso, representación; descripción clara del derecho que desea ejercer y de los datos involucrados; y cualquier elemento que ayude a localizar la información. El Responsable podrá pedir información adicional para verificar identidad o precisar la solicitud. Responderá dentro de los plazos previstos por la legislación aplicable.</p>
+              <p>La cancelación puede estar sujeta a periodos de bloqueo o conservación legal. La revocación no afecta tratamientos realizados previamente y puede hacer que algunas funciones dejen de estar disponibles. Para solicitar eliminación de una cuenta, el Usuario también puede utilizar la opción de eliminación dentro de la aplicación cuando esté disponible.</p>
+            </section>
+            <section class="legal-section"><h2>10. Seguridad</h2>
+              <p>El Responsable aplica controles técnicos y organizativos razonables, como autenticación, separación de cuentas y permisos de acceso, controles de seguridad de infraestructura y límites contra abuso. Ningún medio de transmisión o almacenamiento es absolutamente infalible. En caso de una vulneración que afecte significativamente los derechos patrimoniales o morales de titulares, se les informará conforme a la legislación aplicable.</p>
+            </section>
+            <section class="legal-section"><h2>11. Cookies y almacenamiento del navegador</h2>
+              <p>La aplicación puede usar almacenamiento local e IndexedDB para guardar preferencias y datos que permiten funcionar localmente; la sesión de autenticación también puede persistir en el almacenamiento configurado por el proveedor de autenticación. La landing guarda la preferencia de apariencia en almacenamiento local. No se declaran cookies publicitarias ni analítica de terceros en este Aviso. Si se incorporan, se actualizará el Aviso y se implementarán los controles de consentimiento que correspondan.</p>
+            </section>
+            <section class="legal-section"><h2>12. Cambios al Aviso</h2>
+              <p>El Responsable puede actualizar este Aviso para reflejar cambios en el servicio, proveedores, finalidades o requisitos legales. La versión vigente estará disponible en <a href="https://lunumia.com/privacy/">https://lunumia.com/privacy/</a>, con su fecha de actualización. Los cambios sustanciales se comunicarán dentro de la Plataforma o al correo de cuenta con antelación razonable. Si un cambio requiere nuevo consentimiento, se solicitará antes de iniciar el tratamiento correspondiente.</p>
+            </section>
+            <section class="legal-section"><h2>13. Autoridad competente</h2>
+              <p>El Usuario puede acudir a la Secretaría Anticorrupción y Buen Gobierno, autoridad competente en México en materia de protección de datos personales en posesión de particulares, conforme a la legislación vigente, sin perjuicio de contactar primero al Responsable.</p>
+            </section>
+            <section class="legal-section"><h2>14. Contacto</h2>
+              <p>Responsable: <strong>César Emmanuel Santiago Rodríguez</strong><br />Correo de privacidad: <a href="mailto:legal@lunumia.com">legal@lunumia.com</a><br />Domicilio: Estado de México, México. <strong>[Completar domicilio completo antes de publicar.]</strong></p>
+            </section>
+          </article>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer"><div class="shell footer-grid">
+      <div><a class="brand footer-brand" href="/"><img class="brand-logo" src="/lunumia-logo-horizontal.png" alt="Lunumia" /></a><p>Claridad para entender tu dinero y planear lo que sigue.</p></div>
+      <nav aria-label="Navegación del pie"><a href="/privacy/" aria-current="page">Aviso de Privacidad</a><a href="/terms/">Términos y condiciones</a><a href="/third-party-licenses/">Licencias de terceros</a><a href="{{APP_LOGIN_URL}}">Iniciar sesión</a><a href="{{APP_OPEN_URL}}">Abrir Lunumia</a><span class="footer-brand-products">Otros productos de la marca: <a href="https://organizame.lunumia.com/" target="_blank" rel="noopener noreferrer" class="footer-brand-link"><img class="footer-brand-logo" src="/organizame-logo.png" alt="Logo de OrganizaMe" width="18" height="18" loading="lazy" />OrganizaMe</a></span></nav>
+      <p class="copyright">© <span data-current-year>2026</span> Lunumia</p>
+    </div></footer>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

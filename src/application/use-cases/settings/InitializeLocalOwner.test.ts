@@ -82,7 +82,10 @@ describe('InitializeLocalOwner', () => {
     let sequence = 0
     const initialize = new InitializeLocalOwner(
       'guest:new-owner',
-      { get: vi.fn(async () => ({ id: 'settings' })), upsert: vi.fn() } as never,
+      {
+        get: vi.fn(async () => ({ id: 'settings' })),
+        upsert: vi.fn(),
+      } as never,
       repository as never,
       { generate: () => `category-${sequence++}` },
       { now: () => instant },
@@ -121,10 +124,19 @@ describe('InitializeLocalOwner', () => {
       const create = vi.fn()
       const initialize = new InitializeLocalOwner(
         existing.ownerId,
-        { get: vi.fn(async () => ({ id: 'settings' })), upsert: vi.fn() } as never,
+        {
+          get: vi.fn(async () => ({ id: 'settings' })),
+          upsert: vi.fn(),
+        } as never,
         {
           findAllIncludingDeleted: vi.fn(async () => [
-            { ...existing, id: 'system', name: 'Sin categoría', isSystem: true, deletedAt: null },
+            {
+              ...existing,
+              id: 'system',
+              name: 'Sin categoría',
+              isSystem: true,
+              deletedAt: null,
+            },
             existing,
           ]),
           create,
@@ -143,7 +155,10 @@ describe('InitializeLocalOwner', () => {
     const created: Category[] = []
     const initialize = new InitializeLocalOwner(
       ownerId,
-      { get: vi.fn(async () => ({ id: 'settings' })), upsert: vi.fn() } as never,
+      {
+        get: vi.fn(async () => ({ id: 'settings' })),
+        upsert: vi.fn(),
+      } as never,
       {
         findAllIncludingDeleted: vi.fn(async () => []),
         create: vi.fn(async (category: Category) => {

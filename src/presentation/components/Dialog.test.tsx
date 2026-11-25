@@ -123,7 +123,9 @@ describe('Dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Completar' }))
 
     const status = screen.getByRole('heading', { name: 'Pagado' })
-    expect(screen.queryByRole('button', { name: 'Abrir transición' })).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Abrir transición' }),
+    ).toBeNull()
     expect(status).toHaveFocus()
   })
 

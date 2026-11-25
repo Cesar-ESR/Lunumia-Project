@@ -51,7 +51,13 @@ describe('CloudFront viewer-request function', () => {
   })
 
   it('blocks /api and /server-info probes with 404', () => {
-    for (const uri of ['/api', '/api/', '/api/v1/users', '/server-info', '/server-info/']) {
+    for (const uri of [
+      '/api',
+      '/api/',
+      '/api/v1/users',
+      '/server-info',
+      '/server-info/',
+    ]) {
       const result = handler(makeEvent(uri))
       expect(result).toHaveProperty('statusCode', 404)
     }

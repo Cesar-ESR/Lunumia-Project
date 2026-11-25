@@ -103,6 +103,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    maxWorkers: 4,
     setupFiles: './tests/setup.ts',
     alias: {
       'virtual:pwa-register/react': path.resolve(

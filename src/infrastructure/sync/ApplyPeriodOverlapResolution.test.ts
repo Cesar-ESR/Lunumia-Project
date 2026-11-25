@@ -13,7 +13,10 @@ import {
 } from '@application/services/PeriodResolutionPort'
 import { ApplyPeriodOverlapResolution } from './ApplyPeriodOverlapResolution'
 import { DexieSyncStore } from './DexieSyncStore'
-import { SyncCoordinator, SyncFailure } from '@application/services/SyncCoordinator'
+import {
+  SyncCoordinator,
+  SyncFailure,
+} from '@application/services/SyncCoordinator'
 import { vi } from 'vitest'
 
 const databases: GastoClaroDB[] = []
@@ -140,25 +143,55 @@ async function fixture(checkpoint?: (stage: string) => void) {
 describe('ApplyPeriodOverlapResolution atomic local repair', () => {
   it('retains exact alias recovery after canonical defaults without requiring a modal', async () => {
     const f = await fixture()
-    const canonical = { ...legacy, id: 'canonical', syncStatus: 'synced' as const }
-    const operation = { ...f.periodOperation, status: 'pending' as const, errorMessage: null, retryCount: 0 }
+    const canonical = {
+      ...legacy,
+      id: 'canonical',
+      syncStatus: 'synced' as const,
+    }
+    const operation = {
+      ...f.periodOperation,
+      status: 'pending' as const,
+      errorMessage: null,
+      retryCount: 0,
+    }
     await f.db.syncOperations.put(operation)
     const applyOperation = vi.fn(async (queued: SyncOperation) => {
-      if (queued.entityType === 'period') throw new SyncFailure('conflict', 'overlap', '23P01', false, { constraintName: 'periods_no_overlap_per_user' })
-      return { status: 'applied' as const, entityUpdatedAt: stamp, relatedEntityId: null, relatedUpdatedAt: null }
+      if (queued.entityType === 'period')
+        throw new SyncFailure('conflict', 'overlap', '23P01', false, {
+          constraintName: 'periods_no_overlap_per_user',
+        })
+      return {
+        status: 'applied' as const,
+        entityUpdatedAt: stamp,
+        relatedEntityId: null,
+        relatedUpdatedAt: null,
+      }
     })
-    const result = await new SyncCoordinator(new DexieSyncStore(f.db), {
-      verifyAuthenticatedOwner: async () => undefined,
-      fetchCanonicalDefaults: async () => ({ periods: [canonical], categories: [], userSettings: { ...f.remoteSettings, activePeriodId: null } }),
-      findEquivalentPeriod: async () => canonical,
-      applyOperation,
-      downloadPage: async () => [],
-    }, () => stamp, f.service).fullSync('owner')
+    const result = await new SyncCoordinator(
+      new DexieSyncStore(f.db),
+      {
+        verifyAuthenticatedOwner: async () => undefined,
+        fetchCanonicalDefaults: async () => ({
+          periods: [canonical],
+          categories: [],
+          userSettings: { ...f.remoteSettings, activePeriodId: null },
+        }),
+        findEquivalentPeriod: async () => canonical,
+        applyOperation,
+        downloadPage: async () => [],
+      },
+      () => stamp,
+      f.service,
+    ).fullSync('owner')
     expect(result.failed).toBe(0)
     expect(result.periodResolution).toBeUndefined()
-    expect((await f.db.userSettings.get('settings'))?.activePeriodId).toBe(canonical.id)
+    expect((await f.db.userSettings.get('settings'))?.activePeriodId).toBe(
+      canonical.id,
+    )
     expect(await f.db.periods.get('legacy')).toBeUndefined()
-    const settingsUpload = applyOperation.mock.calls.find(([queued]) => queued.entityType === 'userSettings')![0]
+    const settingsUpload = applyOperation.mock.calls.find(
+      ([queued]) => queued.entityType === 'userSettings',
+    )![0]
     expect(JSON.parse(settingsUpload.payload).activePeriodId).toBe(canonical.id)
   })
   it('preserves the remote-newer navigation decision through reconciliation before the first conflict', async () => {
@@ -191,37 +224,87 @@ describe('ApplyPeriodOverlapResolution atomic local repair', () => {
     )
     const result = await coordinator.fullSync('owner')
     expect(result.periodResolution?.plan.classification).toBe('TRUE_OVERLAP')
-    expect((await f.db.userSettings.get(f.remoteSettings.id))?.activePeriodId).toBe('august')
+    expect(
+      (await f.db.userSettings.get(f.remoteSettings.id))?.activePeriodId,
+    ).toBe('august')
     const navigation = result.periodResolution!.navigation
     expect(navigation.kind).not.toBe('REQUIRES_SELECTION')
-    if (navigation.kind === 'REQUIRES_SELECTION') throw new Error('Unexpected manual navigation decision')
+    if (navigation.kind === 'REQUIRES_SELECTION')
+      throw new Error('Unexpected manual navigation decision')
     expect(navigation.settings.activePeriodId).toBe('august')
     expect(navigation.settings.activePeriodId).not.toBe('legacy')
-    expect(result.periodResolution!.plan.dependencies).toEqual(expect.arrayContaining([
-      expect.objectContaining({ dependency: expect.objectContaining({ kind: 'income', date: '2026-07-31' }), targetPeriodId: 'july' }),
-      expect.objectContaining({ dependency: expect.objectContaining({ kind: 'recurringPaymentOccurrence', date: '2026-08-13' }), targetPeriodId: 'august' }),
-    ]))
+    expect(result.periodResolution!.plan.dependencies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          dependency: expect.objectContaining({
+            kind: 'income',
+            date: '2026-07-31',
+          }),
+          targetPeriodId: 'july',
+        }),
+        expect.objectContaining({
+          dependency: expect.objectContaining({
+            kind: 'recurringPaymentOccurrence',
+            date: '2026-08-13',
+          }),
+          targetPeriodId: 'august',
+        }),
+      ]),
+    )
   })
   it('detects the exact constraint, reconstructs without another POST, applies and resumes uploads/download', async () => {
     const f = await fixture()
-    await f.db.syncOperations.update(f.periodOperation.operationId, { errorMessage: null, status: 'pending', retryCount: 0 })
+    await f.db.syncOperations.update(f.periodOperation.operationId, {
+      errorMessage: null,
+      status: 'pending',
+      retryCount: 0,
+    })
     const applyOperation = vi.fn(async (operation: SyncOperation) => {
-      if (operation.entityType === 'period') throw new SyncFailure('conflict', 'overlap', '23P01', false, { constraintName: 'periods_no_overlap_per_user' })
-      return { status: 'applied' as const, entityUpdatedAt: stamp, relatedEntityId: null, relatedUpdatedAt: null }
+      if (operation.entityType === 'period')
+        throw new SyncFailure('conflict', 'overlap', '23P01', false, {
+          constraintName: 'periods_no_overlap_per_user',
+        })
+      return {
+        status: 'applied' as const,
+        entityUpdatedAt: stamp,
+        relatedEntityId: null,
+        relatedUpdatedAt: null,
+      }
     })
     const downloadPage = vi.fn(async () => [])
-    const gateway = { verifyAuthenticatedOwner: async () => undefined, findEquivalentPeriod: async () => null, applyOperation, downloadPage }
-    const coordinator = new SyncCoordinator(new DexieSyncStore(f.db), gateway, () => stamp, f.service)
+    const gateway = {
+      verifyAuthenticatedOwner: async () => undefined,
+      findEquivalentPeriod: async () => null,
+      applyOperation,
+      downloadPage,
+    }
+    const coordinator = new SyncCoordinator(
+      new DexieSyncStore(f.db),
+      gateway,
+      () => stamp,
+      f.service,
+    )
     const first = await coordinator.fullSync('owner')
     expect(first.periodResolution?.plan.classification).toBe('TRUE_OVERLAP')
     expect(downloadPage).not.toHaveBeenCalled()
     expect(applyOperation).toHaveBeenCalledTimes(1)
-    const reconstructed = new SyncCoordinator(new DexieSyncStore(f.db), gateway, () => stamp, new ApplyPeriodOverlapResolution(f.db, f.remote))
+    const reconstructed = new SyncCoordinator(
+      new DexieSyncStore(f.db),
+      gateway,
+      () => stamp,
+      new ApplyPeriodOverlapResolution(f.db, f.remote),
+    )
     const second = await reconstructed.fullSync('owner')
     expect(applyOperation).toHaveBeenCalledTimes(1)
-    expect((await f.db.syncOperations.get(f.periodOperation.operationId))?.retryCount).toBe(1)
+    expect(
+      (await f.db.syncOperations.get(f.periodOperation.operationId))
+        ?.retryCount,
+    ).toBe(1)
     const preview = second.periodResolution!
-    await reconstructed.resolvePeriodOverlap('owner', preview.operationId, { revision: preview.revision, destinations: {} })
+    await reconstructed.resolvePeriodOverlap('owner', preview.operationId, {
+      revision: preview.revision,
+      destinations: {},
+    })
     const resumed = await reconstructed.fullSync('owner')
     expect(resumed.failed).toBe(0)
     expect(resumed.periodResolution).toBeUndefined()
@@ -260,7 +343,11 @@ describe('ApplyPeriodOverlapResolution atomic local repair', () => {
     expect(await f.db.recurringPaymentOccurrences.count()).toBe(1)
     await new DexieSyncStore(f.db).reconcileRemoteDefaults(
       'owner',
-      { categories: [], periods: [july, august], userSettings: f.remoteSettings },
+      {
+        categories: [],
+        periods: [july, august],
+        userSettings: f.remoteSettings,
+      },
       '2026-09-03T00:00:00.000Z',
     )
     expect(JSON.stringify(await f.db.syncOperations.toArray())).not.toContain(

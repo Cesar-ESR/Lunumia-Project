@@ -45,9 +45,9 @@ describe('ExpenseForm', () => {
       />,
     )
 
-    expect(screen.getByRole('option', { name: 'Sin categoría' })).toHaveTextContent(
-      'Sin categoría',
-    )
+    expect(
+      screen.getByRole('option', { name: 'Sin categoría' }),
+    ).toHaveTextContent('Sin categoría')
     expect(screen.queryByText(/inbox/)).toBeNull()
   })
 

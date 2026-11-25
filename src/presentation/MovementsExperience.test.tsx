@@ -21,10 +21,10 @@ describe('Movimientos e ingresos UX 2.0', () => {
     renderPath('/movimientos')
 
     const registerExpense = await screen.findByRole(
-        'link',
-        { name: 'Registrar gasto' },
-        { timeout: APP_READY_TIMEOUT_MS },
-      )
+      'link',
+      { name: 'Registrar gasto' },
+      { timeout: APP_READY_TIMEOUT_MS },
+    )
     const scanReceipt = screen.getByRole('link', { name: 'Escanear recibo' })
     const registerIncome = screen.getByRole('link', {
       name: 'Registrar ingreso',
