@@ -287,4 +287,18 @@ describe('Lunumia Landing v1', () => {
     expect(source).not.toMatch(/supabase|serviceWorker|registerSW/i)
     expect(landingDocument.querySelectorAll('script')).toHaveLength(2)
   })
+
+  it('mantiene la sección visual de privacidad y enlaza el aviso integral aparte', () => {
+    expect(
+      landingDocument.querySelector('.privacy-section [data-privacy-flow]'),
+    ).not.toBeNull()
+    expect(
+      landingDocument.querySelector('#privacy-notice-title')?.textContent,
+    ).toContain('Conoce cómo se usan tus datos')
+    expect(
+      landingDocument.querySelector<HTMLAnchorElement>(
+        '.legal-summary-section a[href="/privacy/"]',
+      )?.textContent,
+    ).toContain('Aviso de Privacidad integral')
+  })
 })

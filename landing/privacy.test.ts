@@ -22,18 +22,19 @@ describe('Landing Privacy Notice Page', () => {
   })
 
   it('describe los tratamientos, opciones y derechos vinculados con el producto', () => {
-    const content = privacyDocument.body.textContent ?? ''
-    expect(content).toContain('modo invitado')
+    const content = (privacyDocument.body.textContent ?? '').replace(
+      /\s+/g,
+      ' ',
+    )
+    expect(content).toMatch(/utilizarse como invitado/i)
     expect(content).toContain('Supabase')
     expect(content).toContain('Groq')
     expect(content).toContain('La imagen comprimida')
     expect(content).toContain('derechos ARCO')
-    expect(content).toContain('eliminación de cuenta')
+    expect(content).toContain('solicitar eliminación de una cuenta')
   })
 
   it('no deja tokens de contrato sin resolver', () => {
-    expect(privacyDocument.documentElement.outerHTML).not.toMatch(
-      /{{[A-Z_]+}}/,
-    )
+    expect(privacyDocument.documentElement.outerHTML).not.toMatch(/{{[A-Z_]+}}/)
   })
 })

@@ -30,7 +30,7 @@ describe('Landing Terms Page', () => {
   })
 
   it('aclara derechos del consumidor, pagos y eliminación de cuenta', () => {
-    const content = termsDocument.body.textContent ?? ''
+    const content = (termsDocument.body.textContent ?? '').replace(/\s+/g, ' ')
     expect(content).toContain(
       'No se realizará un cobro sin la aceptación expresa',
     )
