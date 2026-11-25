@@ -520,12 +520,65 @@
         aria-labelledby="privacy-title"
       >
         <div class="shell privacy-grid">
-          <div class="privacy-visual" aria-hidden="true">
-            <div class="privacy-shield">
-              <span class="privacy-core"></span>
+          <div class="privacy-visual privacy-flow-card" data-privacy-flow>
+            <div
+              class="privacy-mode-switch"
+              role="group"
+              aria-label="Modo de uso"
+            >
+              <span class="privacy-mode-indicator" aria-hidden="true"></span>
+              <button
+                type="button"
+                class="privacy-mode-button"
+                data-privacy-mode="guest"
+                aria-pressed="true"
+              >
+                Modo invitado
+              </button>
+              <button
+                type="button"
+                class="privacy-mode-button"
+                data-privacy-mode="account"
+                aria-pressed="false"
+              >
+                Con cuenta
+              </button>
             </div>
-            <span class="privacy-badge privacy-badge-one">Tú decides</span>
-            <span class="privacy-badge privacy-badge-two">Local-first</span>
+            <div class="privacy-device-node">
+              <span class="privacy-node-icon" aria-hidden="true"
+                >▣<i>◆</i></span
+              >
+              <span class="privacy-node-copy"
+                ><strong>Este dispositivo</strong
+                ><small>Local Storage / IndexedDB</small></span
+              >
+              <span class="privacy-storage-badge" data-privacy-storage
+                >0 datos en la nube</span
+              >
+            </div>
+            <div class="privacy-connector" aria-hidden="true">
+              <span></span>
+            </div>
+            <div
+              class="privacy-cloud-node"
+              data-privacy-cloud
+              aria-disabled="true"
+            >
+              <span class="privacy-cloud-icon" aria-hidden="true">☁</span>
+              <span class="privacy-node-copy"
+                ><strong>Nube cifrada</strong
+                ><small>Sincronización</small></span
+              >
+              <span class="privacy-cloud-status" data-privacy-cloud-status
+                >Desactivada</span
+              >
+            </div>
+            <div class="privacy-ai-row">
+              <div class="privacy-ai-pills">
+                <span>IA</span><span>OCR</span>
+              </div>
+              <p data-privacy-ai-status>Solo local (IA y OCR desactivados)</p>
+            </div>
           </div>
 
           <div class="section-heading privacy-copy">

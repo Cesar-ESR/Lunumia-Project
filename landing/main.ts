@@ -7,6 +7,53 @@ if (import.meta.hot) import.meta.hot.dispose(disposeTheme)
 const year = document.querySelector<HTMLElement>('[data-current-year]')
 if (year) year.textContent = String(new Date().getFullYear())
 
+const privacyFlow = document.querySelector<HTMLElement>('[data-privacy-flow]')
+if (privacyFlow) {
+  const buttons = [
+    ...privacyFlow.querySelectorAll<HTMLButtonElement>('[data-privacy-mode]'),
+  ]
+  const storage = privacyFlow.querySelector<HTMLElement>(
+    '[data-privacy-storage]',
+  )
+  const cloud = privacyFlow.querySelector<HTMLElement>('[data-privacy-cloud]')
+  const cloudStatus = privacyFlow.querySelector<HTMLElement>(
+    '[data-privacy-cloud-status]',
+  )
+  const aiStatus = privacyFlow.querySelector<HTMLElement>(
+    '[data-privacy-ai-status]',
+  )
+  const setMode = (mode: 'guest' | 'account') => {
+    const account = mode === 'account'
+    privacyFlow.dataset.mode = mode
+    buttons.forEach((button) =>
+      button.setAttribute(
+        'aria-pressed',
+        String(button.dataset.privacyMode === mode),
+      ),
+    )
+    if (storage)
+      storage.textContent = account
+        ? 'Almacenamiento local + respaldo'
+        : '0 datos en la nube'
+    if (cloud) cloud.setAttribute('aria-disabled', String(!account))
+    if (cloudStatus)
+      cloudStatus.textContent = account
+        ? 'Sincronización activa'
+        : 'Desactivada'
+    if (aiStatus)
+      aiStatus.textContent = account
+        ? 'Bajo demanda (Solo cuando tú lo solicitas)'
+        : 'Solo local (IA y OCR desactivados)'
+  }
+  buttons.forEach((button) =>
+    button.addEventListener('click', () => {
+      const mode = button.dataset.privacyMode
+      if (mode === 'guest' || mode === 'account') setMode(mode)
+    }),
+  )
+  setMode('guest')
+}
+
 const capabilityCard = document.querySelector<HTMLElement>(
   '[data-capability-card]',
 )
