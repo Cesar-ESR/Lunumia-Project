@@ -309,4 +309,33 @@ describe('Lunumia Landing v1', () => {
     expect(icon).not.toBeNull()
     expect(icon?.getAttribute('aria-hidden')).toBe('true')
   })
+
+  it('presenta el flujo interactivo de tres pasos con botón destacado', () => {
+    const section = landingDocument.querySelector('#como-funciona')
+    const tabs = section?.querySelectorAll('[role="tab"]')
+    expect(tabs?.length).toBe(3)
+    expect(section?.querySelector('.how-grid')).not.toBeNull()
+    expect(
+      section?.querySelector(`.how-cta[href="${APP_DESTINATIONS.open}"]`),
+    ).not.toBeNull()
+    expect(section?.querySelector('[role="tabpanel"]')).not.toBeNull()
+  })
+
+  it('centra y limita el riel a los círculos y atenúa el color por paso', () => {
+    expect(styles).toMatch(
+      /\.how-steps\s*\{[^}]*align-self:\s*start;[^}]*align-content:\s*start;/s,
+    )
+    expect(styles).toMatch(
+      /\.how-steps::before\s*\{[^}]*top:\s*43px;[^}]*bottom:\s*43px;[^}]*left:\s*31\.5px;[^}]*width:\s*3px;/s,
+    )
+    expect(styles).toMatch(
+      /\.how-steps li:first-child \.how-step-number\s*\{[^}]*background:\s*#38bdf8;/s,
+    )
+    expect(styles).toMatch(
+      /\.how-steps li:nth-child\(2\) \.how-step-number\s*\{[^}]*background:\s*color-mix\(in srgb, #38bdf8 35%, var\(--how-card-bg\)\);/s,
+    )
+    expect(styles).toMatch(
+      /\.how-steps li:nth-child\(3\) \.how-step-number\s*\{[^}]*background:\s*color-mix\(in srgb, #38bdf8 20%, var\(--how-card-bg\)\);/s,
+    )
+  })
 })

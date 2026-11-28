@@ -1,8 +1,12 @@
 import './styles.css'
 import { initializeTheme } from './theme'
+import { initializeHowFlow } from './how-flow'
 
 const disposeTheme = initializeTheme()
 if (import.meta.hot) import.meta.hot.dispose(disposeTheme)
+
+const disposeHowFlow = initializeHowFlow()
+if (import.meta.hot) import.meta.hot.dispose(disposeHowFlow)
 
 const year = document.querySelector<HTMLElement>('[data-current-year]')
 if (year) year.textContent = String(new Date().getFullYear())
